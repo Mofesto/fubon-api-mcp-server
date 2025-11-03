@@ -4,13 +4,15 @@ FUBON 斷線重連功能演示腳本
 展示如何處理交易Socket斷線並自動重連
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # 加載環境變數
 load_dotenv()
+
 
 def demo_disconnect_reconnect():
     """演示斷線重連功能"""
@@ -23,12 +25,8 @@ def demo_disconnect_reconnect():
     def mock_on_event(code, content):
         """模擬事件處理器"""
         from datetime import datetime
-        report = {
-            'timestamp': datetime.now().isoformat(),
-            'code': code,
-            'content': content,
-            'type': 'event'
-        }
+
+        report = {"timestamp": datetime.now().isoformat(), "code": code, "content": content, "type": "event"}
         event_reports.append(report)
         print(f"收到事件通知: {code} - {content}")
 
@@ -57,6 +55,7 @@ def demo_disconnect_reconnect():
     print("\n=== 演示完成 ===")
     print(f"總共處理了 {len(event_reports)} 個事件")
     print("注意：實際重連需要在有交易活動時才能觀察到完整效果")
+
 
 if __name__ == "__main__":
     demo_disconnect_reconnect()

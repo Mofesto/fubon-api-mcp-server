@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
+import inspect
 import os
-from fubon_neo.sdk import FubonSDK
+
 from dotenv import load_dotenv
+from fubon_neo.sdk import FubonSDK
 
 # 加載環境變量
 load_dotenv()
 
 # 獲取認證信息
-username = os.getenv('FUBON_USERNAME')
-password = os.getenv('FUBON_PASSWORD')
-pfx_path = os.getenv('FUBON_PFX_PATH')
-pfx_password = os.getenv('FUBON_PFX_PASSWORD')
+username = os.getenv("FUBON_USERNAME")
+password = os.getenv("FUBON_PASSWORD")
+pfx_path = os.getenv("FUBON_PFX_PATH")
+pfx_password = os.getenv("FUBON_PFX_PASSWORD")
 
 if not all([username, password, pfx_path]):
-    raise ValueError('FUBON_USERNAME, FUBON_PASSWORD, and FUBON_PFX_PATH environment variables are required')
+    raise ValueError("FUBON_USERNAME, FUBON_PASSWORD, and FUBON_PFX_PATH environment variables are required")
 
 # 初始化SDK
 sdk = FubonSDK()
@@ -22,7 +24,6 @@ sdk.init_realtime()
 reststock = sdk.marketdata.rest_client.stock
 
 # 測試get_snapshot_actives函數 - 檢查方法簽名
-import inspect
 
 try:
     print("檢查 actives 方法的簽名...")

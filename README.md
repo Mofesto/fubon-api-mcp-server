@@ -48,8 +48,8 @@
 
 ```bash
 # 克隆專案
-git clone https://github.com/yourusername/fubon-mcp-server.git
-cd fubon-mcp-server
+git clone https://github.com/mofesto/fubon-api-mcp-server.git
+cd fubon-api-mcp-server
 
 # 建立虛擬環境
 python -m venv .venv
@@ -102,7 +102,7 @@ python server.py
 ```json
 {
   "mcpServers": {
-    "fubon-mcp-server": {
+    "fubon-api-mcp-server": {
       "command": "python",
       "args": ["server.py"],
       "env": {
@@ -327,7 +327,7 @@ python test_snapshot_actives.py
 ### 專案結構
 
 ```
-fubon-mcp-server/
+fubon-api-mcp-server/
 ├── fubon_mcp/              # 主要程式碼包
 │   ├── __init__.py        # 包初始化
 │   └── server.py          # MCP 伺服器主程式

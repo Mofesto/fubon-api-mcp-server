@@ -11,7 +11,7 @@
 ### 📧 聯絡方式
 
 - **Email**: security@fubon.com
-- **PGP Key**: [下載 PGP 公鑰](https://github.com/yourusername/fubon-mcp-server/security/pgp-key.asc)
+- **PGP Key**: [下載 PGP 公鑰](https://github.com/mofesto/fubon-api-mcp-server/security/pgp-key.asc)
 
 ### 📝 回報格式
 

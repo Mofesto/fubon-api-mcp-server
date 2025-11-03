@@ -11,7 +11,7 @@
 1. 登入 GitHub
 2. 點擊右上角的 "+" 按鈕，選擇 "New repository"
 3. 設定倉庫資訊：
-   - **Repository name**: `fubon-mcp-server` (建議)
+   - **Repository name**: `fubon-api-mcp-server` (建議)
    - **Description**: 富邦證券市場資料 MCP (Model Communication Protocol) 伺服器
    - **Visibility**: Public (公開) 或 Private (私有)
 4. **不要** 初始化 README、.gitignore 或 License（因為專案中已有）
@@ -54,7 +54,7 @@ cat ~/.ssh/id_ed25519.pub
 cd D:\FubonMcpServer
 
 # 運行發佈腳本
-.\publish_to_github.ps1 -GitHubUsername "您的GitHub用戶名" -RepositoryName "fubon-mcp-server"
+.\publish_to_github.ps1 -GitHubUsername "Mofesto" -RepositoryName "fubon-api-mcp-server"
 ```
 
 ### 方法二：手動執行
@@ -64,7 +64,7 @@ cd D:\FubonMcpServer
 cd D:\FubonMcpServer
 
 # 添加遠端倉庫
-git remote add origin https://github.com/您的用戶名/fubon-mcp-server.git
+git remote add origin https://github.com/Mofesto/fubon-api-mcp-server.git
 
 # 推送代碼
 git push -u origin main
@@ -100,7 +100,7 @@ git push -u origin main
 ### 驗證發佈成功
 
 發佈完成後，您可以：
-1. 訪問 `https://github.com/您的用戶名/fubon-mcp-server`
+1. 訪問 `https://github.com/Mofesto/fubon-api-mcp-server`
 2. 確認所有文件都已上傳
 3. 查看 README.md 是否正確顯示
 

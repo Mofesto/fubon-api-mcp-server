@@ -15,7 +15,7 @@
 1. **Fork 專案**
    ```bash
    git clone https://github.com/Mofesto/fubon-api-mcp-server.git
-   cd fubon-mcp-server
+   cd fubon-api-mcp-server
    ```
 
 2. **建立開發環境**
@@ -38,7 +38,7 @@
 ### 專案結構
 
 ```
-fubon-mcp-server/
+fubon-api-mcp-server/
 ├── fubon_mcp/              # 主要程式碼
 │   ├── __init__.py        # 包初始化
 │   └── server.py          # MCP 伺服器主程式
@@ -218,6 +218,6 @@ type(scope): description
 ## 📞 聯絡方式
 
 - 📧 Email: mcp@fubon.com
-- 💬 Issues: [GitHub Issues](https://github.com/Mofesto/fubon-mcp-server/issues)
+- 💬 Issues: [GitHub Issues](https://github.com/Mofesto/fubon-api-mcp-server/issues)
 
 感謝您的貢獻！🎉

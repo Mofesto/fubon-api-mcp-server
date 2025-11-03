@@ -1,5 +1,5 @@
 # GitHub 發佈腳本 - 富邦 MCP 伺服器
-# 使用方法: .\publish_to_github.ps1 -GitHubUsername "yourusername" -RepositoryName "fubon-mcp-server"
+# 使用方法: .\publish_to_github.ps1 -GitHubUsername "yourusername" -RepositoryName "fubon-api-mcp-server"
 
 param(
     [Parameter(Mandatory=$true)]

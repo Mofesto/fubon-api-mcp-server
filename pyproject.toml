@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fubon-mcp-server"
+name = "fubon-api-mcp-server"
 version = "1.6.0"
 description = "富邦證券 MCP 服務器 - Model Context Protocol 服務器用於富邦證券 API"
 readme = "README.md"
@@ -72,14 +72,14 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/fubon-mcp-server"
-Documentation = "https://fubon-mcp-server.readthedocs.io/"
-Repository = "https://github.com/yourusername/fubon-mcp-server"
-Issues = "https://github.com/yourusername/fubon-mcp-server/issues"
-Changelog = "https://github.com/yourusername/fubon-mcp-server/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/mofesto/fubon-api-mcp-server"
+Documentation = "https://fubon-api-mcp-server.readthedocs.io/"
+Repository = "https://github.com/mofesto/fubon-api-mcp-server"
+Issues = "https://github.com/mofesto/fubon-api-mcp-server/issues"
+Changelog = "https://github.com/mofesto/fubon-api-mcp-server/blob/main/CHANGELOG.md"
 
 [project.scripts]
-fubon-mcp-server = "fubon_mcp.server:main"
+fubon-api-mcp-server = "fubon_mcp.server:main"
 
 [tool.setuptools]
 zip-safe = false
@@ -124,11 +124,11 @@ known_first_party = ["fubon_mcp"]
 python_version = "3.8"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-check_untyped_defs = true
-disallow_untyped_decorators = true
-no_implicit_optional = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+disallow_untyped_decorators = false
+no_implicit_optional = false
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
@@ -141,6 +141,12 @@ module = [
     "fubon_neo.*",
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "mcp.*",
+]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

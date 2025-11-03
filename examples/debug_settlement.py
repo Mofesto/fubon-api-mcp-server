@@ -3,21 +3,23 @@
 測試交割資訊數據結構
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 from fubon_neo.sdk import FubonSDK
 
 # 加載環境變數
 load_dotenv()
 
+
 def main():
     try:
-        username = os.getenv('FUBON_USERNAME')
-        password = os.getenv('FUBON_PASSWORD')
-        pfx_path = os.getenv('FUBON_PFX_PATH')
-        pfx_password = os.getenv('FUBON_PFX_PASSWORD')
+        username = os.getenv("FUBON_USERNAME")
+        password = os.getenv("FUBON_PASSWORD")
+        pfx_path = os.getenv("FUBON_PFX_PATH")
+        pfx_password = os.getenv("FUBON_PFX_PASSWORD")
 
         sdk = FubonSDK()
         accounts = sdk.login(username, password, pfx_path, pfx_password or "")
@@ -34,7 +36,7 @@ def main():
             print(f"data類型: {type(data)}")
             print(f"data內容: {data}")
 
-            if hasattr(data, 'details'):
+            if hasattr(data, "details"):
                 print(f"details類型: {type(data.details)}")
                 print(f"details長度: {len(data.details) if data.details else 0}")
 
@@ -45,7 +47,7 @@ def main():
 
                     # 檢查所有屬性
                     for attr in dir(detail):
-                        if not attr.startswith('_'):
+                        if not attr.startswith("_"):
                             try:
                                 value = getattr(detail, attr)
                                 print(f"  {attr}: {value} ({type(value)})")
@@ -55,7 +57,9 @@ def main():
     except Exception as e:
         print(f"錯誤: {str(e)}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

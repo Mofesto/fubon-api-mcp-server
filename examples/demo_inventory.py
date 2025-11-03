@@ -7,15 +7,17 @@ FUBON MCP 庫存查詢演示
 import os
 import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # 加載環境變數
 load_dotenv()
 
 # 獲取帳戶號碼
-account = os.getenv('FUBON_USERNAME')
+account = os.getenv("FUBON_USERNAME")
 if not account:
-    raise ValueError('FUBON_USERNAME environment variable is required')
+    raise ValueError("FUBON_USERNAME environment variable is required")
+
 
 def demo_inventory():
     """演示庫存查詢（未實現損益）"""
@@ -28,10 +30,10 @@ def demo_inventory():
         print(f"📋 查詢帳戶: {account} (戶名(人名))")
         print("🔍 正在查詢未實現損益（庫存明細）...")
 
-        result = get_unrealized_pnl({'account': account})
+        result = get_unrealized_pnl({"account": account})
 
-        if result['status'] == 'success':
-            pnl_data = result['data']
+        if result["status"] == "success":
+            pnl_data = result["data"]
             print("\n✅ 查詢成功！")
             print("-" * 80)
 
@@ -44,20 +46,15 @@ def demo_inventory():
                 total_value = 0
 
                 # 股票名稱映射
-                stock_names = {
-                    '0050': '台灣50',
-                    '1301': '台塑',
-                    '1303': '南亞',
-                    '6505': '台塑化'
-                }
+                stock_names = {"0050": "台灣50", "1301": "台塑", "1303": "南亞", "6505": "台塑化"}
 
                 for item in pnl_data:
-                    stock_no = getattr(item, 'stock_no', 'N/A')
-                    stock_name = stock_names.get(stock_no, '未知')
-                    quantity = getattr(item, 'tradable_qty', 0)
-                    cost_price = getattr(item, 'cost_price', 0)
-                    profit = getattr(item, 'unrealized_profit', 0)
-                    loss = getattr(item, 'unrealized_loss', 0)
+                    stock_no = getattr(item, "stock_no", "N/A")
+                    stock_name = stock_names.get(stock_no, "未知")
+                    quantity = getattr(item, "tradable_qty", 0)
+                    cost_price = getattr(item, "cost_price", 0)
+                    profit = getattr(item, "unrealized_profit", 0)
+                    loss = getattr(item, "unrealized_loss", 0)
 
                     # 計算盈虧
                     net_pnl = profit - loss
@@ -70,7 +67,9 @@ def demo_inventory():
                         total_loss += abs(net_pnl)
                         pnl_str = f"{net_pnl:,}"
 
-                    print(f"{stock_no:<8} {stock_name:<10} {quantity:<8,} {cost_price:<8.2f} {'利潤' if profit > 0 else '損失':<12} {pnl_str:<10}")
+                    print(
+                        f"{stock_no:<8} {stock_name:<10} {quantity:<8,} {cost_price:<8.2f} {'利潤' if profit > 0 else '損失':<12} {pnl_str:<10}"
+                    )
 
                 print("-" * 80)
                 print(f"總計 - 利潤: +{total_profit:,} 元 | 損失: -{total_loss:,} 元 | 淨盈虧: {total_value:,} 元")
@@ -85,6 +84,7 @@ def demo_inventory():
     except Exception as e:
         print(f"❌ 演示過程中發生錯誤: {str(e)}")
 
+
 def demo_detailed_inventory():
     """演示詳細庫存資訊"""
     print("\n🔍 詳細庫存資訊")
@@ -93,10 +93,10 @@ def demo_detailed_inventory():
     try:
         from server import get_unrealized_pnl
 
-        result = get_unrealized_pnl({'account': account})
+        result = get_unrealized_pnl({"account": account})
 
-        if result['status'] == 'success':
-            pnl_data = result['data']
+        if result["status"] == "success":
+            pnl_data = result["data"]
 
             if isinstance(pnl_data, list) and pnl_data:
                 for i, item in enumerate(pnl_data, 1):
@@ -113,14 +113,15 @@ def demo_detailed_inventory():
                     print(f"   未實現利潤: {getattr(item, 'unrealized_profit', 0):,}")
                     print(f"   未實現損失: {getattr(item, 'unrealized_loss', 0):,}")
 
-                    profit = getattr(item, 'unrealized_profit', 0)
-                    loss = getattr(item, 'unrealized_loss', 0)
+                    profit = getattr(item, "unrealized_profit", 0)
+                    loss = getattr(item, "unrealized_loss", 0)
                     net = profit - loss
                     print(f"   淨盈虧: {net:,} 元")
                     print("-" * 40)
 
     except Exception as e:
         print(f"❌ 詳細查詢過程中發生錯誤: {str(e)}")
+
 
 if __name__ == "__main__":
     demo_inventory()

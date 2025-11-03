@@ -1,9 +1,11 @@
 """
 測試配置和共享fixtures
 """
+
 import os
-import pytest
 from pathlib import Path
+
+import pytest
 from dotenv import load_dotenv
 from fubon_neo.sdk import FubonSDK
 
@@ -14,20 +16,15 @@ load_dotenv()
 @pytest.fixture(scope="session")
 def fubon_credentials():
     """獲取富邦API認證資訊"""
-    username = os.getenv('FUBON_USERNAME')
-    password = os.getenv('FUBON_PASSWORD')
-    pfx_path = os.getenv('FUBON_PFX_PATH')
-    pfx_password = os.getenv('FUBON_PFX_PASSWORD')
+    username = os.getenv("FUBON_USERNAME")
+    password = os.getenv("FUBON_PASSWORD")
+    pfx_path = os.getenv("FUBON_PFX_PATH")
+    pfx_password = os.getenv("FUBON_PFX_PASSWORD")
 
     if not all([username, password, pfx_path]):
         pytest.skip("缺少必要的環境變數: FUBON_USERNAME, FUBON_PASSWORD, FUBON_PFX_PATH")
 
-    return {
-        'username': username,
-        'password': password,
-        'pfx_path': pfx_path,
-        'pfx_password': pfx_password
-    }
+    return {"username": username, "password": password, "pfx_path": pfx_path, "pfx_password": pfx_password}
 
 
 @pytest.fixture(scope="session")
@@ -36,17 +33,17 @@ def fubon_sdk(fubon_credentials):
     # 使用正式環境 URL (生產環境)
     sdk = FubonSDK()
     accounts = sdk.login(
-        fubon_credentials['username'],
-        fubon_credentials['password'],
-        fubon_credentials['pfx_path'],
-        fubon_credentials['pfx_password'] or ""
+        fubon_credentials["username"],
+        fubon_credentials["password"],
+        fubon_credentials["pfx_path"],
+        fubon_credentials["pfx_password"] or "",
     )
 
     # 初始化即時連線
     try:
         sdk.init_realtime()
     except Exception as e:
-        print(f"Warning: 無法初始化即時連線: {e}", file=__import__('sys').stderr)
+        print(f"Warning: 無法初始化即時連線: {e}", file=__import__("sys").stderr)
 
     # 返回 SDK 和帳戶資訊的元組
     yield sdk, accounts
@@ -54,7 +51,7 @@ def fubon_sdk(fubon_credentials):
     # 清理：關閉連線
     try:
         sdk.logout()
-    except:
+    except Exception:
         pass
 
 
@@ -71,13 +68,13 @@ def rest_client(fubon_sdk):
 @pytest.fixture(scope="session")
 def test_account(fubon_credentials):
     """測試帳戶號碼"""
-    return fubon_credentials['username']
+    return fubon_credentials["username"]
 
 
 @pytest.fixture(scope="session")
 def data_dir():
     """測試數據目錄"""
-    data_path = Path(os.getenv('FUBON_DATA_DIR', './data'))
+    data_path = Path(os.getenv("FUBON_DATA_DIR", "./data"))
     data_path.mkdir(exist_ok=True)
     return data_path
 
@@ -95,9 +92,6 @@ def skip_if_not_trading_hours():
     trading_start = datetime.time(9, 0)
     trading_end = datetime.time(15, 0)
 
-    is_trading_hours = (
-        is_weekday and
-        (trading_start <= current_time <= trading_end)
-    )
+    is_trading_hours = is_weekday and (trading_start <= current_time <= trading_end)
 
     return is_trading_hours

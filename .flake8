@@ -1,11 +1,7 @@
 [flake8]
 max-line-length = 127
 max-complexity = 10
-ignore =
-    E203,  # whitespace before ':'
-    E501,  # line too long (handled by black)
-    W503,  # line break before binary operator
-    F821,  # undefined name (handled by mypy)
+ignore = E203,E501,W503,F821
 exclude =
     .git,
     __pycache__,
@@ -18,6 +14,6 @@ exclude =
     *.egg-info,
     .tox,
     .mypy_cache,
-    docs,
+    docs
 per-file-ignores =
-    __init__.py:F401  # imported but unused (module imports)
+    __init__.py:F401

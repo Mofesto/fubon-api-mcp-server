@@ -7,7 +7,7 @@ set -e
 # 檢查參數
 if [ $# -ne 2 ]; then
     echo "使用方法: $0 <github_username> <repository_name>"
-    echo "範例: $0 yourusername fubon-mcp-server"
+    echo "範例: $0 yourusername fubon-api-mcp-server"
     exit 1
 fi
 

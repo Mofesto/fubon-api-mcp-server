@@ -4,14 +4,16 @@ FUBON MCP Server 主動回報功能演示
 展示如何使用主動回報查詢功能
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
+
 from dotenv import load_dotenv
 from fubon_neo.sdk import FubonSDK
 
 # 加載環境變數
 load_dotenv()
+
 
 def main():
     print("🎯 FUBON MCP Server 主動回報功能演示")
@@ -19,10 +21,10 @@ def main():
 
     try:
         # 初始化 SDK
-        username = os.getenv('FUBON_USERNAME')
-        password = os.getenv('FUBON_PASSWORD')
-        pfx_path = os.getenv('FUBON_PFX_PATH')
-        pfx_password = os.getenv('FUBON_PFX_PASSWORD')
+        username = os.getenv("FUBON_USERNAME")
+        password = os.getenv("FUBON_PASSWORD")
+        pfx_path = os.getenv("FUBON_PFX_PATH")
+        pfx_password = os.getenv("FUBON_PFX_PASSWORD")
 
         sdk = FubonSDK()
         accounts = sdk.login(username, password, pfx_path, pfx_password or "")
@@ -65,10 +67,12 @@ def main():
     except Exception as e:
         print(f"❌ 錯誤: {str(e)}")
         import traceback
+
         traceback.print_exc()
         return 1
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
