@@ -1,0 +1,26 @@
+include README.md
+include CHANGELOG.md
+include LICENSE
+include CONTRIBUTING.md
+include CODE_OF_CONDUCT.md
+include SECURITY.md
+include GITHUB_PUBLISH_GUIDE.md
+include pyproject.toml
+include requirements.txt
+include pytest.ini
+include .pre-commit-config.yaml
+include .flake8
+include .mypy.ini
+
+recursive-include fubon_mcp *.py
+recursive-include tests *.py
+recursive-include examples *.py
+recursive-include docs *.md *.rst
+
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude .pytest_cache
+global-exclude .mypy_cache
+global-exclude *.egg-info
+global-exclude .git*
+global-exclude .DS_Store

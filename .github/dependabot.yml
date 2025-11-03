@@ -1,0 +1,30 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "your-username"
+    assignees:
+      - "your-username"
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "your-username"
+    assignees:
+      - "your-username"
+    groups:
+      python-packages:
+        patterns:
+          - "*"
+      test-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"

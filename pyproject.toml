@@ -1,0 +1,216 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fubon-mcp-server"
+version = "1.6.0"
+description = "富邦證券 MCP 服務器 - Model Context Protocol 服務器用於富邦證券 API"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "Fubon MCP Team", email = "mcp@fubon.com"},
+]
+maintainers = [
+    {name = "Mofesto.Cui", email = "mofesto.cui@gmail.com"},
+]
+keywords = [
+    "fubon",
+    "securities",
+    "trading",
+    "mcp",
+    "model-context-protocol",
+    "taiwan-stock",
+    "api",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+]
+dependencies = [
+    "fubon_neo",
+    "pandas",
+    "mcp>=1.0.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.0.0",
+    "pytest-mock>=3.10.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "bandit>=1.7.0",
+    "safety>=2.3.0",
+    "bump2version>=1.0.0",
+    "twine>=4.0.0",
+    "build>=1.0.0",
+]
+docs = [
+    "sphinx>=5.0.0",
+    "sphinx-rtd-theme>=1.2.0",
+    "myst-parser>=0.18.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/fubon-mcp-server"
+Documentation = "https://fubon-mcp-server.readthedocs.io/"
+Repository = "https://github.com/yourusername/fubon-mcp-server"
+Issues = "https://github.com/yourusername/fubon-mcp-server/issues"
+Changelog = "https://github.com/yourusername/fubon-mcp-server/blob/main/CHANGELOG.md"
+
+[project.scripts]
+fubon-mcp-server = "fubon_mcp.server:main"
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fubon_mcp*"]
+
+[tool.setuptools.package-data]
+fubon_mcp = ["*.txt", "*.md"]
+
+[tool.black]
+line-length = 127
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312', 'py313']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 127
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+known_first_party = ["fubon_mcp"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = [
+    "fubon_neo.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = [
+    "--verbose",
+    "--tb=short",
+    "--strict-markers",
+    "--disable-warnings",
+    "--durations=10",
+    "--cov=fubon_mcp",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+]
+markers = [
+    "slow: 標記慢速測試",
+    "integration: 標記整合測試",
+    "trading: 標記交易相關測試（需要特殊啟用）",
+]
+
+[tool.coverage.run]
+source = ["fubon_mcp"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "setup.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "examples"]
+skips = ["B101", "B601"]  # Skip assert checks and shell usage
+
+[tool.bumpversion]
+current_version = "1.6.0"
+parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
+serialize = ["{major}.{minor}.{patch}"]
+search = "{current_version}"
+replace = "{new_version}"
+regex = false
+ignore_missing_version = false
+tag = true
+sign_tags = false
+tag_name = "v{new_version}"
+tag_message = "chore: bump version to {new_version}"
+allow_dirty = false
+commit = true
+message = "chore: bump version to {new_version}"
+commit_args = ""
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+
+[[tool.bumpversion.files]]
+filename = "fubon_mcp/__init__.py"
+
+[[tool.bumpversion.files]]
+filename = "fubon_mcp/server.py"

@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        default: 'patch'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+
+    - name: Get version from tag
+      if: github.event_name == 'release'
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+    - name: Bump version and create tag
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+        # Bump version based on input
+        if [ "${{ github.event.inputs.version }}" = "major" ]; then
+          python -m pip install bump2version
+          bump2version major
+        elif [ "${{ github.event.inputs.version }}" = "minor" ]; then
+          python -m pip install bump2version
+          bump2version minor
+        else
+          python -m pip install bump2version
+          bump2version patch
+        fi
+
+        # Get new version
+        VERSION=$(python -c "import fubon_mcp; print(fubon_mcp.__version__)")
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+        # Commit and tag
+        git add .
+        git commit -m "chore: bump version to $VERSION"
+        git tag "v$VERSION"
+        git push origin main
+        git push origin "v$VERSION"
+
+    - name: Build package
+      run: |
+        python -m build
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        print-hash: true
+
+    - name: Create GitHub release
+      if: github.event_name == 'workflow_dispatch'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ env.VERSION }}
+        release_name: Release v${{ env.VERSION }}
+        body: |
+          ## What's Changed
+
+          ### 🚀 Features
+          - New features and improvements
+
+          ### 🐛 Bug Fixes
+          - Bug fixes and patches
+
+          ### 📚 Documentation
+          - Documentation updates
+
+          ### 🔧 Maintenance
+          - Code quality improvements
+          - Dependency updates
+
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/v${{ env.VERSION }}...v${{ env.VERSION }}
+
+        draft: false
+        prerelease: false
