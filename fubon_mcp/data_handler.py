@@ -13,7 +13,8 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
-from .config import BASE_DATA_DIR, reststock
+from . import config
+from .config import BASE_DATA_DIR
 
 # =============================================================================
 # Local Data Storage Functions
@@ -134,13 +135,13 @@ def fetch_historical_data_segment(symbol: str, from_date: str, to_date: str) -> 
     """
     try:
         # Check if reststock is initialized
-        if reststock is None:
+        if config.reststock is None:
             print("REST client not initialized", file=sys.stderr)
             return []
 
         params = {"symbol": symbol, "from": from_date, "to": to_date}
         print(f"Fetching {symbol} data from {params['from']} to {params['to']}...", file=sys.stderr)
-        response = reststock.historical.candles(**params)
+        response = config.reststock.historical.candles(**params)
         print(f"API response: {response}", file=sys.stderr)
 
         if isinstance(response, dict):

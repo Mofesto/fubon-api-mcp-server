@@ -240,6 +240,6 @@ git push
 ---
 
 **最後更新**: 2025-11-04
-**當前版本**: 1.8.5
+**當前版本**: 1.8.6
 **Extension ID**: mofesto.fubon-api-mcp-server
 **fubon_neo 版本**: 2.2.5

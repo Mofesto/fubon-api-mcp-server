@@ -68,7 +68,7 @@ class BatchPlaceOrderArgs(BaseModel):
 
 
 class GetAccountInfoArgs(BaseModel):
-    account: str
+    account: str = ""  # Empty string means return all accounts
 
 
 class GetInventoryArgs(BaseModel):

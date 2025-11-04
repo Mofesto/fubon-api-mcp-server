@@ -8,6 +8,7 @@ real-time quotes, historical data, intraday data, and snapshots.
 from typing import Any, Dict
 
 from .config import mcp, reststock, sdk
+from . import config
 from .models import (
     GetHistoricalStatsArgs,
     GetIntradayCandlesArgs,
@@ -40,11 +41,11 @@ def get_realtime_quotes(args: Dict[str, Any]) -> Dict[str, Any]:
         symbol = validated_args.symbol
 
         # Check if SDK is initialized
-        if sdk is None:
+        if config.sdk is None:
             return {"status": "error", "data": None, "message": "SDK not initialized"}
 
         # Use realtime API
-        quotes = sdk.marketdata.realtime.quote(symbol)
+        quotes = config.sdk.marketdata.realtime.quote(symbol)
         return {"status": "success", "data": quotes, "message": f"Successfully retrieved real-time quotes for {symbol}"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"Failed to get real-time quotes: {str(e)}"}
@@ -63,10 +64,10 @@ def get_intraday_tickers(args: Dict[str, Any]) -> Dict[str, Any]:
         market = validated_args.market
 
         # Check if reststock is initialized
-        if reststock is None:
+        if config.reststock is None:
             return {"status": "error", "data": None, "message": "REST client not initialized"}
 
-        result = reststock.intraday.tickers(market=market)
+        result = config.reststock.intraday.tickers(market=market)
         return {"status": "success", "data": result, "message": f"Successfully retrieved stock list for {market} market"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"Failed to get stock list: {str(e)}"}
@@ -85,10 +86,10 @@ def get_intraday_ticker(args: Dict[str, Any]) -> Dict[str, Any]:
         symbol = validated_args.symbol
 
         # Check if reststock is initialized
-        if reststock is None:
+        if config.reststock is None:
             return {"status": "error", "data": None, "message": "REST client not initialized"}
 
-        result = reststock.intraday.ticker(symbol)
+        result = config.reststock.intraday.ticker(symbol)
         return {"status": "success", "data": result, "message": f"Successfully retrieved basic info for {symbol}"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"Failed to get basic info: {str(e)}"}
@@ -107,10 +108,10 @@ def get_intraday_quote(args: Dict[str, Any]) -> Dict[str, Any]:
         symbol = validated_args.symbol
 
         # Check if reststock is initialized
-        if reststock is None:
+        if config.reststock is None:
             return {"status": "error", "data": None, "message": "REST client not initialized"}
 
-        result = reststock.intraday.quote(symbol)
+        result = config.reststock.intraday.quote(symbol=symbol)
         return {"status": "success", "data": result, "message": f"Successfully retrieved real-time quote for {symbol}"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"Failed to get real-time quote: {str(e)}"}
@@ -129,10 +130,10 @@ def get_intraday_candles(args: Dict[str, Any]) -> Dict[str, Any]:
         symbol = validated_args.symbol
 
         # Check if reststock is initialized
-        if reststock is None:
+        if config.reststock is None:
             return {"status": "error", "data": None, "message": "REST client not initialized"}
 
-        result = reststock.intraday.candles(symbol)
+        result = config.reststock.intraday.candles(symbol)
         return {"status": "success", "data": result, "message": f"Successfully retrieved intraday K-line for {symbol}"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"Failed to get intraday K-line: {str(e)}"}
@@ -151,10 +152,10 @@ def get_intraday_trades(args: Dict[str, Any]) -> Dict[str, Any]:
         symbol = validated_args.symbol
 
         # Check if reststock is initialized
-        if reststock is None:
+        if config.reststock is None:
             return {"status": "error", "data": None, "message": "REST client not initialized"}
 
-        result = reststock.intraday.trades(symbol)
+        result = config.reststock.intraday.trades(symbol)
         return {"status": "success", "data": result, "message": f"Successfully retrieved trade details for {symbol}"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"Failed to get trade details: {str(e)}"}
@@ -173,10 +174,10 @@ def get_intraday_volumes(args: Dict[str, Any]) -> Dict[str, Any]:
         symbol = validated_args.symbol
 
         # Check if reststock is initialized
-        if reststock is None:
+        if config.reststock is None:
             return {"status": "error", "data": None, "message": "REST client not initialized"}
 
-        result = reststock.intraday.volumes(symbol)
+        result = config.reststock.intraday.volumes(symbol)
         return {"status": "success", "data": result, "message": f"Successfully retrieved price-volume table for {symbol}"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"Failed to get price-volume table: {str(e)}"}
@@ -195,10 +196,10 @@ def get_snapshot_quotes(args: Dict[str, Any]) -> Dict[str, Any]:
         market = validated_args.market
 
         # Check if reststock is initialized
-        if reststock is None:
+        if config.reststock is None:
             return {"status": "error", "data": None, "message": "REST client not initialized"}
 
-        result = reststock.snapshot.quotes(market)
+        result = config.reststock.snapshot.quotes(market)
         return {"status": "success", "data": result, "message": f"Successfully retrieved market snapshot for {market}"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"Failed to get market snapshot: {str(e)}"}
@@ -217,10 +218,10 @@ def get_snapshot_movers(args: Dict[str, Any]) -> Dict[str, Any]:
         market = validated_args.market
 
         # Check if reststock is initialized
-        if reststock is None:
+        if config.reststock is None:
             return {"status": "error", "data": None, "message": "REST client not initialized"}
 
-        result = reststock.snapshot.movers(market)
+        result = config.reststock.snapshot.movers(market)
         return {"status": "success", "data": result, "message": f"Successfully retrieved price change rankings for {market}"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"Failed to get price change rankings: {str(e)}"}
@@ -239,10 +240,10 @@ def get_snapshot_actives(args: Dict[str, Any]) -> Dict[str, Any]:
         market = validated_args.market
 
         # Check if reststock is initialized
-        if reststock is None:
+        if config.reststock is None:
             return {"status": "error", "data": None, "message": "REST client not initialized"}
 
-        result = reststock.snapshot.actives(market=market, trade="volume")
+        result = config.reststock.snapshot.actives(market=market, trade="volume")
 
         # API returns dictionary format with 'data' key
         if isinstance(result, dict) and "data" in result:
@@ -283,10 +284,10 @@ def get_historical_stats(args: Dict[str, Any]) -> Dict[str, Any]:
         symbol = validated_args.symbol
 
         # Check if reststock is initialized
-        if reststock is None:
+        if config.reststock is None:
             return {"status": "error", "data": None, "message": "REST client not initialized"}
 
-        result = reststock.historical.stats(symbol)
+        result = config.reststock.historical.stats(symbol)
         return {"status": "success", "data": result, "message": f"Successfully retrieved 52-week data for {symbol}"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"Failed to get historical stats: {str(e)}"}

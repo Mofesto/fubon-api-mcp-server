@@ -9,6 +9,7 @@ import concurrent.futures
 from typing import Any, Dict, Optional
 
 from .config import accounts, mcp, sdk
+from . import config
 from .models import BatchPlaceOrderArgs, CancelOrderArgs, ModifyPriceArgs, ModifyQuantityArgs, PlaceOrderArgs
 from .utils import validate_and_get_account
 
@@ -31,13 +32,13 @@ def _create_modify_object(target_order: Any, modify_value: Any, modify_type: str
     if modify_type not in ("quantity", "price"):
         raise ValueError(f"Unsupported modification type: {modify_type}")
 
-    if sdk is None or sdk.stock is None:
+    if config.sdk is None or config.sdk.stock is None:
         raise ValueError("SDK not initialized or stock module not available")
 
     if modify_type == "quantity":
-        return sdk.stock.make_modify_quantity_obj(target_order, modify_value)
+        return config.sdk.stock.make_modify_quantity_obj(target_order, modify_value)
     elif modify_type == "price":
-        return sdk.stock.make_modify_price_obj(target_order, str(modify_value))
+        return config.sdk.stock.make_modify_price_obj(target_order, str(modify_value))
     else:
         # This should never happen due to the check above, but keep for type checkers
         raise ValueError(f"Unsupported modification type: {modify_type}")
@@ -48,13 +49,13 @@ def _execute_modify_operation(account_obj: Any, modify_obj: Any, modify_type: st
     if modify_type not in ("quantity", "price"):
         raise ValueError(f"Unsupported modification type: {modify_type}")
 
-    if sdk is None or sdk.stock is None:
+    if config.sdk is None or config.sdk.stock is None:
         raise ValueError("SDK not initialized or stock module not available")
 
     if modify_type == "quantity":
-        return sdk.stock.modify_quantity(account_obj, modify_obj)
+        return config.sdk.stock.modify_quantity(account_obj, modify_obj)
     elif modify_type == "price":
-        return sdk.stock.modify_price(account_obj, modify_obj)
+        return config.sdk.stock.modify_price(account_obj, modify_obj)
     else:
         # This should never happen due to the check above, but mypy needs it
         raise ValueError(f"Unsupported modification type: {modify_type}")
@@ -77,11 +78,11 @@ def _modify_order(account: str, order_no: str, modify_value: Any, modify_type: s
             return {"status": "error", "data": None, "message": error}
 
         # Check if SDK is initialized
-        if not sdk or not sdk.stock:
+        if not config.sdk or not config.sdk.stock:
             return {"status": "error", "data": None, "message": "SDK not initialized or stock module not available"}
 
         # Get order results
-        order_results = sdk.stock.get_order_results(account_obj)
+        order_results = config.sdk.stock.get_order_results(account_obj)
         if not (order_results and hasattr(order_results, "is_success") and order_results.is_success):
             return {"status": "error", "data": None, "message": f"Unable to get order results for account {account}"}
 
@@ -194,7 +195,7 @@ def _place_single_order(account_obj: Any, order_data: Dict[str, Any]) -> Dict[st
             }
 
         # Now check if SDK is initialized before placing the order
-        if not sdk or not sdk.stock:
+        if not config.sdk or not config.sdk.stock:
             return {
                 "order_data": order_data,
                 "result": None,
@@ -206,7 +207,7 @@ def _place_single_order(account_obj: Any, order_data: Dict[str, Any]) -> Dict[st
         is_non_blocking = order_data.get("is_non_blocking", False)
 
         # Place order
-        result = sdk.stock.place_order(account_obj, order, is_non_blocking)
+        result = config.sdk.stock.place_order(account_obj, order, is_non_blocking)
 
         return {"order_data": order_data, "result": result, "success": True, "error": None}
     except Exception as e:
@@ -237,6 +238,8 @@ def _summarize_batch_results(results: list[Dict[str, Any]]) -> Dict[str, Any]:
         "total_orders": len(results),
         "successful_orders": len(successful_orders),
         "failed_orders": len(failed_orders),
+        "successful_orders_detail": successful_orders,
+        "failed_orders_detail": failed_orders,
         "results": results,
     }
 
@@ -279,7 +282,7 @@ def place_order(args: Dict[str, Any]) -> Dict[str, Any]:
         is_non_blocking = validated_args.is_non_blocking
 
         # Check if accounts were successfully retrieved
-        if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
+        if not config.accounts or not hasattr(config.accounts, "is_success") or not config.accounts.is_success:
             return {
                 "status": "error",
                 "data": None,
@@ -288,8 +291,8 @@ def place_order(args: Dict[str, Any]) -> Dict[str, Any]:
 
         # Find corresponding account object
         account_obj = None
-        if hasattr(accounts, "data") and accounts.data:
-            for acc in accounts.data:
+        if hasattr(config.accounts, "data") and config.accounts.data:
+            for acc in config.accounts.data:
                 if getattr(acc, "account", None) == account:
                     account_obj = acc
                     break
@@ -298,7 +301,7 @@ def place_order(args: Dict[str, Any]) -> Dict[str, Any]:
             return {"status": "error", "data": None, "message": f"Account {account} not found"}
 
         # Check if SDK is initialized
-        if not sdk or not sdk.stock:
+        if not config.sdk or not config.sdk.stock:
             return {"status": "error", "data": None, "message": "SDK not initialized or stock module not available"}
 
         try:
@@ -337,7 +340,7 @@ def place_order(args: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         # Place order using blocking or non-blocking mode
-        result = sdk.stock.place_order(account_obj, order, is_non_blocking)
+        result = config.sdk.stock.place_order(account_obj, order, is_non_blocking)
 
         mode_desc = "non-blocking" if is_non_blocking else "blocking"
         return {
@@ -413,11 +416,11 @@ def cancel_order(args: Dict[str, Any]) -> Dict[str, Any]:
             return {"status": "error", "data": None, "message": error}
 
         # Check if SDK is initialized
-        if not sdk or not sdk.stock:
+        if not config.sdk or not config.sdk.stock:
             return {"status": "error", "data": None, "message": "SDK not initialized or stock module not available"}
 
         # Get order results
-        order_results = sdk.stock.get_order_results(account_obj)
+        order_results = config.sdk.stock.get_order_results(account_obj)
         if not (order_results and hasattr(order_results, "is_success") and order_results.is_success):
             return {"status": "error", "data": None, "message": f"Unable to get order results for account {account}"}
 
@@ -427,7 +430,7 @@ def cancel_order(args: Dict[str, Any]) -> Dict[str, Any]:
             return {"status": "error", "data": None, "message": f"Order number {order_no} not found"}
 
         # Cancel order
-        result = sdk.stock.cancel_order(account_obj, target_order)
+        result = config.sdk.stock.cancel_order(account_obj, target_order)
         if result and hasattr(result, "is_success") and result.is_success:
             return {
                 "status": "success",

@@ -489,7 +489,7 @@ fubon-api-mcp-server/
 - 🔒 **網路安全**: 確保網路連線的安全性
 
 ## 📝 更新日誌
-### v1.8.5 (2025-11-04)
+### v1.8.6 (2025-11-04)
 - 🚀 **VS Code Extension**: 完整的 VS Code Extension，一鍵啟動/停止 MCP Server
 - 🔧 **動態版本管理**: 採用 setuptools-scm 從 Git tags 自動生成版本號
 - 📦 **自動化發佈**: PyPI 和 VS Code Marketplace 自動發佈流程
@@ -604,14 +604,14 @@ flake8 .
 
 ### PyPI Package
 - **套件名稱**: `fubon-api-mcp-server`
-- **最新版本**: 1.8.5
+- **最新版本**: 1.8.6
 - **安裝**: `pip install fubon-api-mcp-server`
 - **PyPI**: https://pypi.org/project/fubon-api-mcp-server/
 
 ### VS Code Extension
 - **Extension ID**: `mofesto.fubon-api-mcp-server`
 - **Publisher**: mofesto
-- **版本**: 1.8.5
+- **版本**: 1.8.6
 - **Marketplace**: https://marketplace.visualstudio.com/items?itemName=mofesto.fubon-api-mcp-server
 - **安裝方式**: 在 VS Code 中搜尋 "Fubon API MCP Server"
 

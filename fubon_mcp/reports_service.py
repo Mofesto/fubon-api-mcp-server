@@ -7,13 +7,9 @@ order reports, filled reports, and event notifications.
 
 from typing import Dict
 
-from .callbacks import (  # noqa: F401 - Used in functions
-    latest_event_reports,
-    latest_filled_reports,
-    latest_order_changed_reports,
-    latest_order_reports,
-)
-from .config import mcp, sdk
+from . import callbacks
+from . import config
+from .config import mcp
 from .models import (
     GetEventReportsArgs,
     GetFilledReportsArgs,
@@ -46,11 +42,11 @@ def get_order_results(args: Dict) -> Dict:
             return {"status": "error", "data": None, "message": error}
 
         # Check if SDK is initialized
-        if not sdk or not sdk.stock:
+        if not config.sdk or not config.sdk.stock:
             return {"status": "error", "data": None, "message": "SDK not initialized or stock module not available"}
 
         # Get order results
-        order_results = sdk.stock.get_order_results(account_obj)
+        order_results = config.sdk.stock.get_order_results(account_obj)
         if order_results and hasattr(order_results, "is_success") and order_results.is_success:
             return {
                 "status": "success",
@@ -76,8 +72,7 @@ def get_order_reports(args: Dict) -> Dict:
         validated_args = GetOrderReportsArgs(**args)
         limit = validated_args.limit
 
-        global latest_order_reports  # noqa: F824 - Global variable accessed for reports
-        reports = latest_order_reports[-limit:] if latest_order_reports else []
+        reports = callbacks.latest_order_reports[-limit:] if callbacks.latest_order_reports else []
 
         return {
             "status": "success",
@@ -101,8 +96,7 @@ def get_order_changed_reports(args: Dict) -> Dict:
         validated_args = GetOrderChangedReportsArgs(**args)
         limit = validated_args.limit
 
-        global latest_order_changed_reports  # noqa: F824 - Global variable accessed for reports
-        reports = latest_order_changed_reports[-limit:] if latest_order_changed_reports else []
+        reports = callbacks.latest_order_changed_reports[-limit:] if callbacks.latest_order_changed_reports else []
 
         return {
             "status": "success",
@@ -126,8 +120,7 @@ def get_filled_reports(args: Dict) -> Dict:
         validated_args = GetFilledReportsArgs(**args)
         limit = validated_args.limit
 
-        global latest_filled_reports  # noqa: F824 - Global variable accessed for reports
-        reports = latest_filled_reports[-limit:] if latest_filled_reports else []
+        reports = callbacks.latest_filled_reports[-limit:] if callbacks.latest_filled_reports else []
 
         return {
             "status": "success",
@@ -151,8 +144,7 @@ def get_event_reports(args: Dict) -> Dict:
         validated_args = GetEventReportsArgs(**args)
         limit = validated_args.limit
 
-        global latest_event_reports  # noqa: F824 - Global variable accessed for reports
-        reports = latest_event_reports[-limit:] if latest_event_reports else []
+        reports = callbacks.latest_event_reports[-limit:] if callbacks.latest_event_reports else []
 
         return {
             "status": "success",
@@ -176,13 +168,11 @@ def get_all_reports(args: Dict) -> Dict:
         validated_args = GetOrderReportsArgs(**args)  # Reuse same parameter class
         limit = validated_args.limit
 
-        global latest_order_reports, latest_order_changed_reports, latest_filled_reports, latest_event_reports  # noqa: F824 - Global variables accessed for reports
-
         all_reports = {
-            "order_reports": latest_order_reports[-limit:] if latest_order_reports else [],
-            "order_changed_reports": latest_order_changed_reports[-limit:] if latest_order_changed_reports else [],
-            "filled_reports": latest_filled_reports[-limit:] if latest_filled_reports else [],
-            "event_reports": latest_event_reports[-limit:] if latest_event_reports else [],
+            "order_reports": callbacks.latest_order_reports[-limit:] if callbacks.latest_order_reports else [],
+            "order_changed_reports": callbacks.latest_order_changed_reports[-limit:] if callbacks.latest_order_changed_reports else [],
+            "filled_reports": callbacks.latest_filled_reports[-limit:] if callbacks.latest_filled_reports else [],
+            "event_reports": callbacks.latest_event_reports[-limit:] if callbacks.latest_event_reports else [],
         }
 
         total_count = sum(len(reports) for reports in all_reports.values())

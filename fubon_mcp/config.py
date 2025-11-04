@@ -9,7 +9,11 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
+from dotenv import load_dotenv
 from fastmcp import FastMCP
+
+# Load environment variables from .env file
+load_dotenv()
 
 # =============================================================================
 # Data Directory Configuration

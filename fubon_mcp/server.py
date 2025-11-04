@@ -67,111 +67,111 @@ from .trading_service import batch_place_order, cancel_order, modify_price, modi
 
 # Create callable wrapper functions for testing
 def callable_get_account_info(args: Any) -> Any:
-    return get_account_info(args)
+    return get_account_info.fn(args)
 
 
 def callable_get_inventory(args: Any) -> Any:
-    return get_inventory(args)
+    return get_inventory.fn(args)
 
 
 def callable_get_bank_balance(args: Any) -> Any:
-    return get_bank_balance(args)
+    return get_bank_balance.fn(args)
 
 
 def callable_get_settlement_info(args: Any) -> Any:
-    return get_settlement_info(args)
+    return get_settlement_info.fn(args)
 
 
 def callable_get_unrealized_pnl(args: Any) -> Any:
-    return get_unrealized_pnl(args)
+    return get_unrealized_pnl.fn(args)
 
 
 def callable_place_order(args: Any) -> Any:
-    return place_order(args)
+    return place_order.fn(args)
 
 
 def callable_modify_price(args: Any) -> Any:
-    return modify_price(args)
+    return modify_price.fn(args)
 
 
 def callable_modify_quantity(args: Any) -> Any:
-    return modify_quantity(args)
+    return modify_quantity.fn(args)
 
 
 def callable_cancel_order(args: Any) -> Any:
-    return cancel_order(args)
+    return cancel_order.fn(args)
 
 
 def callable_batch_place_order(args: Any) -> Any:
-    return batch_place_order(args)
+    return batch_place_order.fn(args)
 
 
 def callable_get_order_results(args: Any) -> Any:
-    return get_order_results(args)
+    return get_order_results.fn(args)
 
 
 def callable_get_order_reports(args: Any) -> Any:
-    return get_order_reports(args)
+    return get_order_reports.fn(args)
 
 
 def callable_get_order_changed_reports(args: Any) -> Any:
-    return get_order_changed_reports(args)
+    return get_order_changed_reports.fn(args)
 
 
 def callable_get_filled_reports(args: Any) -> Any:
-    return get_filled_reports(args)
+    return get_filled_reports.fn(args)
 
 
 def callable_get_event_reports(args: Any) -> Any:
-    return get_event_reports(args)
+    return get_event_reports.fn(args)
 
 
 def callable_get_all_reports(args: Any) -> Any:
-    return get_all_reports(args)
+    return get_all_reports.fn(args)
 
 
 def callable_get_realtime_quotes(args: Any) -> Any:
-    return get_realtime_quotes(args)
+    return get_realtime_quotes.fn(args)
 
 
 def callable_get_intraday_tickers(args: Any) -> Any:
-    return get_intraday_tickers(args)
+    return get_intraday_tickers.fn(args)
 
 
 def callable_get_intraday_ticker(args: Any) -> Any:
-    return get_intraday_ticker(args)
+    return get_intraday_ticker.fn(args)
 
 
 def callable_get_intraday_quote(args: Any) -> Any:
-    return get_intraday_quote(args)
+    return get_intraday_quote.fn(args)
 
 
 def callable_get_intraday_candles(args: Any) -> Any:
-    return get_intraday_candles(args)
+    return get_intraday_candles.fn(args)
 
 
 def callable_get_intraday_trades(args: Any) -> Any:
-    return get_intraday_trades(args)
+    return get_intraday_trades.fn(args)
 
 
 def callable_get_intraday_volumes(args: Any) -> Any:
-    return get_intraday_volumes(args)
+    return get_intraday_volumes.fn(args)
 
 
 def callable_get_snapshot_quotes(args: Any) -> Any:
-    return get_snapshot_quotes(args)
+    return get_snapshot_quotes.fn(args)
 
 
 def callable_get_snapshot_movers(args: Any) -> Any:
-    return get_snapshot_movers(args)
+    return get_snapshot_movers.fn(args)
 
 
 def callable_get_snapshot_actives(args: Any) -> Any:
-    return get_snapshot_actives(args)
+    return get_snapshot_actives.fn(args)
 
 
 def callable_get_historical_stats(args: Any) -> Any:
-    return get_historical_stats(args)
+    return get_historical_stats.fn(args)
 
 
 def main() -> None:
@@ -197,7 +197,7 @@ def main() -> None:
 
     如果初始化失敗，程式會輸出錯誤訊息並以錯誤代碼退出。
     """
-    global sdk, accounts, reststock
+    from . import config
 
     try:
         # 檢查必要的環境變數
@@ -209,20 +209,20 @@ def main() -> None:
         # 初始化 SDK 並登入
         from fubon_neo.sdk import FubonSDK
 
-        sdk = FubonSDK()
-        accounts = sdk.login(username, password, pfx_path, pfx_password or "")
-        sdk.init_realtime()
-        reststock = sdk.marketdata.rest_client.stock
+        config.sdk = FubonSDK()
+        config.accounts = config.sdk.login(username, password, pfx_path, pfx_password or "")
+        config.sdk.init_realtime()
+        config.reststock = config.sdk.marketdata.rest_client.stock
 
         # 驗證登入是否成功
-        if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
+        if not config.accounts or not hasattr(config.accounts, "is_success") or not config.accounts.is_success:
             raise ValueError("登入失敗，請檢查憑證是否正確")
 
         # 設定主動回報事件回調函數
-        sdk.set_on_order(on_order)
-        sdk.set_on_order_changed(on_order_changed)
-        sdk.set_on_filled(on_filled)
-        sdk.set_on_event(on_event)
+        config.sdk.set_on_order(on_order)
+        config.sdk.set_on_order_changed(on_order_changed)
+        config.sdk.set_on_filled(on_filled)
+        config.sdk.set_on_event(on_event)
 
         print("富邦證券MCP server運行中...", file=sys.stderr)
         mcp.run()

@@ -88,7 +88,7 @@ def validate_and_get_account(account: str) -> Tuple[Optional[Any], Optional[str]
                 break
 
     if not account_obj:
-        return None, f"Account {account} not found"
+        return None, f"account {account} not found"
 
     return account_obj, None
 
