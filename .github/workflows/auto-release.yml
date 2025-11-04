@@ -1,0 +1,292 @@
+name: Auto Release
+
+# 當推送特定格式的標籤時自動觸發
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # 例如: v1.8.0, v2.0.0
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch  # 1.8.0 -> 1.8.1
+          - minor  # 1.8.0 -> 1.9.0
+          - major  # 1.8.0 -> 2.0.0
+        default: 'patch'
+
+jobs:
+  # 先執行完整的 CI 測試
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools-scm
+        pip install ./wheels/fubon_neo-2.2.5-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+        pip install pandas fastmcp mcp pydantic python-dotenv
+        pip install pytest pytest-cov pytest-xdist pytest-mock
+        pip install flake8 black isort mypy pandas-stubs
+
+    - name: Run linters
+      continue-on-error: true
+      run: |
+        flake8 fubon_mcp tests --count --select=E9,F63,F7,F82 --show-source --statistics
+        black --check fubon_mcp tests --exclude fubon_mcp/_version.py
+        isort --check-only fubon_mcp tests --skip fubon_mcp/_version.py
+        mypy fubon_mcp
+
+    - name: Run tests
+      run: |
+        pytest --cov=fubon_mcp --cov-report=xml --cov-fail-under=10
+
+  # 計算新版本號
+  version:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.11"
+
+    - name: Install setuptools-scm
+      run: pip install setuptools-scm
+
+    - name: Determine version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "push" ]; then
+          # 從標籤獲取版本
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Using version from tag: $VERSION"
+        else
+          # 從當前版本計算新版本
+          CURRENT=$(python -c "import setuptools_scm; print(setuptools_scm.get_version())" | sed 's/\.post.*//' | sed 's/+.*//')
+          echo "Current version: $CURRENT"
+          
+          IFS='.' read -r major minor patch <<< "$CURRENT"
+          
+          if [ "${{ github.event.inputs.bump_type }}" = "major" ]; then
+            NEW_VERSION="$((major + 1)).0.0"
+          elif [ "${{ github.event.inputs.bump_type }}" = "minor" ]; then
+            NEW_VERSION="$major.$((minor + 1)).0"
+          else
+            NEW_VERSION="$major.$minor.$((patch + 1))"
+          fi
+          
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+        fi
+
+    - name: Create and push tag
+      if: github.event_name == 'workflow_dispatch'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git tag ${{ steps.version.outputs.tag }}
+        git push origin ${{ steps.version.outputs.tag }}
+
+  # 發布到 PyPI
+  pypi-release:
+    needs: version
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        ref: ${{ needs.version.outputs.tag }}
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: "3.11"
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine setuptools-scm
+
+    - name: Build package
+      run: python -m build
+
+    - name: Check package
+      run: twine check dist/*
+
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}
+        print-hash: true
+
+  # 發布到 VS Code Marketplace
+  vscode-release:
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        ref: ${{ needs.version.outputs.tag }}
+        fetch-depth: 0
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Update package.json version
+      working-directory: ./vscode-extension
+      run: |
+        npm version ${{ needs.version.outputs.version }} --no-git-tag-version
+
+    - name: Install dependencies
+      working-directory: ./vscode-extension
+      run: npm install
+
+    - name: Install vsce
+      run: npm install -g @vscode/vsce
+
+    - name: Package extension
+      working-directory: ./vscode-extension
+      run: vsce package
+
+    - name: Publish to VS Code Marketplace
+      working-directory: ./vscode-extension
+      env:
+        VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
+      run: vsce publish -p $VSCE_PAT
+
+    - name: Upload VSIX artifact
+      uses: actions/upload-artifact@v5
+      with:
+        name: vscode-extension-${{ needs.version.outputs.version }}
+        path: vscode-extension/*.vsix
+        retention-days: 90
+
+  # 創建 GitHub Release
+  github-release:
+    needs: [version, pypi-release, vscode-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+
+    - name: Get previous tag
+      id: prev_tag
+      run: |
+        PREV_TAG=$(git describe --tags --abbrev=0 ${{ needs.version.outputs.tag }}^ 2>/dev/null || echo "")
+        echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        if [ -n "${{ steps.prev_tag.outputs.prev_tag }}" ]; then
+          CHANGELOG=$(git log ${{ steps.prev_tag.outputs.prev_tag }}..${{ needs.version.outputs.tag }} --pretty=format:"- %s (%h)" --no-merges)
+        else
+          CHANGELOG=$(git log ${{ needs.version.outputs.tag }} --pretty=format:"- %s (%h)" --no-merges | head -20)
+        fi
+        
+        # 保存到文件以避免多行問題
+        echo "$CHANGELOG" > /tmp/changelog.txt
+
+    - name: Download VSIX artifact
+      uses: actions/download-artifact@v5
+      with:
+        name: vscode-extension-${{ needs.version.outputs.version }}
+        path: ./artifacts
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ needs.version.outputs.tag }}
+        name: Release ${{ needs.version.outputs.tag }}
+        body: |
+          ## 🚀 Release ${{ needs.version.outputs.version }}
+          
+          ### 📦 Installation
+          
+          **PyPI (Python Package):**
+          ```bash
+          pip install --upgrade fubon-api-mcp-server==${{ needs.version.outputs.version }}
+          ```
+          
+          **VS Code Extension:**
+          - Search for "fubon-api-mcp-server" in VS Code Extensions
+          - Or download the `.vsix` file below and install manually
+          
+          ### 📝 Changelog
+          
+          ${{ steps.changelog.outputs.changelog }}
+          
+          ### 🔗 Links
+          - PyPI: https://pypi.org/project/fubon-api-mcp-server/${{ needs.version.outputs.version }}/
+          - VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=YOUR_PUBLISHER.fubon-api-mcp-server
+          - Documentation: https://github.com/${{ github.repository }}#readme
+          
+          ---
+          
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.prev_tag.outputs.prev_tag }}...${{ needs.version.outputs.tag }}
+        files: |
+          ./artifacts/*.vsix
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 發送通知
+  notify:
+    needs: [version, github-release]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Release Summary
+      run: |
+        echo "### 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Version:** ${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Tag:** ${{ needs.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### ✅ Published to:" >> $GITHUB_STEP_SUMMARY
+        echo "- 📦 PyPI: https://pypi.org/project/fubon-api-mcp-server/${{ needs.version.outputs.version }}/" >> $GITHUB_STEP_SUMMARY
+        echo "- 🔌 VS Code Marketplace" >> $GITHUB_STEP_SUMMARY
+        echo "- 🏷️ GitHub Release: https://github.com/${{ github.repository }}/releases/tag/${{ needs.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
