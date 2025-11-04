@@ -169,35 +169,52 @@ if ($confirm -ne "y" -and $confirm -ne "Y") {
 if (-not $SkipTests) {
     Write-Step "執行完整測試"
     
-    Write-ColorOutput "  ├─ 檢查語法..." "Gray"
-    flake8 fubon_mcp tests --count --select=E9,F63,F7,F82 --show-source --statistics
+    Write-ColorOutput "  ├─ 檢查 Python 版本..." "Gray"
+    python --version
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "Flake8 檢查失敗"
+        Write-Error "Python 版本檢查失敗"
         exit 1
     }
     
-    Write-ColorOutput "  ├─ 檢查格式..." "Gray"
-    black --check fubon_mcp tests --exclude fubon_mcp/_version.py --quiet
+    Write-ColorOutput "  ├─ 檢查包導入..." "Gray"
+    python -c "import fubon_mcp; print('版本:', fubon_mcp.__version__)"
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Black 格式檢查有警告(已忽略)"
+        Write-Error "包導入檢查失敗"
+        exit 1
     }
     
-    Write-ColorOutput "  ├─ 檢查導入..." "Gray"
-    isort --check-only fubon_mcp tests --skip fubon_mcp/_version.py --quiet
+    Write-ColorOutput "  ├─ 檢查 Black 格式化..." "Gray"
+    python -m black --check --diff fubon_mcp tests
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "isort 檢查有警告(已忽略)"
+        Write-Error "Black 格式化檢查失敗"
+        exit 1
     }
     
-    Write-ColorOutput "  ├─ 類型檢查..." "Gray"
-    mypy fubon_mcp --no-error-summary 2>&1 | Out-Null
+    Write-ColorOutput "  ├─ 檢查 isort 導入排序..." "Gray"
+    python -m isort --check-only --diff fubon_mcp tests --skip fubon_mcp/_version.py
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "mypy 檢查有警告(已忽略)"
+        Write-Error "isort 導入排序檢查失敗"
+        exit 1
     }
     
-    Write-ColorOutput "  └─ 單元測試..." "Gray"
-    pytest --cov=fubon_mcp --cov-fail-under=10 -q --tb=no
+    Write-ColorOutput "  ├─ 檢查 flake8 代碼品質..." "Gray"
+    python -m flake8 fubon_mcp tests
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "測試失敗，請修復後再發布"
+        Write-Error "flake8 代碼品質檢查失敗"
+        exit 1
+    }
+    
+    Write-ColorOutput "  ├─ 檢查 mypy 類型檢查..." "Gray"
+    python -m mypy fubon_mcp
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "mypy 類型檢查失敗"
+        exit 1
+    }
+    
+    Write-ColorOutput "  └─ 運行測試套件..." "Gray"
+    python -m pytest --tb=short
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "測試套件運行失敗"
         exit 1
     }
     
@@ -235,13 +252,25 @@ if (-not $SkipVersionUpdate) {
 
 # 構建測試
 Write-Step "測試構建"
-python -m build --outdir dist-test 2>&1 | Out-Null
+python -m build
 if ($LASTEXITCODE -ne 0) {
     Write-Error "構建失敗"
     exit 1
 }
-Remove-Item -Recurse -Force dist-test -ErrorAction SilentlyContinue
 Write-Success "構建測試通過"
+
+# 檢查 twine 驗證
+Write-Step "檢查 twine 包驗證"
+if (Test-Path "dist") {
+    python -m twine check dist/*
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "twine 包驗證失敗"
+        exit 1
+    }
+    Write-Success "twine 包驗證通過"
+} else {
+    Write-Warning "跳過 twine 檢查 - 沒有 dist 目錄"
+}
 
 # 創建標籤
 Write-Step "創建並推送標籤"
