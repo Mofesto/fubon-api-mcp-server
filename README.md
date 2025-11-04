@@ -1,6 +1,6 @@
 # Fubon MCP Server
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![PyPI version](https://img.shields.io/pypi/v/fubon-api-mcp-server.svg)](https://pypi.org/project/fubon-api-mcp-server/)
 [![PyPI downloads](https://img.shields.io/pypi/dm/fubon-api-mcp-server.svg)](https://pypi.org/project/fubon-api-mcp-server/)
 [![codecov](https://codecov.io/gh/Mofesto/fubon-api-mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/Mofesto/fubon-api-mcp-server)
@@ -66,7 +66,7 @@
 
 ## �📋 系統需求
 
-- **Python**: 3.8 或以上版本
+- **Python**: 3.10 或以上版本
 - **作業系統**: macOS / Linux / Windows
 - **憑證**: 富邦證券電子憑證 (.pfx 文件)
 - **網路**: 穩定網路連線
@@ -443,6 +443,14 @@ fubon-api-mcp-server/
 - 🔒 **網路安全**: 確保網路連線的安全性
 
 ## 📝 更新日誌
+
+### v1.7.0 (2025-11-03)
+- 🔄 **CI/CD 完善**: 新增完整的 GitHub Actions 工作流程
+- 🛠️ **開發工具**: 添加 pre-commit hooks、代碼品質工具
+- 📦 **現代化包裝**: 遷移至 pyproject.toml
+- 🔒 **安全增強**: 新增安全掃描和漏洞檢查
+- 🤝 **貢獻指南**: 添加詳細的貢獻者和行為準則
+- 🔧 **PyPI 發佈修復**: 修復發佈工作流程的認證參數
 
 ### v1.6.0 (2025-11-03)
 - 🐛 **帳戶查詢修正**: 修正正式環境帳戶資訊查詢問題

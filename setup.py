@@ -18,15 +18,15 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 setup(
     # 包基本資訊
     name="fubon-api-mcp-server",
-    version="1.6.0",  # 與 __init__.py 中的版本保持一致
-    author="Fubon MCP Team",
+    version="1.7.0",  # 與 __init__.py 中的版本保持一致
+    author="Jimmy Cui",
     author_email="",
     description="富邦證券 MCP 服務器 - Model Context Protocol 服務器用於富邦證券 API",
     # 詳細說明（從 README.md 讀取）
     long_description=long_description,
     long_description_content_type="text/markdown",
     # 專案連結
-    url="https://github.com/your-repo/fubon-api-mcp-server",
+    url="https://github.com/Mofesto/fubon-api-mcp-server",
     # 自動發現包（會找到 fubon_mcp 包）
     packages=find_packages(),
     # PyPI 分類器，用於描述包的特性和適用性
@@ -36,16 +36,15 @@ setup(
         "License :: OSI Approved :: MIT License",  # 許可證
         "Operating System :: OS Independent",  # 作業系統：跨平台
         "Programming Language :: Python :: 3",  # Python 版本支援
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "Topic :: Office/Business :: Financial :: Investment",  # 主題：金融投資
     ],
     # Python 版本需求
-    python_requires=">=3.8",
+    python_requires=">=3.10",
     # 運行依賴（從 requirements.txt 讀取）
     install_requires=requirements,
     # 可選依賴，用於開發和測試

@@ -5,18 +5,14 @@ FUBON MCP 庫存查詢演示
 """
 
 import os
-import sys
-from pathlib import Path
 
 from dotenv import load_dotenv
 
 # 加載環境變數
 load_dotenv()
 
-# 獲取帳戶號碼
-account = os.getenv("FUBON_USERNAME")
-if not account:
-    raise ValueError("FUBON_USERNAME environment variable is required")
+# 獲取帳戶號碼 - 將從SDK登入中動態獲取
+account = None  # 將在函數中設置
 
 
 def demo_inventory():
@@ -25,15 +21,33 @@ def demo_inventory():
     print("=" * 60)
 
     try:
-        from server import get_unrealized_pnl
+        # 初始化 SDK 並登入
+        username = os.getenv("FUBON_USERNAME")
+        password = os.getenv("FUBON_PASSWORD")
+        pfx_path = os.getenv("FUBON_PFX_PATH")
+        pfx_password = os.getenv("FUBON_PFX_PASSWORD")
 
-        print(f"📋 查詢帳戶: {account} (戶名(人名))")
+        from fubon_neo.sdk import FubonSDK
+
+        sdk = FubonSDK()
+        accounts = sdk.login(username, password, pfx_path, pfx_password or "")
+
+        if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
+            print("❌ 登入失敗")
+            return
+
+        # 使用第一個帳戶
+        account_obj = accounts.data[0]
+        account = account_obj.account
+
+        print(f"📋 查詢帳戶: {account_obj.name} ({account})")
         print("🔍 正在查詢未實現損益（庫存明細）...")
 
-        result = get_unrealized_pnl({"account": account})
+        # 直接使用SDK查詢未實現損益
+        pnl = sdk.accounting.unrealized_gains_and_loses(account_obj)
 
-        if result["status"] == "success":
-            pnl_data = result["data"]
+        if pnl and hasattr(pnl, "is_success") and pnl.is_success:
+            pnl_data = pnl.data
             print("\n✅ 查詢成功！")
             print("-" * 80)
 
@@ -79,7 +93,7 @@ def demo_inventory():
                 print("📭 目前無持倉")
 
         else:
-            print(f"❌ 查詢失敗: {result['message']}")
+            print(f"❌ 查詢失敗: {getattr(pnl, 'message', 'Unknown error')}")
 
     except Exception as e:
         print(f"❌ 演示過程中發生錯誤: {str(e)}")
@@ -91,12 +105,29 @@ def demo_detailed_inventory():
     print("=" * 60)
 
     try:
-        from server import get_unrealized_pnl
+        # 初始化 SDK 並登入
+        username = os.getenv("FUBON_USERNAME")
+        password = os.getenv("FUBON_PASSWORD")
+        pfx_path = os.getenv("FUBON_PFX_PATH")
+        pfx_password = os.getenv("FUBON_PFX_PASSWORD")
 
-        result = get_unrealized_pnl({"account": account})
+        from fubon_neo.sdk import FubonSDK
 
-        if result["status"] == "success":
-            pnl_data = result["data"]
+        sdk = FubonSDK()
+        accounts = sdk.login(username, password, pfx_path, pfx_password or "")
+
+        if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
+            print("❌ 登入失敗")
+            return
+
+        # 使用第一個帳戶
+        account_obj = accounts.data[0]
+
+        # 直接使用SDK查詢未實現損益
+        pnl = sdk.accounting.unrealized_gains_and_loses(account_obj)
+
+        if pnl and hasattr(pnl, "is_success") and pnl.is_success:
+            pnl_data = pnl.data
 
             if isinstance(pnl_data, list) and pnl_data:
                 for i, item in enumerate(pnl_data, 1):

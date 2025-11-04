@@ -6,7 +6,6 @@ FUBON MCP Server 主動回報功能演示
 
 import os
 import sys
-from pathlib import Path
 
 from dotenv import load_dotenv
 from fubon_neo.sdk import FubonSDK

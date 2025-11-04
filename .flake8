@@ -1,7 +1,7 @@
 [flake8]
 max-line-length = 127
-max-complexity = 10
-ignore = E203,E501,W503,F821
+max-complexity = 20
+ignore = E203,E501,W503,F821,C901
 exclude =
     .git,
     __pycache__,

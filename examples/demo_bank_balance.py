@@ -5,18 +5,14 @@ FUBON MCP 銀行水位查詢演示
 """
 
 import os
-import sys
-from pathlib import Path
 
 from dotenv import load_dotenv
 
 # 加載環境變數
 load_dotenv()
 
-# 獲取帳戶號碼
-account = os.getenv("FUBON_USERNAME")
-if not account:
-    raise ValueError("FUBON_USERNAME environment variable is required")
+# 獲取帳戶號碼 - 將從SDK登入中動態獲取
+account = None  # 將在函數中設置
 
 
 def demo_bank_balance():
@@ -25,17 +21,33 @@ def demo_bank_balance():
     print("=" * 50)
 
     try:
-        # 模擬 MCP 工具調用
-        from server import get_bank_balance
+        # 初始化 SDK 並登入
+        username = os.getenv("FUBON_USERNAME")
+        password = os.getenv("FUBON_PASSWORD")
+        pfx_path = os.getenv("FUBON_PFX_PATH")
+        pfx_password = os.getenv("FUBON_PFX_PASSWORD")
 
-        print(f"📋 查詢帳戶: {account} (戶名(人名))")
+        from fubon_neo.sdk import FubonSDK
+
+        sdk = FubonSDK()
+        accounts = sdk.login(username, password, pfx_path, pfx_password or "")
+
+        if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
+            print("❌ 登入失敗")
+            return
+
+        # 使用第一個帳戶
+        account_obj = accounts.data[0]
+        account = account_obj.account
+
+        print(f"📋 查詢帳戶: {account_obj.name} ({account})")
         print("🔍 正在查詢銀行水位...")
 
-        # 調用銀行水位查詢
-        result = get_bank_balance({"account": account})
+        # 直接使用SDK查詢銀行水位
+        balance = sdk.accounting.bank_remain(account_obj)
 
-        if result["status"] == "success":
-            balance_data = result["data"]
+        if balance and hasattr(balance, "is_success") and balance.is_success:
+            balance_data = balance.data
             print("\n✅ 查詢成功！")
             print("-" * 30)
             print("💰 銀行水位資訊:")
@@ -47,10 +59,13 @@ def demo_bank_balance():
             print("-" * 30)
             print("💡 提示: 可用餘額可用於買入股票或進行交易")
         else:
-            print(f"❌ 查詢失敗: {result['message']}")
+            print(f"❌ 查詢失敗: {getattr(balance, 'message', 'Unknown error')}")
 
     except Exception as e:
         print(f"❌ 演示過程中發生錯誤: {str(e)}")
+        import traceback
+
+        traceback.print_exc()
 
 
 def demo_all_account_info():
@@ -59,50 +74,59 @@ def demo_all_account_info():
     print("=" * 50)
 
     try:
-        from server import get_account_info
+        # 初始化 SDK 並登入
+        username = os.getenv("FUBON_USERNAME")
+        password = os.getenv("FUBON_PASSWORD")
+        pfx_path = os.getenv("FUBON_PFX_PATH")
+        pfx_password = os.getenv("FUBON_PFX_PASSWORD")
 
-        print(f"📋 查詢帳戶: {account} (戶名(人名))")
+        from fubon_neo.sdk import FubonSDK
+
+        sdk = FubonSDK()
+        accounts = sdk.login(username, password, pfx_path, pfx_password or "")
+
+        if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
+            print("❌ 登入失敗")
+            return
+
+        # 使用第一個帳戶
+        account_obj = accounts.data[0]
+        account = account_obj.account
+
+        print(f"📋 查詢帳戶: {account_obj.name} ({account})")
         print("🔍 正在查詢完整帳戶資訊...")
 
-        result = get_account_info({"account": account})
+        # 直接使用SDK查詢完整帳戶資訊
+        balance = sdk.accounting.bank_remain(account_obj)
+        inventory = sdk.accounting.inventories(account_obj)
+        pnl = sdk.accounting.unrealized_gains_and_loses(account_obj)
 
-        if result["status"] == "success":
-            account_data = result["data"]
+        account_data = {
+            "balance": balance.data if hasattr(balance, "data") else balance,
+            "inventory": inventory.data if hasattr(inventory, "data") else inventory,
+            "pnl": pnl.data if hasattr(pnl, "data") else pnl,
+        }
+
+        # 檢查是否包含基本資訊
+        if "balance" in account_data:
+            balance_data = account_data["balance"]
             print("\n✅ 查詢成功！")
             print("-" * 30)
 
             # 基本資訊
-            if "basic_info" in account_data:
-                basic = account_data["basic_info"]
-                print("👤 基本資訊:")
-                print(f"   姓名: {basic.get('name', 'N/A')}")
-                print(f"   分行: {basic.get('branch_no', 'N/A')}")
-                print(f"   帳戶: {basic.get('account', 'N/A')}")
-                print(f"   類型: {basic.get('account_type', 'N/A')}")
+            print("👤 基本資訊:")
+            print(f"   姓名: {account_obj.name}")
+            print(f"   分行: {getattr(account_obj, 'branch_no', 'N/A')}")
+            print(f"   帳戶: {account}")
+            print(f"   類型: {getattr(account_obj, 'account_type', 'N/A')}")
 
             # 銀行水位
-            if "bank_balance" in account_data:
-                balance = account_data["bank_balance"]
-                print("\n💰 銀行水位:")
-                print(f"   餘額: {getattr(balance, 'balance', 0):,} 元")
-                print(f"   可用: {getattr(balance, 'available_balance', 0):,} 元")
-            else:
-                print("\n⚠️ 銀行水位資訊不可用")
-
-            # 庫存資訊
-            if "inventories" in account_data and account_data["inventories"]:
-                print("\n📈 庫存資訊:")
-                inventories = account_data["inventories"]
-                if isinstance(inventories, list):
-                    for item in inventories[:3]:  # 只顯示前3筆
-                        print(f"   {getattr(item, 'symbol', 'N/A')}: {getattr(item, 'quantity', 0)} 股")
-                else:
-                    print(f"   {inventories}")
-            else:
-                print("\n📭 目前無庫存")
-
+            print("\n💰 銀行水位:")
+            print(f"   餘額: {getattr(balance_data, 'balance', 0):,} 元")
+            print(f"   可用: {getattr(balance_data, 'available_balance', 0):,} 元")
+            print("-" * 30)
         else:
-            print(f"❌ 查詢失敗: {result['message']}")
+            print("❌ 無法獲取帳戶資訊")
 
     except Exception as e:
         print(f"❌ 演示過程中發生錯誤: {str(e)}")

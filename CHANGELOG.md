@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2025-11-03
+
 ### Added
 - GitHub Actions CI/CD workflows
 - Pre-commit hooks configuration
@@ -23,7 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced testing infrastructure
 - Improved code quality standards
 
-## [1.6.0] - 2025-11-03
+### Fixed
+- PyPI publishing authentication parameters in release workflow
 
 ### Added
 - 🐛 **帳戶查詢修正**: 修正正式環境帳戶資訊查詢問題

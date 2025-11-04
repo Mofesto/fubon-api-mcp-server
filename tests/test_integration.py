@@ -11,75 +11,68 @@ class TestIntegration:
     def test_full_workflow_simulation(self, fubon_sdk, fubon_credentials, rest_client):
         """模擬完整工作流程（不實際交易）"""
         try:
+            # 解包 SDK 和帳戶資訊
+            sdk, accounts = fubon_sdk
+
             # 1. 檢查帳戶連線
-            assert fubon_sdk is not None
+            assert sdk is not None
             assert fubon_credentials["username"] is not None
 
             # 2. 檢查市場數據可用性
             assert rest_client is not None
 
             # 3. 檢查基本帳戶功能
-            accounts = fubon_sdk.login(
-                fubon_credentials["username"],
-                fubon_credentials["password"],
-                fubon_credentials["pfx_path"],
-                fubon_credentials["pfx_password"] or "",
-            )
-
             if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
                 pytest.skip("登入失敗")
 
-            account_obj = None
-            if hasattr(accounts, "data") and accounts.data:
-                for acc in accounts.data:
-                    if getattr(acc, "account", None) == fubon_credentials["username"]:
-                        account_obj = acc
-                        break
+            # 使用第一個帳戶
+            if not hasattr(accounts, "data") or not accounts.data:
+                pytest.skip("沒有帳戶資料")
 
-            if not account_obj:
-                pytest.skip(f"找不到帳戶 {fubon_credentials['username']}")
+            account_obj = accounts.data[0]
 
-            balance = fubon_sdk.accounting.bank_remain(account_obj)
+            balance = sdk.accounting.bank_remain(account_obj)
             assert balance and hasattr(balance, "is_success") and balance.is_success
+            import time
+
+            time.sleep(0.5)  # Add delay to avoid rate limiting
 
             # 4. 檢查庫存功能
-            inventory = fubon_sdk.stock.get_inventory(account_obj)
+            inventory = sdk.accounting.inventories(account_obj)
             assert inventory and hasattr(inventory, "is_success") and inventory.is_success
+            time.sleep(0.5)  # Add delay to avoid rate limiting
 
             # 5. 檢查損益功能
-            pnl = fubon_sdk.stock.get_unrealized_profit_loss(account_obj)
+            pnl = sdk.accounting.unrealized_gains_and_loses(account_obj)
+            # Check if API is rate limited
+            if hasattr(pnl, "message") and "流量控管" in str(pnl.message):
+                pytest.skip("API rate limited - skipping integration test")
             assert pnl and hasattr(pnl, "is_success") and pnl.is_success
 
         except Exception as e:
-            pytest.skip(f"整合測試失敗: {str(e)}")
+            pytest.fail(f"整合測試失敗: {str(e)}")
 
     def test_data_consistency(self, fubon_sdk, fubon_credentials):
         """測試數據一致性"""
         try:
-            # 獲取帳戶列表
-            accounts = fubon_sdk.login(
-                fubon_credentials["username"],
-                fubon_credentials["password"],
-                fubon_credentials["pfx_path"],
-                fubon_credentials["pfx_password"] or "",
-            )
+            # 解包 SDK 和帳戶資訊
+            sdk, accounts = fubon_sdk
 
             if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
                 pytest.skip("登入失敗")
 
-            account_obj = None
-            if hasattr(accounts, "data") and accounts.data:
-                for acc in accounts.data:
-                    if getattr(acc, "account", None) == fubon_credentials["username"]:
-                        account_obj = acc
-                        break
+            # 使用第一個帳戶
+            if not hasattr(accounts, "data") or not accounts.data:
+                pytest.skip("沒有帳戶資料")
 
-            if not account_obj:
-                pytest.skip(f"找不到帳戶 {fubon_credentials['username']}")
+            account_obj = accounts.data[0]
 
             # 獲取庫存和損益數據
-            inventory = fubon_sdk.stock.get_inventory(account_obj)
-            pnl = fubon_sdk.stock.get_unrealized_profit_loss(account_obj)
+            inventory = sdk.accounting.inventories(account_obj)
+            import time
+
+            time.sleep(0.5)  # Add delay to avoid rate limiting
+            pnl = sdk.accounting.unrealized_gains_and_loses(account_obj)
 
             if (
                 inventory
@@ -102,13 +95,16 @@ class TestIntegration:
                     assert pnl_symbols.issubset(inventory_symbols), "損益記錄與庫存不一致"
 
         except Exception as e:
-            pytest.skip(f"數據一致性檢查失敗: {str(e)}")
+            pytest.fail(f"數據一致性檢查失敗: {str(e)}")
 
     def test_error_handling(self, fubon_sdk, fubon_credentials):
         """測試錯誤處理"""
         try:
+            # 解包 SDK
+            sdk, _ = fubon_sdk
+
             # 測試無效憑證
-            invalid_accounts = fubon_sdk.login(
+            invalid_accounts = sdk.login(
                 "INVALID", "INVALID", fubon_credentials["pfx_path"], fubon_credentials["pfx_password"] or ""
             )
             # 應該返回錯誤狀態
@@ -121,36 +117,27 @@ class TestIntegration:
     def test_api_response_format(self, fubon_sdk, fubon_credentials):
         """測試API回應格式"""
         try:
-            # 獲取帳戶列表
-            accounts = fubon_sdk.login(
-                fubon_credentials["username"],
-                fubon_credentials["password"],
-                fubon_credentials["pfx_path"],
-                fubon_credentials["pfx_password"] or "",
-            )
+            # 解包 SDK 和帳戶資訊
+            sdk, accounts = fubon_sdk
 
             if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
                 pytest.skip("登入失敗")
 
-            account_obj = None
-            if hasattr(accounts, "data") and accounts.data:
-                for acc in accounts.data:
-                    if getattr(acc, "account", None) == fubon_credentials["username"]:
-                        account_obj = acc
-                        break
+            # 使用第一個帳戶
+            if not hasattr(accounts, "data") or not accounts.data:
+                pytest.skip("沒有帳戶資料")
 
-            if not account_obj:
-                pytest.skip(f"找不到帳戶 {fubon_credentials['username']}")
+            account_obj = accounts.data[0]
 
             # 測試銀行水位 API
-            balance = fubon_sdk.accounting.bank_remain(account_obj)
+            balance = sdk.accounting.bank_remain(account_obj)
 
             # 檢查標準回應格式
             assert hasattr(balance, "is_success")
             assert hasattr(balance, "data") or hasattr(balance, "error")
 
         except Exception as e:
-            pytest.skip(f"API回應格式檢查失敗: {str(e)}")
+            pytest.fail(f"API回應格式檢查失敗: {str(e)}")
 
 
 class TestPerformance:
@@ -161,29 +148,20 @@ class TestPerformance:
         import time
 
         try:
-            # 獲取帳戶列表
-            accounts = fubon_sdk.login(
-                fubon_credentials["username"],
-                fubon_credentials["password"],
-                fubon_credentials["pfx_path"],
-                fubon_credentials["pfx_password"] or "",
-            )
+            # 解包 SDK 和帳戶資訊
+            sdk, accounts = fubon_sdk
 
             if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
                 pytest.skip("登入失敗")
 
-            account_obj = None
-            if hasattr(accounts, "data") and accounts.data:
-                for acc in accounts.data:
-                    if getattr(acc, "account", None) == fubon_credentials["username"]:
-                        account_obj = acc
-                        break
+            # 使用第一個帳戶
+            if not hasattr(accounts, "data") or not accounts.data:
+                pytest.skip("沒有帳戶資料")
 
-            if not account_obj:
-                pytest.skip(f"找不到帳戶 {fubon_credentials['username']}")
+            account_obj = accounts.data[0]
 
             start_time = time.time()
-            balance = fubon_sdk.accounting.bank_remain(account_obj)
+            balance = sdk.accounting.bank_remain(account_obj)
             end_time = time.time()
 
             response_time = end_time - start_time
@@ -193,36 +171,25 @@ class TestPerformance:
             assert balance and hasattr(balance, "is_success") and balance.is_success
 
         except Exception as e:
-            pytest.skip(f"效能測試失敗: {str(e)}")
+            pytest.fail(f"效能測試失敗: {str(e)}")
 
     def get_account_obj(self, fubon_sdk, fubon_credentials):
         """獲取帳戶對象"""
-        accounts = fubon_sdk.login(
-            fubon_credentials["username"],
-            fubon_credentials["password"],
-            fubon_credentials["pfx_path"],
-            fubon_credentials["pfx_password"] or "",
-        )
+        sdk, accounts = fubon_sdk
 
         if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
             pytest.skip("登入失敗")
 
-        account_obj = None
-        if hasattr(accounts, "data") and accounts.data:
-            for acc in accounts.data:
-                if getattr(acc, "account", None) == fubon_credentials["username"]:
-                    account_obj = acc
-                    break
+        # 使用第一個帳戶
+        if not hasattr(accounts, "data") or not accounts.data:
+            pytest.skip("沒有帳戶資料")
 
-        if not account_obj:
-            pytest.skip(f"找不到帳戶 {fubon_credentials['username']}")
+        return sdk, accounts.data[0]
 
-        return account_obj
-
-    def make_request(self, fubon_sdk, account_obj):
+    def make_request(self, sdk, account_obj):
         """發送請求"""
         try:
-            balance = fubon_sdk.accounting.bank_remain(account_obj)
+            balance = sdk.accounting.bank_remain(account_obj)
             return ("success", balance)
         except Exception as e:
             return ("error", str(e))
@@ -232,11 +199,11 @@ class TestPerformance:
         import concurrent.futures
 
         try:
-            account_obj = self.get_account_obj(fubon_sdk, fubon_credentials)
+            sdk, account_obj = self.get_account_obj(fubon_sdk, fubon_credentials)
 
             # 模擬3個並發請求
             with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-                futures = [executor.submit(self.make_request, fubon_sdk, account_obj) for _ in range(3)]
+                futures = [executor.submit(self.make_request, sdk, account_obj) for _ in range(3)]
                 results = [future.result() for future in concurrent.futures.as_completed(futures)]
 
             # 檢查結果
@@ -246,4 +213,4 @@ class TestPerformance:
             assert success_count > 0, "並發請求測試失敗"
 
         except Exception as e:
-            pytest.skip(f"並發請求測試失敗: {str(e)}")
+            pytest.fail(f"並發請求測試失敗: {str(e)}")

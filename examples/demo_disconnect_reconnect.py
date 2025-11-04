@@ -4,10 +4,6 @@ FUBON 斷線重連功能演示腳本
 展示如何處理交易Socket斷線並自動重連
 """
 
-import os
-import sys
-from pathlib import Path
-
 from dotenv import load_dotenv
 
 # 加載環境變數

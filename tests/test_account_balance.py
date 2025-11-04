@@ -107,7 +107,11 @@ def test_account_balance():
                     # 嘗試獲取資金餘額/銀行水位
                     print("🔍 查詢資金餘額...")
                     query_balance_apis(sdk, acc)
+                    import time
+
+                    time.sleep(0.5)  # Add delay to avoid rate limiting
                     check_accounting_methods(sdk)
+                    time.sleep(0.5)  # Add delay to avoid rate limiting
                     query_settlement_info(sdk, acc)
 
                 except Exception as e:

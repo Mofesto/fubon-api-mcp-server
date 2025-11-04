@@ -6,16 +6,16 @@
 import os
 import sys
 
-from fubon_mcp.server import (
-    get_account_info,
-    get_bank_balance,
-    get_filled_reports,
-    get_inventory,
-    get_order_changed_reports,
-    get_order_reports,
-    get_order_results,
-    modify_price,
-    place_order,
+from fubon_mcp import (
+    callable_get_account_info,
+    callable_get_bank_balance,
+    callable_get_filled_reports,
+    callable_get_inventory,
+    callable_get_order_changed_reports,
+    callable_get_order_reports,
+    callable_get_order_results,
+    callable_modify_price,
+    callable_place_order,
 )
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -24,7 +24,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 def check_account_info():
     """檢查帳戶資訊"""
     print("1. 檢查帳戶資訊...")
-    account_info = get_account_info({"account": ""})  # 獲取所有帳戶
+    account_info = callable_get_account_info({"account": ""})  # 獲取所有帳戶
     if account_info["status"] == "success":
         accounts = account_info["data"]
         if accounts:
@@ -42,21 +42,27 @@ def check_account_info():
 def check_bank_balance(account_number):
     """檢查銀行餘額"""
     print("\n2. 檢查銀行餘額...")
-    balance = get_bank_balance({"account": account_number})
+    balance = callable_get_bank_balance({"account": account_number})
     if balance["status"] == "success":
         print(f"銀行餘額: {balance['data']}")
     else:
         print(f"獲取銀行餘額失敗: {balance['message']}")
+    import time
+
+    time.sleep(0.5)  # Add delay to avoid rate limiting
 
 
 def check_inventory(account_number):
     """檢查庫存"""
     print("\n3. 檢查庫存...")
-    inventory = get_inventory({"account": account_number})
+    inventory = callable_get_inventory({"account": account_number})
     if inventory["status"] == "success":
         print(f"庫存資訊: {inventory['data']}")
     else:
         print(f"獲取庫存失敗: {inventory['message']}")
+    import time
+
+    time.sleep(0.5)  # Add delay to avoid rate limiting
 
 
 def place_buy_order(account_number):
@@ -76,7 +82,7 @@ def place_buy_order(account_number):
         "is_non_blocking": False,
     }
 
-    buy_result = place_order(buy_order)
+    buy_result = callable_place_order(buy_order)
     if buy_result["status"] == "success":
         print(f"買入委託成功: {buy_result['message']}")
         return True
@@ -88,7 +94,7 @@ def place_buy_order(account_number):
 def check_order_results(account_number):
     """檢查委託結果"""
     print("\n5. 檢查委託結果...")
-    order_results = get_order_results({"account": account_number})
+    order_results = callable_get_order_results({"account": account_number})
     if order_results["status"] == "success":
         orders = order_results["data"]
         if orders:
@@ -109,6 +115,9 @@ def check_order_results(account_number):
     else:
         print(f"獲取委託結果失敗: {order_results['message']}")
         return None
+    import time
+
+    time.sleep(0.5)  # Add delay to avoid rate limiting
 
 
 def modify_order_price(account_number, orders):
@@ -118,7 +127,7 @@ def modify_order_price(account_number, orders):
         first_order = orders[0]
         order_no = getattr(first_order, "order_no", None)
         if order_no:
-            modify_result = modify_price({"account": account_number, "order_no": order_no, "new_price": 66.5})
+            modify_result = callable_modify_price({"account": account_number, "order_no": order_no, "new_price": 66.5})
             if modify_result["status"] == "success":
                 print(f"修改價格成功: {modify_result['message']}")
             else:
@@ -132,7 +141,7 @@ def modify_order_price(account_number, orders):
 def check_filled_reports():
     """檢查成交回報"""
     print("\n8. 檢查成交回報...")
-    filled_reports = get_filled_reports({"limit": 5})
+    filled_reports = callable_get_filled_reports({"limit": 5})
     if filled_reports["status"] == "success":
         reports = filled_reports["data"]
         if reports:
@@ -149,12 +158,15 @@ def check_filled_reports():
             print("沒有找到成交回報記錄 (可能是因為沒有實際成交)")
     else:
         print(f"獲取成交回報失敗: {filled_reports['message']}")
+    import time
+
+    time.sleep(0.5)  # Add delay to avoid rate limiting
 
 
 def check_order_reports():
     """檢查委託回報"""
     print("\n9. 檢查委託回報...")
-    order_reports = get_order_reports({"limit": 5})
+    order_reports = callable_get_order_reports({"limit": 5})
     if order_reports["status"] == "success":
         reports = order_reports["data"]
         if reports:
@@ -165,12 +177,15 @@ def check_order_reports():
             print("沒有找到委託回報記錄")
     else:
         print(f"獲取委託回報失敗: {order_reports['message']}")
+    import time
+
+    time.sleep(0.5)  # Add delay to avoid rate limiting
 
 
 def check_changed_reports():
     """檢查改價/改量/刪單回報"""
     print("\n10. 檢查改價/改量/刪單回報...")
-    changed_reports = get_order_changed_reports({"limit": 5})
+    changed_reports = callable_get_order_changed_reports({"limit": 5})
     if changed_reports["status"] == "success":
         reports = changed_reports["data"]
         if reports:
@@ -181,6 +196,9 @@ def check_changed_reports():
             print("沒有找到改價/改量/刪單回報記錄")
     else:
         print(f"獲取改價/改量/刪單回報失敗: {changed_reports['message']}")
+    import time
+
+    time.sleep(0.5)  # Add delay to avoid rate limiting
 
 
 def test_trading_workflow():

@@ -33,6 +33,7 @@ try:
 except ImportError:
     try:
         from setuptools_scm import get_version
+
         __version__ = get_version()
     except ImportError:
         __version__ = "unknown"
@@ -40,7 +41,68 @@ except ImportError:
 __author__ = "Fubon MCP Team"
 
 # 匯入主要組件
-from .server import main, mcp
+from .server import (  # Callable wrapper functions for testing
+    callable_batch_place_order,
+    callable_cancel_order,
+    callable_get_account_info,
+    callable_get_all_reports,
+    callable_get_bank_balance,
+    callable_get_event_reports,
+    callable_get_filled_reports,
+    callable_get_historical_stats,
+    callable_get_intraday_candles,
+    callable_get_intraday_quote,
+    callable_get_intraday_ticker,
+    callable_get_intraday_tickers,
+    callable_get_intraday_trades,
+    callable_get_intraday_volumes,
+    callable_get_inventory,
+    callable_get_order_changed_reports,
+    callable_get_order_reports,
+    callable_get_order_results,
+    callable_get_realtime_quotes,
+    callable_get_settlement_info,
+    callable_get_snapshot_actives,
+    callable_get_snapshot_movers,
+    callable_get_snapshot_quotes,
+    callable_get_unrealized_pnl,
+    callable_modify_price,
+    callable_modify_quantity,
+    callable_place_order,
+    main,
+    mcp,
+)
 
 # 定義包的公開介面
-__all__ = ["mcp", "main"]
+__all__ = [
+    "mcp",
+    "main",
+    # Callable wrapper functions
+    "callable_get_account_info",
+    "callable_get_inventory",
+    "callable_get_bank_balance",
+    "callable_get_settlement_info",
+    "callable_get_unrealized_pnl",
+    "callable_place_order",
+    "callable_modify_price",
+    "callable_modify_quantity",
+    "callable_cancel_order",
+    "callable_batch_place_order",
+    "callable_get_order_results",
+    "callable_get_order_reports",
+    "callable_get_order_changed_reports",
+    "callable_get_filled_reports",
+    "callable_get_event_reports",
+    "callable_get_all_reports",
+    "callable_get_realtime_quotes",
+    "callable_get_intraday_tickers",
+    "callable_get_intraday_ticker",
+    "callable_get_intraday_quote",
+    "callable_get_intraday_candles",
+    "callable_get_intraday_trades",
+    "callable_get_intraday_volumes",
+    "callable_get_snapshot_quotes",
+    "callable_get_snapshot_movers",
+    "callable_get_snapshot_actives",
+    "callable_get_historical_stats",
+]

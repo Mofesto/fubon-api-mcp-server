@@ -7,7 +7,17 @@ from pathlib import Path
 
 import pytest
 from dotenv import load_dotenv
-from fubon_neo.sdk import FubonSDK
+
+# 只有在需要真實 SDK 時才載入 fubon_neo
+USE_REAL_SDK = os.getenv("USE_REAL_SDK", "false").lower() == "true"
+
+if USE_REAL_SDK:
+    try:
+        from fubon_neo.sdk import FubonSDK
+    except ImportError:
+        FubonSDK = None
+else:
+    FubonSDK = None
 
 # 加載環境變數
 load_dotenv()
@@ -30,6 +40,9 @@ def fubon_credentials():
 @pytest.fixture(scope="session")
 def fubon_sdk(fubon_credentials):
     """初始化富邦SDK實例 - 使用正式環境"""
+    if not FubonSDK:
+        pytest.skip("FubonSDK not available")
+
     # 使用正式環境 URL (生產環境)
     sdk = FubonSDK()
     accounts = sdk.login(
@@ -38,6 +51,10 @@ def fubon_sdk(fubon_credentials):
         fubon_credentials["pfx_path"],
         fubon_credentials["pfx_password"] or "",
     )
+
+    # 檢查登入是否成功
+    if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
+        pytest.skip("無法登入到富邦SDK - 請檢查憑證")
 
     # 初始化即時連線
     try:

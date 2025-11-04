@@ -6,7 +6,6 @@ FUBON MCP Server 功能總結演示
 
 import os
 import sys
-from pathlib import Path
 
 from dotenv import load_dotenv
 from fubon_neo.sdk import FubonSDK
@@ -47,7 +46,7 @@ def main():
         if isinstance(quote, dict):
             print(f"  💡 台積電 (2330) 最新價: {quote.get('lastPrice', 'N/A')} (漲跌: {quote.get('change', 'N/A')})")
         else:
-            print(f"  💡 台積電 (2330) 行情數據已獲取")
+            print("  💡 台積電 (2330) 行情數據已獲取")
 
         # 帳戶功能
         print("\n💰 帳戶資訊功能:")

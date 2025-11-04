@@ -14,7 +14,7 @@
 
 1. **Fork 專案**
    ```bash
-   git clone https://github.com/Mofesto/fubon-api-mcp-server.git
+   git clone https://github.com/mofesto/fubon-api-mcp-server.git
    cd fubon-api-mcp-server
    ```
 

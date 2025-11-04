@@ -25,6 +25,9 @@ class TestAccountInfo:
             # 獲取銀行水位
             balance = sdk.accounting.bank_remain(account_obj)
             assert balance and hasattr(balance, "is_success") and balance.is_success
+            import time
+
+            time.sleep(0.5)  # Add delay to avoid rate limiting
 
             balance_data = balance.data if hasattr(balance, "data") else balance
 
@@ -55,6 +58,9 @@ class TestAccountInfo:
             # 獲取庫存
             inventory = sdk.accounting.inventories(account_obj)
             assert inventory and hasattr(inventory, "is_success") and inventory.is_success
+            import time
+
+            time.sleep(0.5)  # Add delay to avoid rate limiting
 
             inventory_data = inventory.data if hasattr(inventory, "data") else inventory
 
@@ -81,6 +87,9 @@ class TestAccountInfo:
             # 獲取未實現損益
             pnl = sdk.accounting.unrealized_gains_and_loses(account_obj)
             assert pnl and hasattr(pnl, "is_success") and pnl.is_success
+            import time
+
+            time.sleep(0.5)  # Add delay to avoid rate limiting
 
             pnl_data = pnl.data if hasattr(pnl, "data") else pnl
 
@@ -106,7 +115,11 @@ class TestAccountInfo:
 
             # 測試多個 API 調用來獲取帳戶資訊
             balance = sdk.accounting.bank_remain(account_obj)
+            import time
+
+            time.sleep(0.5)  # Add delay to avoid rate limiting
             inventory = sdk.accounting.inventories(account_obj)
+            time.sleep(0.5)  # Add delay to avoid rate limiting
             pnl = sdk.accounting.unrealized_gains_and_loses(account_obj)
 
             account_data = {
@@ -138,6 +151,9 @@ class TestAccountInfo:
             # 獲取結算資訊
             settlement = sdk.accounting.query_settlement(account_obj, "0d")
             assert settlement and hasattr(settlement, "is_success") and settlement.is_success
+            import time
+
+            time.sleep(0.5)  # Add delay to avoid rate limiting
 
         except Exception as e:
             pytest.skip(f"交割資訊查詢失敗: {str(e)}")
@@ -159,6 +175,9 @@ class TestAccountInfo:
             # 測試庫存資料結構
             inventory = sdk.accounting.inventories(account_obj)
             if inventory and hasattr(inventory, "is_success") and inventory.is_success:
+                import time
+
+                time.sleep(0.5)  # Add delay to avoid rate limiting
                 inventory_data = inventory.data if hasattr(inventory, "data") else inventory
 
                 if inventory_data:
@@ -191,6 +210,9 @@ class TestAccountInfo:
             # 測試損益資料結構
             pnl = sdk.accounting.unrealized_gains_and_loses(account_obj)
             if pnl and hasattr(pnl, "is_success") and pnl.is_success:
+                import time
+
+                time.sleep(0.5)  # Add delay to avoid rate limiting
                 pnl_data = pnl.data if hasattr(pnl, "data") else pnl
 
                 if pnl_data:

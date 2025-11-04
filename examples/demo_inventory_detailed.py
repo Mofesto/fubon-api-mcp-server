@@ -5,18 +5,14 @@ FUBON MCP 庫存 vs 未實現損益對比演示
 """
 
 import os
-import sys
-from pathlib import Path
 
 from dotenv import load_dotenv
 
 # 加載環境變數
 load_dotenv()
 
-# 獲取帳戶號碼
-account = os.getenv("FUBON_USERNAME")
-if not account:
-    raise ValueError("FUBON_USERNAME environment variable is required")
+# 獲取帳戶號碼 - 將從SDK登入中動態獲取
+account = None  # 將在函數中設置
 
 
 def demo_inventory_vs_pnl():
@@ -25,18 +21,35 @@ def demo_inventory_vs_pnl():
     print("=" * 80)
 
     try:
-        from server import get_inventory, get_unrealized_pnl
+        # 初始化 SDK 並登入
+        username = os.getenv("FUBON_USERNAME")
+        password = os.getenv("FUBON_PASSWORD")
+        pfx_path = os.getenv("FUBON_PFX_PATH")
+        pfx_password = os.getenv("FUBON_PFX_PASSWORD")
 
-        print(f"📋 查詢帳戶: {account} (戶名(人名))")
+        from fubon_neo.sdk import FubonSDK
+
+        sdk = FubonSDK()
+        accounts = sdk.login(username, password, pfx_path, pfx_password or "")
+
+        if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
+            print("❌ 登入失敗")
+            return
+
+        # 使用第一個帳戶
+        account_obj = accounts.data[0]
+        account = account_obj.account
+
+        print(f"📋 查詢帳戶: {account_obj.name} ({account})")
         print()
 
         # 獲取庫存資訊
         print("📦 庫存資訊 (Inventory) - 實際持股狀況:")
         print("-" * 80)
-        inventory_result = get_inventory({"account": account})
+        inventory = sdk.accounting.inventories(account_obj)
 
-        if inventory_result["status"] == "success":
-            inventory_data = inventory_result["data"]
+        if inventory and hasattr(inventory, "is_success") and inventory.is_success:
+            inventory_data = inventory.data
             if isinstance(inventory_data, list) and inventory_data:
                 print(f"{'股票代號':<8} {'昨餘股數':<8} {'今日股數':<8} {'可交易股數':<10} {'買進':<8} {'賣出':<8}")
                 print("-" * 80)
@@ -58,14 +71,14 @@ def demo_inventory_vs_pnl():
             else:
                 print("📭 目前無庫存")
         else:
-            print(f"❌ 庫存查詢失敗: {inventory_result['message']}")
+            print(f"❌ 庫存查詢失敗: {getattr(inventory, 'message', 'Unknown error')}")
 
         print("\n💰 未實現損益 (Unrealized P&L) - 盈虧狀況:")
         print("-" * 80)
-        pnl_result = get_unrealized_pnl({"account": account})
+        pnl = sdk.accounting.unrealized_gains_and_loses(account_obj)
 
-        if pnl_result["status"] == "success":
-            pnl_data = pnl_result["data"]
+        if pnl and hasattr(pnl, "is_success") and pnl.is_success:
+            pnl_data = pnl.data
             if isinstance(pnl_data, list) and pnl_data:
                 print(f"{'股票代號':<8} {'持股數量':<8} {'成本價':<8} {'未實現盈虧':<12} {'金額':<10}")
                 print("-" * 80)
@@ -73,12 +86,8 @@ def demo_inventory_vs_pnl():
                 total_profit = 0
                 total_loss = 0
 
-                # 股票名稱映射
-                stock_names = {"0050": "台灣50", "1301": "台塑", "1303": "南亞", "6505": "台塑化"}
-
                 for item in pnl_data:
                     stock_no = getattr(item, "stock_no", "N/A")
-                    stock_name = stock_names.get(stock_no, "未知")
                     quantity = getattr(item, "tradable_qty", 0)
                     cost_price = getattr(item, "cost_price", 0)
                     profit = getattr(item, "unrealized_profit", 0)
@@ -102,7 +111,7 @@ def demo_inventory_vs_pnl():
                 )
 
         else:
-            print(f"❌ 未實現損益查詢失敗: {pnl_result['message']}")
+            print(f"❌ 未實現損益查詢失敗: {getattr(pnl, 'message', 'Unknown error')}")
 
     except Exception as e:
         print(f"❌ 演示過程中發生錯誤: {str(e)}")
@@ -114,12 +123,29 @@ def demo_detailed_inventory():
     print("=" * 80)
 
     try:
-        from server import get_inventory
+        # 初始化 SDK 並登入
+        username = os.getenv("FUBON_USERNAME")
+        password = os.getenv("FUBON_PASSWORD")
+        pfx_path = os.getenv("FUBON_PFX_PATH")
+        pfx_password = os.getenv("FUBON_PFX_PASSWORD")
 
-        result = get_inventory({"account": account})
+        from fubon_neo.sdk import FubonSDK
 
-        if result["status"] == "success":
-            inventory_data = result["data"]
+        sdk = FubonSDK()
+        accounts = sdk.login(username, password, pfx_path, pfx_password or "")
+
+        if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
+            print("❌ 登入失敗")
+            return
+
+        # 使用第一個帳戶
+        account_obj = accounts.data[0]
+
+        # 直接使用SDK查詢庫存
+        inventory = sdk.accounting.inventories(account_obj)
+
+        if inventory and hasattr(inventory, "is_success") and inventory.is_success:
+            inventory_data = inventory.data
 
             if isinstance(inventory_data, list) and inventory_data:
                 for i, item in enumerate(inventory_data, 1):

@@ -4,8 +4,6 @@
 """
 
 import os
-import sys
-from pathlib import Path
 
 from dotenv import load_dotenv
 from fubon_neo.sdk import FubonSDK
@@ -51,8 +49,8 @@ def main():
                             try:
                                 value = getattr(detail, attr)
                                 print(f"  {attr}: {value} ({type(value)})")
-                            except:
-                                print(f"  {attr}: 無法獲取")
+                            except Exception as e:
+                                print(f"  {attr}: 無法獲取 - {e}")
 
     except Exception as e:
         print(f"錯誤: {str(e)}")
