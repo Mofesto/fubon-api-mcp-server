@@ -39,7 +39,7 @@ jobs:
         # Install fubon_neo from local wheel (Linux)
         pip install ./wheels/fubon_neo-2.2.5-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
         # Install other dependencies
-        pip install pandas mcp pydantic python-dotenv
+        pip install pandas fastmcp mcp pydantic python-dotenv
         pip install pytest pytest-cov pytest-xdist pytest-mock
         pip install flake8 black isort mypy pandas-stubs
 
