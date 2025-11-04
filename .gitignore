@@ -152,9 +152,23 @@ data/
 *.key
 *.crt
 
-# Local development scripts
-publish_to_github.sh
-publish_to_github.ps1
+# Local development scripts (已移除,現在使用 scripts/ 目錄)
+# publish_to_github.sh
+# publish_to_github.ps1
+
+# Old release files
+release.ps1  # 使用 scripts/release.ps1 代替
+RELEASE_NOTES_*.md  # 保留在 CHANGELOG.md 中
+RELEASE_GUIDE.md  # 已移至 .github/
+GITHUB_PUBLISH_GUIDE.md
+COVERAGE_PLAN.md
+TYPING_GUIDE.md
+
+# Test helper files
+fubon_neo_stub.py
+test_mcp_server.py  # 測試應在 tests/ 目錄中
+run_tests.py  # 使用 pytest 直接運行
+validate_ci.py
 
 # VS Code Extension
 vscode-extension/node_modules/

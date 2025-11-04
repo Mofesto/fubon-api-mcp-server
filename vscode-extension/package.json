@@ -2,7 +2,7 @@
   "name": "fubon-api-mcp-server",
   "displayName": "Fubon API MCP Server",
   "description": "富邦證券 MCP Server - 完整的台股交易功能與市場數據查詢",
-  "version": "1.8.4",
+  "version": "1.8.5",
   "publisher": "mofesto",
   "icon": "icon.png",
   "engines": {
@@ -32,6 +32,10 @@
   },
   "homepage": "https://github.com/Mofesto/fubon-api-mcp-server#readme",
   "license": "MIT",
+  "author": {
+    "name": "Mofesto",
+    "email": "mofesto.cui@gmail.com"
+  },
   "main": "./src/extension.js",
   "activationEvents": [
     "onStartupFinished"

@@ -219,6 +219,15 @@ type(scope): description
 
 請閱讀並遵循我們的 [行為準則](CODE_OF_CONDUCT.md)。
 
+## ☕ 支持專案
+
+如果您覺得這個專案對您有幫助，歡迎請我喝杯咖啡支持開發！
+
+<div align="center">
+  <img src="assets/images/support-qrcode.png" alt="Buy me a coffee" width="200"/>
+  <p><i>掃描 QR Code 支持專案開發</i></p>
+</div>
+
 ## 📞 聯絡方式
 
 - 📧 Email: mcp@fubon.com

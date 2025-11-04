@@ -1,0 +1,81 @@
+# VS Code Extension 打包排除文件
+# 參考: https://aka.ms/vscode-vscodeignore
+
+# 開發文件
+.vscode/**
+.vscode-test/**
+.gitignore
+.yarnrc
+vsc-extension-quickstart.md
+**/jsconfig.json
+**/*.map
+**/.eslintrc.json
+
+# 開發依賴和測試
+node_modules/**
+test/**
+tests/**
+**/*.test.js
+**/*.spec.js
+.eslintrc.*
+.prettierrc.*
+tsconfig.json
+
+# 源代碼管理
+.git/**
+.gitattributes
+.github/**
+
+# 文檔和範例
+examples/**
+docs/**
+**/*.md
+!README.md
+!CHANGELOG.md
+!LICENSE
+!LICENSE.md
+!LICENSE.txt
+ICON_README.md
+
+# 構建和臨時文件
+out/test/**
+*.vsix
+.DS_Store
+Thumbs.db
+**/.cache
+**/.temp
+**/.tmp
+
+# 日誌和數據
+*.log
+log/**
+logs/**
+data/**
+
+# IDE 和編輯器
+.idea/**
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/**
+
+# 系統文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# NPM
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
+
+# 其他
+coverage/**
+.nyc_output/**
+*.tgz
+package-lock.json
+yarn.lock

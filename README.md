@@ -489,7 +489,7 @@ fubon-api-mcp-server/
 - 🔒 **網路安全**: 確保網路連線的安全性
 
 ## 📝 更新日誌
-### v1.8.4 (2025-11-04)
+### v1.8.5 (2025-11-04)
 - 🚀 **VS Code Extension**: 完整的 VS Code Extension，一鍵啟動/停止 MCP Server
 - 🔧 **動態版本管理**: 採用 setuptools-scm 從 Git tags 自動生成版本號
 - 📦 **自動化發佈**: PyPI 和 VS Code Marketplace 自動發佈流程
@@ -604,14 +604,14 @@ flake8 .
 
 ### PyPI Package
 - **套件名稱**: `fubon-api-mcp-server`
-- **最新版本**: 1.8.4
+- **最新版本**: 1.8.5
 - **安裝**: `pip install fubon-api-mcp-server`
 - **PyPI**: https://pypi.org/project/fubon-api-mcp-server/
 
 ### VS Code Extension
 - **Extension ID**: `mofesto.fubon-api-mcp-server`
 - **Publisher**: mofesto
-- **版本**: 1.8.4
+- **版本**: 1.8.5
 - **Marketplace**: https://marketplace.visualstudio.com/items?itemName=mofesto.fubon-api-mcp-server
 - **安裝方式**: 在 VS Code 中搜尋 "Fubon API MCP Server"
 
@@ -634,6 +634,16 @@ flake8 .
 - **開發者**: Mofesto.Cui
 - **Publisher**: mofesto (VS Code Marketplace)
 - **貢獻者**: 歡迎所有貢獻者
+
+## ☕ 支持專案
+
+如果這個專案對您有幫助，歡迎請我喝杯咖啡支持開發！
+
+<div align="center">
+  <img src="assets/images/support-qrcode.png" alt="Buy me a coffee" width="200"/>
+  <p><i>掃描 QR Code 支持專案</i></p>
+</div>
+
 ## 🔗 相關連結
 
 - **PyPI Package**: https://pypi.org/project/fubon-api-mcp-server/

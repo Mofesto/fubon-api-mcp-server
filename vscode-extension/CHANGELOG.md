@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.8.4] - 2025-11-04
+## [1.8.5] - 2025-11-04
 
 ### Added
 - 🚀 **VS Code Extension**: 完整的 VS Code Extension 功能

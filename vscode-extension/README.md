@@ -8,7 +8,7 @@
 
 **Extension ID**: `mofesto.fubon-api-mcp-server`  
 **Publisher**: mofesto  
-**Version**: 1.8.4
+**Version**: 1.8.5
 
 ## ✨ 功能特點
 
@@ -145,6 +145,16 @@ Extension 使用系統預設的 `python` 命令。如需指定 Python 路徑：
 ## 🤝 貢獻
 
 歡迎提交 Pull Request 或回報問題！
+
+## ☕ 支持專案
+
+如果這個 Extension 對您有幫助，歡迎請我喝杯咖啡支持開發！
+
+<div align="center">
+  <img src="../assets/images/support-qrcode.png" alt="Buy me a coffee" width="200"/>
+  <p><i>掃描 QR Code 支持專案</i></p>
+</div>
+
 ### 開發者資訊
 
 - **Extension ID**: `mofesto.fubon-api-mcp-server`
@@ -168,5 +178,5 @@ MIT License
 **開發者**: Mofesto.Cui  
 **Publisher**: mofesto  
 **Extension ID**: mofesto.fubon-api-mcp-server  
-**版本**: 1.8.4  
+**版本**: 1.8.5  
 **最後更新**: 2025-11-04
