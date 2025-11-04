@@ -51,7 +51,7 @@ def main():
     results.append(("Black 格式化", success))
 
     # 4. 檢查導入排序
-    success, output = run_command("python -m isort --check-only --diff fubon_mcp tests", "檢查 isort 導入排序")
+    success, output = run_command("python -m isort --check-only --diff fubon_mcp tests --skip fubon_mcp/_version.py", "檢查 isort 導入排序")
     results.append(("isort 導入排序", success))
 
     # 5. 檢查代碼品質
