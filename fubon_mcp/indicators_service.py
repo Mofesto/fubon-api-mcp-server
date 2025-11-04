@@ -5,7 +5,7 @@ This module provides technical analysis indicators for quantitative trading,
 including moving averages, RSI, MACD, and other common indicators.
 """
 
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
@@ -64,10 +64,10 @@ def calculate_rsi(data: pd.DataFrame, period: int = 14, column: str = "close") -
         pd.Series: RSI values (0-100)
     """
     delta = data[column].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()  # type: ignore[operator]
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()  # type: ignore[operator]
     rs = gain / loss
-    rsi = 100 - (100 / (1 + rs))
+    rsi: pd.Series = 100 - (100 / (1 + rs))
     return rsi
 
 
@@ -270,7 +270,9 @@ def analyze_momentum(data: pd.DataFrame) -> Dict:
 
 
 @mcp.tool()
-def calculate_technical_indicators(symbol: str, indicators: List[str] = None, periods: Dict = None) -> Dict:
+def calculate_technical_indicators(
+    symbol: str, indicators: Optional[List[str]] = None, periods: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """# noqa: C901
     Calculate technical indicators for a stock
 
@@ -312,7 +314,7 @@ def calculate_technical_indicators(symbol: str, indicators: List[str] = None, pe
         if len(data) < 50:
             return {"status": "error", "data": None, "message": f"Insufficient data for {symbol} (need at least 50 records)"}
 
-        results = {}
+        results: Dict[str, Any] = {}
         latest_values = {}
 
         # Calculate requested indicators
@@ -424,7 +426,7 @@ def analyze_stock_trend(symbol: str, analysis_type: str = "comprehensive") -> Di
                 "message": "Insufficient data for analysis (need at least 100 records)",
             }
 
-        results = {
+        results: Dict[str, Any] = {
             "symbol": symbol,
             "analysis_type": analysis_type,
             "current_price": data["close"].iloc[-1] if not data.empty else None,

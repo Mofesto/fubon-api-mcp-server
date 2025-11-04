@@ -25,20 +25,25 @@
 - FUBON_PFX_PASSWORD: PFX 憑證密碼（可選）
 - FUBON_DATA_DIR: 本地數據儲存目錄（可選）
 
-作者: Fubon MCP Team
+作者: Jimmy Cui
 """
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any
 
 try:
     from ._version import version as __version__
 except ImportError:
     try:
-        from setuptools_scm import get_version
+        from setuptools_scm import get_version  # type: ignore[import-not-found]
 
         __version__ = get_version()
     except ImportError:
         __version__ = "unknown"
 
-__author__ = "Fubon MCP Team"
+__author__ = "Jimmy Cui"
 
 # 匯入主要組件
 from .server import (  # Callable wrapper functions for testing

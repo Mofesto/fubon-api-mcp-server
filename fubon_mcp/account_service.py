@@ -5,7 +5,7 @@ This module contains MCP tools related to account management,
 including balance, inventory, settlement, and financial information.
 """
 
-from typing import Dict
+from typing import Any, Dict
 
 from . import config as config_module  # 導入 config 模組
 from .config import mcp
@@ -49,7 +49,7 @@ def _get_all_accounts_basic_info() -> Dict:
     }
 
 
-def _get_basic_account_info(account_obj) -> Dict:
+def _get_basic_account_info(account_obj: Any) -> Dict[str, Any]:
     """Get basic account information"""
     return {
         "basic_info": {
@@ -61,30 +61,37 @@ def _get_basic_account_info(account_obj) -> Dict:
     }
 
 
-def _get_account_financial_info(account_obj) -> Dict:
+def _get_account_financial_info(account_obj: Any) -> Dict[str, Any]:
     """Get account financial information"""
     info = {}
 
+    # Check if SDK is initialized
+    if not config_module.sdk or not config_module.sdk.accounting:
+        return {"error": "SDK not initialized or accounting module not available"}
+
+    # Assert SDK is available for type checker
+    assert config_module.sdk is not None and config_module.sdk.accounting is not None
+
     # Get bank balance
     info["bank_balance"] = _safe_api_call(
-        lambda: config_module.sdk.accounting.bank_remain(account_obj), "Failed to get bank balance"
+        lambda: config_module.sdk.accounting.bank_remain(account_obj), "Failed to get bank balance"  # type: ignore[union-attr]
     )
 
     # Get unrealized P&L
     info["unrealized_pnl"] = _safe_api_call(
-        lambda: config_module.sdk.accounting.unrealized_gains_and_loses(account_obj), "Failed to get unrealized P&L"
+        lambda: config_module.sdk.accounting.unrealized_gains_and_loses(account_obj), "Failed to get unrealized P&L"  # type: ignore[union-attr]
     )
 
     # Get settlement info (today)
     info["settlement_today"] = _safe_api_call(
-        lambda: config_module.sdk.accounting.query_settlement(account_obj, "0d"), "Failed to get settlement info"
+        lambda: config_module.sdk.accounting.query_settlement(account_obj, "0d"), "Failed to get settlement info"  # type: ignore[union-attr]
     )
 
     return info
 
 
 @mcp.tool()
-def get_account_info(args: Dict) -> Dict:
+def get_account_info(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get account information including balance, inventory, P&L, etc.
 
@@ -119,7 +126,7 @@ def get_account_info(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_inventory(args: Dict) -> Dict:
+def get_inventory(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get account inventory information
 
@@ -134,6 +141,10 @@ def get_inventory(args: Dict) -> Dict:
         account_obj, error = validate_and_get_account(account)
         if error:
             return {"status": "error", "data": None, "message": error}
+
+        # Check if SDK is initialized
+        if not config_module.sdk or not config_module.sdk.accounting:
+            return {"status": "error", "data": None, "message": "SDK not initialized or accounting module not available"}
 
         # Get inventory information
         inventory = config_module.sdk.accounting.inventories(account_obj)
@@ -151,7 +162,7 @@ def get_inventory(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_unrealized_pnl(args: Dict) -> Dict:
+def get_unrealized_pnl(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get unrealized P&L information
 
@@ -166,6 +177,10 @@ def get_unrealized_pnl(args: Dict) -> Dict:
         account_obj, error = validate_and_get_account(account)
         if error:
             return {"status": "error", "data": None, "message": error}
+
+        # Check if SDK is initialized
+        if not config_module.sdk or not config_module.sdk.accounting:
+            return {"status": "error", "data": None, "message": "SDK not initialized or accounting module not available"}
 
         # Get unrealized P&L
         unrealized_pnl = config_module.sdk.accounting.unrealized_gains_and_loses(account_obj)
@@ -183,7 +198,7 @@ def get_unrealized_pnl(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_settlement_info(args: Dict) -> Dict:
+def get_settlement_info(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get settlement information (receivables/payables)
 
@@ -201,6 +216,10 @@ def get_settlement_info(args: Dict) -> Dict:
         if error:
             return {"status": "error", "data": None, "message": error}
 
+        # Check if SDK is initialized
+        if not config_module.sdk or not config_module.sdk.accounting:
+            return {"status": "error", "data": None, "message": "SDK not initialized or accounting module not available"}
+
         # Get settlement information
         settlement = config_module.sdk.accounting.query_settlement(account_obj, days)
         if settlement and hasattr(settlement, "is_success") and settlement.is_success:
@@ -217,7 +236,7 @@ def get_settlement_info(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_bank_balance(args: Dict) -> Dict:
+def get_bank_balance(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get account bank balance (funds balance)
 
@@ -232,6 +251,10 @@ def get_bank_balance(args: Dict) -> Dict:
         account_obj, error = validate_and_get_account(account)
         if error:
             return {"status": "error", "data": None, "message": error}
+
+        # Check if SDK is initialized
+        if not config_module.sdk or not config_module.sdk.accounting:
+            return {"status": "error", "data": None, "message": "SDK not initialized or accounting module not available"}
 
         # Get bank balance information
         bank_balance = config_module.sdk.accounting.bank_remain(account_obj)

@@ -45,6 +45,10 @@ def get_order_results(args: Dict) -> Dict:
         if error:
             return {"status": "error", "data": None, "message": error}
 
+        # Check if SDK is initialized
+        if not sdk or not sdk.stock:
+            return {"status": "error", "data": None, "message": "SDK not initialized or stock module not available"}
+
         # Get order results
         order_results = sdk.stock.get_order_results(account_obj)
         if order_results and hasattr(order_results, "is_success") and order_results.is_success:

@@ -58,10 +58,9 @@ def main():
     success, output = run_command("python -m flake8 fubon_mcp tests", "檢查 flake8 代碼品質")
     results.append(("flake8 代碼品質", success))
 
-    # 6. 檢查類型提示 (由於配置寬鬆，總是通過)
-    print(f"🔍 檢查 mypy 類型檢查...")
-    print(f"✅ 檢查 mypy 類型檢查 - 成功")
-    results.append(("mypy 類型檢查", True))
+    # 6. 檢查類型提示 - 實際運行 mypy
+    success, output = run_command("python -m mypy fubon_mcp", "檢查 mypy 類型檢查")
+    results.append(("mypy 類型檢查", success))
 
     # 7. 運行測試
     success, output = run_command("python -m pytest --tb=short", "運行測試套件")

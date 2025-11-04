@@ -7,6 +7,7 @@ and global SDK instances used throughout the application.
 
 import os
 from pathlib import Path
+from typing import Any, Optional
 
 from fastmcp import FastMCP
 
@@ -26,10 +27,10 @@ BASE_DATA_DIR.mkdir(parents=True, exist_ok=True)
 # =============================================================================
 
 # Fubon API credentials from environment variables
-username = os.getenv("FUBON_USERNAME")
-password = os.getenv("FUBON_PASSWORD")
-pfx_path = os.getenv("FUBON_PFX_PATH")
-pfx_password = os.getenv("FUBON_PFX_PASSWORD")
+username: Optional[str] = os.getenv("FUBON_USERNAME")
+password: Optional[str] = os.getenv("FUBON_PASSWORD")
+pfx_path: Optional[str] = os.getenv("FUBON_PFX_PATH")
+pfx_password: Optional[str] = os.getenv("FUBON_PFX_PASSWORD")
 
 # =============================================================================
 # MCP Server Instance
@@ -43,10 +44,10 @@ mcp = FastMCP("fubon-api-mcp-server")
 # =============================================================================
 
 # Fubon SDK instance - initialized in main() to avoid import-time errors
-sdk = None
+sdk: Optional[Any] = None
 
 # Account information after login
-accounts = None
+accounts: Optional[Any] = None
 
 # REST API client for stock data queries
-reststock = None
+reststock: Optional[Any] = None

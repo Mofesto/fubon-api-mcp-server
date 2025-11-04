@@ -5,7 +5,7 @@ This module contains MCP tools for retrieving and managing historical
 stock data, with local caching capabilities.
 """
 
-from typing import Dict
+from typing import Any, Dict, Optional
 
 import pandas as pd
 
@@ -18,7 +18,7 @@ from .models import HistoricalCandlesArgs
 # =============================================================================
 
 
-def _get_local_historical_data(symbol: str, from_date: str, to_date: str) -> Dict:
+def _get_local_historical_data(symbol: str, from_date: str, to_date: str) -> Optional[Dict[str, Any]]:
     """Get historical data from local cache"""
     local_data = read_local_stock_data(symbol)
     if local_data is None:

@@ -6,6 +6,7 @@ The server has been refactored into modular components for better maintainabilit
 """
 
 import sys
+from typing import Any
 
 from fastmcp import FastMCP  # noqa: F401 - Used for MCP tool registration
 
@@ -65,115 +66,115 @@ from .trading_service import batch_place_order, cancel_order, modify_price, modi
 
 
 # Create callable wrapper functions for testing
-def callable_get_account_info(args):
+def callable_get_account_info(args: Any) -> Any:
     return get_account_info(args)
 
 
-def callable_get_inventory(args):
+def callable_get_inventory(args: Any) -> Any:
     return get_inventory(args)
 
 
-def callable_get_bank_balance(args):
+def callable_get_bank_balance(args: Any) -> Any:
     return get_bank_balance(args)
 
 
-def callable_get_settlement_info(args):
+def callable_get_settlement_info(args: Any) -> Any:
     return get_settlement_info(args)
 
 
-def callable_get_unrealized_pnl(args):
+def callable_get_unrealized_pnl(args: Any) -> Any:
     return get_unrealized_pnl(args)
 
 
-def callable_place_order(args):
+def callable_place_order(args: Any) -> Any:
     return place_order(args)
 
 
-def callable_modify_price(args):
+def callable_modify_price(args: Any) -> Any:
     return modify_price(args)
 
 
-def callable_modify_quantity(args):
+def callable_modify_quantity(args: Any) -> Any:
     return modify_quantity(args)
 
 
-def callable_cancel_order(args):
+def callable_cancel_order(args: Any) -> Any:
     return cancel_order(args)
 
 
-def callable_batch_place_order(args):
+def callable_batch_place_order(args: Any) -> Any:
     return batch_place_order(args)
 
 
-def callable_get_order_results(args):
+def callable_get_order_results(args: Any) -> Any:
     return get_order_results(args)
 
 
-def callable_get_order_reports(args):
+def callable_get_order_reports(args: Any) -> Any:
     return get_order_reports(args)
 
 
-def callable_get_order_changed_reports(args):
+def callable_get_order_changed_reports(args: Any) -> Any:
     return get_order_changed_reports(args)
 
 
-def callable_get_filled_reports(args):
+def callable_get_filled_reports(args: Any) -> Any:
     return get_filled_reports(args)
 
 
-def callable_get_event_reports(args):
+def callable_get_event_reports(args: Any) -> Any:
     return get_event_reports(args)
 
 
-def callable_get_all_reports(args):
+def callable_get_all_reports(args: Any) -> Any:
     return get_all_reports(args)
 
 
-def callable_get_realtime_quotes(args):
+def callable_get_realtime_quotes(args: Any) -> Any:
     return get_realtime_quotes(args)
 
 
-def callable_get_intraday_tickers(args):
+def callable_get_intraday_tickers(args: Any) -> Any:
     return get_intraday_tickers(args)
 
 
-def callable_get_intraday_ticker(args):
+def callable_get_intraday_ticker(args: Any) -> Any:
     return get_intraday_ticker(args)
 
 
-def callable_get_intraday_quote(args):
+def callable_get_intraday_quote(args: Any) -> Any:
     return get_intraday_quote(args)
 
 
-def callable_get_intraday_candles(args):
+def callable_get_intraday_candles(args: Any) -> Any:
     return get_intraday_candles(args)
 
 
-def callable_get_intraday_trades(args):
+def callable_get_intraday_trades(args: Any) -> Any:
     return get_intraday_trades(args)
 
 
-def callable_get_intraday_volumes(args):
+def callable_get_intraday_volumes(args: Any) -> Any:
     return get_intraday_volumes(args)
 
 
-def callable_get_snapshot_quotes(args):
+def callable_get_snapshot_quotes(args: Any) -> Any:
     return get_snapshot_quotes(args)
 
 
-def callable_get_snapshot_movers(args):
+def callable_get_snapshot_movers(args: Any) -> Any:
     return get_snapshot_movers(args)
 
 
-def callable_get_snapshot_actives(args):
+def callable_get_snapshot_actives(args: Any) -> Any:
     return get_snapshot_actives(args)
 
 
-def callable_get_historical_stats(args):
+def callable_get_historical_stats(args: Any) -> Any:
     return get_historical_stats(args)
 
 
-def main():
+def main() -> None:
     """
     應用程式主入口點函數。
 

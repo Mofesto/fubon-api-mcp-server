@@ -5,7 +5,7 @@ This module contains MCP tools for retrieving market data including
 real-time quotes, historical data, intraday data, and snapshots.
 """
 
-from typing import Dict
+from typing import Any, Dict
 
 from .config import mcp, reststock, sdk
 from .models import (
@@ -28,7 +28,7 @@ from .models import (
 
 
 @mcp.tool()
-def get_realtime_quotes(args: Dict) -> Dict:
+def get_realtime_quotes(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get real-time quotes
 
@@ -39,6 +39,10 @@ def get_realtime_quotes(args: Dict) -> Dict:
         validated_args = GetRealtimeQuotesArgs(**args)
         symbol = validated_args.symbol
 
+        # Check if SDK is initialized
+        if sdk is None:
+            return {"status": "error", "data": None, "message": "SDK not initialized"}
+
         # Use realtime API
         quotes = sdk.marketdata.realtime.quote(symbol)
         return {"status": "success", "data": quotes, "message": f"Successfully retrieved real-time quotes for {symbol}"}
@@ -47,7 +51,7 @@ def get_realtime_quotes(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_intraday_tickers(args: Dict) -> Dict:
+def get_intraday_tickers(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock/index list (query by conditions)
 
@@ -58,6 +62,10 @@ def get_intraday_tickers(args: Dict) -> Dict:
         validated_args = GetIntradayTickersArgs(**args)
         market = validated_args.market
 
+        # Check if reststock is initialized
+        if reststock is None:
+            return {"status": "error", "data": None, "message": "REST client not initialized"}
+
         result = reststock.intraday.tickers(market=market)
         return {"status": "success", "data": result, "message": f"Successfully retrieved stock list for {market} market"}
     except Exception as e:
@@ -65,7 +73,7 @@ def get_intraday_tickers(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_intraday_ticker(args: Dict) -> Dict:
+def get_intraday_ticker(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock basic information (query by symbol)
 
@@ -76,6 +84,10 @@ def get_intraday_ticker(args: Dict) -> Dict:
         validated_args = GetIntradayTickerArgs(**args)
         symbol = validated_args.symbol
 
+        # Check if reststock is initialized
+        if reststock is None:
+            return {"status": "error", "data": None, "message": "REST client not initialized"}
+
         result = reststock.intraday.ticker(symbol)
         return {"status": "success", "data": result, "message": f"Successfully retrieved basic info for {symbol}"}
     except Exception as e:
@@ -83,7 +95,7 @@ def get_intraday_ticker(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_intraday_quote(args: Dict) -> Dict:
+def get_intraday_quote(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock real-time quote (query by symbol)
 
@@ -94,6 +106,10 @@ def get_intraday_quote(args: Dict) -> Dict:
         validated_args = GetIntradayQuoteArgs(**args)
         symbol = validated_args.symbol
 
+        # Check if reststock is initialized
+        if reststock is None:
+            return {"status": "error", "data": None, "message": "REST client not initialized"}
+
         result = reststock.intraday.quote(symbol)
         return {"status": "success", "data": result, "message": f"Successfully retrieved real-time quote for {symbol}"}
     except Exception as e:
@@ -101,7 +117,7 @@ def get_intraday_quote(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_intraday_candles(args: Dict) -> Dict:
+def get_intraday_candles(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock price K-line (query by symbol)
 
@@ -112,6 +128,10 @@ def get_intraday_candles(args: Dict) -> Dict:
         validated_args = GetIntradayCandlesArgs(**args)
         symbol = validated_args.symbol
 
+        # Check if reststock is initialized
+        if reststock is None:
+            return {"status": "error", "data": None, "message": "REST client not initialized"}
+
         result = reststock.intraday.candles(symbol)
         return {"status": "success", "data": result, "message": f"Successfully retrieved intraday K-line for {symbol}"}
     except Exception as e:
@@ -119,7 +139,7 @@ def get_intraday_candles(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_intraday_trades(args: Dict) -> Dict:
+def get_intraday_trades(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock trade details (query by symbol)
 
@@ -130,6 +150,10 @@ def get_intraday_trades(args: Dict) -> Dict:
         validated_args = GetIntradayTradesArgs(**args)
         symbol = validated_args.symbol
 
+        # Check if reststock is initialized
+        if reststock is None:
+            return {"status": "error", "data": None, "message": "REST client not initialized"}
+
         result = reststock.intraday.trades(symbol)
         return {"status": "success", "data": result, "message": f"Successfully retrieved trade details for {symbol}"}
     except Exception as e:
@@ -137,7 +161,7 @@ def get_intraday_trades(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_intraday_volumes(args: Dict) -> Dict:
+def get_intraday_volumes(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock price-volume table (query by symbol)
 
@@ -148,6 +172,10 @@ def get_intraday_volumes(args: Dict) -> Dict:
         validated_args = GetIntradayVolumesArgs(**args)
         symbol = validated_args.symbol
 
+        # Check if reststock is initialized
+        if reststock is None:
+            return {"status": "error", "data": None, "message": "REST client not initialized"}
+
         result = reststock.intraday.volumes(symbol)
         return {"status": "success", "data": result, "message": f"Successfully retrieved price-volume table for {symbol}"}
     except Exception as e:
@@ -155,7 +183,7 @@ def get_intraday_volumes(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_snapshot_quotes(args: Dict) -> Dict:
+def get_snapshot_quotes(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock market snapshot (by market type)
 
@@ -166,6 +194,10 @@ def get_snapshot_quotes(args: Dict) -> Dict:
         validated_args = GetSnapshotQuotesArgs(**args)
         market = validated_args.market
 
+        # Check if reststock is initialized
+        if reststock is None:
+            return {"status": "error", "data": None, "message": "REST client not initialized"}
+
         result = reststock.snapshot.quotes(market)
         return {"status": "success", "data": result, "message": f"Successfully retrieved market snapshot for {market}"}
     except Exception as e:
@@ -173,7 +205,7 @@ def get_snapshot_quotes(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_snapshot_movers(args: Dict) -> Dict:
+def get_snapshot_movers(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock price change rankings (by market type)
 
@@ -184,6 +216,10 @@ def get_snapshot_movers(args: Dict) -> Dict:
         validated_args = GetSnapshotMoversArgs(**args)
         market = validated_args.market
 
+        # Check if reststock is initialized
+        if reststock is None:
+            return {"status": "error", "data": None, "message": "REST client not initialized"}
+
         result = reststock.snapshot.movers(market)
         return {"status": "success", "data": result, "message": f"Successfully retrieved price change rankings for {market}"}
     except Exception as e:
@@ -191,7 +227,7 @@ def get_snapshot_movers(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_snapshot_actives(args: Dict) -> Dict:
+def get_snapshot_actives(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock trading volume rankings (by market type)
 
@@ -201,6 +237,10 @@ def get_snapshot_actives(args: Dict) -> Dict:
     try:
         validated_args = GetSnapshotActivesArgs(**args)
         market = validated_args.market
+
+        # Check if reststock is initialized
+        if reststock is None:
+            return {"status": "error", "data": None, "message": "REST client not initialized"}
 
         result = reststock.snapshot.actives(market=market, trade="volume")
 
@@ -231,7 +271,7 @@ def get_snapshot_actives(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def get_historical_stats(args: Dict) -> Dict:
+def get_historical_stats(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get 52-week stock price data (query by symbol)
 
@@ -241,6 +281,10 @@ def get_historical_stats(args: Dict) -> Dict:
     try:
         validated_args = GetHistoricalStatsArgs(**args)
         symbol = validated_args.symbol
+
+        # Check if reststock is initialized
+        if reststock is None:
+            return {"status": "error", "data": None, "message": "REST client not initialized"}
 
         result = reststock.historical.stats(symbol)
         return {"status": "success", "data": result, "message": f"Successfully retrieved 52-week data for {symbol}"}

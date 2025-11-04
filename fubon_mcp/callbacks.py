@@ -8,22 +8,23 @@ for handling real-time updates from the Fubon API.
 import sys
 import threading
 from datetime import datetime
+from typing import Any, Dict, List
 
 # =============================================================================
 # Global Report Data Storage (Thread-safe)
 # =============================================================================
 
 # Latest order reports (keep max 10)
-latest_order_reports = []  # Stored by SDK callback functions
+latest_order_reports: List[Dict[str, Any]] = []  # Stored by SDK callback functions
 
 # Latest order change reports (keep max 10)
-latest_order_changed_reports = []  # Stored by SDK callback functions
+latest_order_changed_reports: List[Dict[str, Any]] = []  # Stored by SDK callback functions
 
 # Latest filled reports (keep max 10)
-latest_filled_reports = []  # Stored by SDK callback functions
+latest_filled_reports: List[Dict[str, Any]] = []  # Stored by SDK callback functions
 
 # Latest event reports (keep max 10)
-latest_event_reports = []  # Stored by SDK callback functions
+latest_event_reports: List[Dict[str, Any]] = []  # Stored by SDK callback functions
 
 # Global lock to avoid duplicate reconnections
 relogin_lock = threading.Lock()
@@ -34,7 +35,7 @@ relogin_lock = threading.Lock()
 # =============================================================================
 
 
-def on_order(order_data):
+def on_order(order_data: Any) -> None:
     """
     Order report event callback function.
 
@@ -60,7 +61,7 @@ def on_order(order_data):
         print(f"Error processing order report: {str(e)}", file=sys.stderr)
 
 
-def on_order_changed(order_changed_data):
+def on_order_changed(order_changed_data: Any) -> None:
     """
     Order change report event callback function.
 
@@ -86,7 +87,7 @@ def on_order_changed(order_changed_data):
         print(f"Error processing order change report: {str(e)}", file=sys.stderr)
 
 
-def on_filled(filled_data):
+def on_filled(filled_data: Any) -> None:
     """
     Filled report event callback function.
 
@@ -112,7 +113,7 @@ def on_filled(filled_data):
         print(f"Error processing fill report: {str(e)}", file=sys.stderr)
 
 
-def on_event(event_data):
+def on_event(event_data: Any) -> None:
     """
     Event notification callback function.
 

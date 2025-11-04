@@ -6,7 +6,7 @@ order placement, modification, cancellation, and batch operations.
 """
 
 import concurrent.futures
-from typing import Dict
+from typing import Any, Dict, Optional
 
 from .config import accounts, mcp, sdk
 from .models import BatchPlaceOrderArgs, CancelOrderArgs, ModifyPriceArgs, ModifyQuantityArgs, PlaceOrderArgs
@@ -17,36 +17,50 @@ from .utils import validate_and_get_account
 # =============================================================================
 
 
-def _find_target_order(order_results, order_no):
+def _find_target_order(order_results: Any, order_no: str) -> Optional[Any]:
     """Find target order from order results"""
     if hasattr(order_results, "data") and order_results.data:
         for order in order_results.data:
             if getattr(order, "order_no", None) == order_no:
                 return order
-    return None
+    return None  # Explicit return for mypy
 
 
-def _create_modify_object(target_order, modify_value, modify_type: str):
+def _create_modify_object(target_order: Any, modify_value: Any, modify_type: str) -> Optional[Any]:
     """Create modification object"""
+    if modify_type not in ("quantity", "price"):
+        raise ValueError(f"Unsupported modification type: {modify_type}")
+
+    if sdk is None or sdk.stock is None:
+        raise ValueError("SDK not initialized or stock module not available")
+
     if modify_type == "quantity":
         return sdk.stock.make_modify_quantity_obj(target_order, modify_value)
     elif modify_type == "price":
         return sdk.stock.make_modify_price_obj(target_order, str(modify_value))
     else:
+        # This should never happen due to the check above, but keep for type checkers
         raise ValueError(f"Unsupported modification type: {modify_type}")
 
 
-def _execute_modify_operation(account_obj, modify_obj, modify_type: str):
+def _execute_modify_operation(account_obj: Any, modify_obj: Any, modify_type: str) -> Any:
     """Execute modification operation"""
+    if modify_type not in ("quantity", "price"):
+        raise ValueError(f"Unsupported modification type: {modify_type}")
+
+    if sdk is None or sdk.stock is None:
+        raise ValueError("SDK not initialized or stock module not available")
+
     if modify_type == "quantity":
         return sdk.stock.modify_quantity(account_obj, modify_obj)
     elif modify_type == "price":
         return sdk.stock.modify_price(account_obj, modify_obj)
     else:
+        # This should never happen due to the check above, but mypy needs it
         raise ValueError(f"Unsupported modification type: {modify_type}")
 
 
-def _modify_order(account: str, order_no: str, modify_value, modify_type: str) -> Dict:
+def _modify_order(account: str, order_no: str, modify_value: Any, modify_type: str) -> Dict[str, Any]:
     """
     Generic order modification function
 
@@ -61,6 +75,10 @@ def _modify_order(account: str, order_no: str, modify_value, modify_type: str) -
         account_obj, error = validate_and_get_account(account)
         if error:
             return {"status": "error", "data": None, "message": error}
+
+        # Check if SDK is initialized
+        if not sdk or not sdk.stock:
+            return {"status": "error", "data": None, "message": "SDK not initialized or stock module not available"}
 
         # Get order results
         order_results = sdk.stock.get_order_results(account_obj)
@@ -95,79 +113,57 @@ def _modify_order(account: str, order_no: str, modify_value, modify_type: str) -
 # =============================================================================
 
 
-def _convert_order_data_to_enums(order_data):
+def _convert_order_data_to_enums(order_data: Dict[str, Any]) -> Dict[str, Any]:
     """Convert order data to enum values"""
     try:
-        from fubon_neo.constant import BSAction, MarketType, OrderType, PriceType, TimeInForce
+        from fubon_neo.constant import (  # type: ignore[import-not-found, unused-ignore]
+            BSAction,
+            MarketType,
+            OrderType,
+            PriceType,
+            TimeInForce,
+        )
+
+        buy_sell_str = order_data.get("buy_sell", "Buy")
+        buy_sell_enum = BSAction.Buy if buy_sell_str == "Buy" else BSAction.Sell
+
+        market_type_str = order_data.get("market_type", "Common")
+        market_type_enum = getattr(MarketType, market_type_str, MarketType.Common)
+
+        price_type_str = order_data.get("price_type", "Limit")
+        price_type_enum = getattr(PriceType, price_type_str, PriceType.Limit)
+
+        time_in_force_str = order_data.get("time_in_force", "ROD")
+        time_in_force_enum = getattr(TimeInForce, time_in_force_str, TimeInForce.ROD)
+
+        order_type_str = order_data.get("order_type", "Stock")
+        order_type_enum = getattr(OrderType, order_type_str, OrderType.Stock)
+
+        return {
+            "buy_sell": buy_sell_enum,
+            "market_type": market_type_enum,
+            "price_type": price_type_enum,
+            "time_in_force": time_in_force_enum,
+            "order_type": order_type_enum,
+        }
     except ImportError:
-        # For testing purposes, create mock enums
-        class MockEnum:
-            def __init__(self, value):
-                self.value = value
-
-        class BSAction:
-            Buy = MockEnum("Buy")
-            Sell = MockEnum("Sell")
-
-        class MarketType:
-            Common = MockEnum("Common")
-            AfterHour = MockEnum("AfterHour")
-
-        class OrderType:
-            Stock = MockEnum("Stock")
-            Odd = MockEnum("Odd")
-
-        class PriceType:
-            Limit = MockEnum("Limit")
-            Market = MockEnum("Market")
-
-        class TimeInForce:
-            ROD = MockEnum("ROD")
-            IOC = MockEnum("IOC")
-
-    buy_sell_str = order_data.get("buy_sell", "Buy")
-    buy_sell_enum = BSAction.Buy if buy_sell_str == "Buy" else BSAction.Sell
-
-    market_type_str = order_data.get("market_type", "Common")
-    market_type_enum = getattr(MarketType, market_type_str, MarketType.Common)
-
-    price_type_str = order_data.get("price_type", "Limit")
-    price_type_enum = getattr(PriceType, price_type_str, PriceType.Limit)
-
-    time_in_force_str = order_data.get("time_in_force", "ROD")
-    time_in_force_enum = getattr(TimeInForce, time_in_force_str, TimeInForce.ROD)
-
-    order_type_str = order_data.get("order_type", "Stock")
-    order_type_enum = getattr(OrderType, order_type_str, OrderType.Stock)
-
-    return {
-        "buy_sell": buy_sell_enum,
-        "market_type": market_type_enum,
-        "price_type": price_type_enum,
-        "time_in_force": time_in_force_enum,
-        "order_type": order_type_enum,
-    }
+        # Fallback for unit tests or environments without fubon_neo installed
+        # Return simple string-based values while preserving expected keys
+        return {
+            "buy_sell": order_data.get("buy_sell", "Buy"),
+            "market_type": order_data.get("market_type", "Common"),
+            "price_type": order_data.get("price_type", "Limit"),
+            "time_in_force": order_data.get("time_in_force", "ROD"),
+            "order_type": order_data.get("order_type", "Stock"),
+        }
 
 
-def _create_order_object(order_data, enums):
-    """Create order object"""
-    try:
-        from fubon_neo.sdk import Order
-    except ImportError:
-        # For testing purposes, create mock Order class
-        class Order:
-            def __init__(
-                self, buy_sell, symbol, price, quantity, market_type, price_type, time_in_force, order_type, user_def=None
-            ):
-                self.buy_sell = buy_sell
-                self.symbol = symbol
-                self.price = price
-                self.quantity = quantity
-                self.market_type = market_type
-                self.price_type = price_type
-                self.time_in_force = time_in_force
-                self.order_type = order_type
-                self.user_def = user_def
+def _create_order_object(order_data: Dict[str, Any], enums: Dict[str, Any]) -> Any:
+    """Create order object
+
+    Requires fubon_neo.sdk.Order to be available at runtime.
+    """
+    from fubon_neo.sdk import Order  # type: ignore[import-not-found, unused-ignore]
 
     return Order(
         buy_sell=enums["buy_sell"],
@@ -182,11 +178,29 @@ def _create_order_object(order_data, enums):
     )
 
 
-def _place_single_order(account_obj, order_data):
+def _place_single_order(account_obj: Any, order_data: Dict[str, Any]) -> Dict[str, Any]:
     """Process single order placement"""
     try:
+        # First, convert inputs to enums and build the order; propagate conversion errors to caller
         enums = _convert_order_data_to_enums(order_data)
-        order = _create_order_object(order_data, enums)
+        try:
+            order = _create_order_object(order_data, enums)
+        except ImportError:
+            return {
+                "order_data": order_data,
+                "result": None,
+                "success": False,
+                "error": "Dependency fubon_neo not installed or unavailable",
+            }
+
+        # Now check if SDK is initialized before placing the order
+        if not sdk or not sdk.stock:
+            return {
+                "order_data": order_data,
+                "result": None,
+                "success": False,
+                "error": "SDK not initialized or stock module not available",
+            }
 
         # Determine whether to use non-blocking mode
         is_non_blocking = order_data.get("is_non_blocking", False)
@@ -199,8 +213,7 @@ def _place_single_order(account_obj, order_data):
         return {"order_data": order_data, "result": None, "success": False, "error": str(e)}
 
 
-def _execute_batch_orders(account_obj, orders, max_workers):
-    """Execute batch orders"""
+def _execute_batch_orders(account_obj: Any, orders: list[Dict[str, Any]], max_workers: int) -> list[Dict[str, Any]]:
     results = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -215,7 +228,7 @@ def _execute_batch_orders(account_obj, orders, max_workers):
     return results
 
 
-def _summarize_batch_results(results):
+def _summarize_batch_results(results: list[Dict[str, Any]]) -> Dict[str, Any]:
     """Summarize batch order results"""
     successful_orders = [r for r in results if r["success"]]
     failed_orders = [r for r in results if not r["success"]]
@@ -234,7 +247,7 @@ def _summarize_batch_results(results):
 
 
 @mcp.tool()
-def place_order(args: Dict) -> Dict:
+def place_order(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Place buy/sell stock order
 
@@ -284,48 +297,25 @@ def place_order(args: Dict) -> Dict:
         if not account_obj:
             return {"status": "error", "data": None, "message": f"Account {account} not found"}
 
+        # Check if SDK is initialized
+        if not sdk or not sdk.stock:
+            return {"status": "error", "data": None, "message": "SDK not initialized or stock module not available"}
+
         try:
-            from fubon_neo.constant import BSAction, MarketType, OrderType, PriceType, TimeInForce
-            from fubon_neo.sdk import Order
+            from fubon_neo.constant import (  # type: ignore[import-not-found, unused-ignore]
+                BSAction,
+                MarketType,
+                OrderType,
+                PriceType,
+                TimeInForce,
+            )
+            from fubon_neo.sdk import Order  # type: ignore[import-not-found, unused-ignore]
         except ImportError:
-            # For testing purposes, create mock enums and Order class
-            class MockEnum:
-                def __init__(self, value):
-                    self.value = value
-
-            class BSAction:
-                Buy = MockEnum("Buy")
-                Sell = MockEnum("Sell")
-
-            class MarketType:
-                Common = MockEnum("Common")
-                AfterHour = MockEnum("AfterHour")
-
-            class OrderType:
-                Stock = MockEnum("Stock")
-                Odd = MockEnum("Odd")
-
-            class PriceType:
-                Limit = MockEnum("Limit")
-                Market = MockEnum("Market")
-
-            class TimeInForce:
-                ROD = MockEnum("ROD")
-                IOC = MockEnum("IOC")
-
-            class Order:
-                def __init__(
-                    self, buy_sell, symbol, price, quantity, market_type, price_type, time_in_force, order_type, user_def=None
-                ):
-                    self.buy_sell = buy_sell
-                    self.symbol = symbol
-                    self.price = price
-                    self.quantity = quantity
-                    self.market_type = market_type
-                    self.price_type = price_type
-                    self.time_in_force = time_in_force
-                    self.order_type = order_type
-                    self.user_def = user_def
+            return {
+                "status": "error",
+                "data": None,
+                "message": "Dependency fubon_neo not installed or unavailable",
+            }
 
         # Convert strings to corresponding enum values
         buy_sell_enum = BSAction.Buy if buy_sell == "Buy" else BSAction.Sell
@@ -360,7 +350,7 @@ def place_order(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def modify_quantity(args: Dict) -> Dict:
+def modify_quantity(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Modify order quantity
 
@@ -382,7 +372,7 @@ def modify_quantity(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def modify_price(args: Dict) -> Dict:
+def modify_price(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Modify order price
 
@@ -404,7 +394,7 @@ def modify_price(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def cancel_order(args: Dict) -> Dict:
+def cancel_order(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Cancel order
 
@@ -421,6 +411,10 @@ def cancel_order(args: Dict) -> Dict:
         account_obj, error = validate_and_get_account(account)
         if error:
             return {"status": "error", "data": None, "message": error}
+
+        # Check if SDK is initialized
+        if not sdk or not sdk.stock:
+            return {"status": "error", "data": None, "message": "SDK not initialized or stock module not available"}
 
         # Get order results
         order_results = sdk.stock.get_order_results(account_obj)
@@ -448,7 +442,7 @@ def cancel_order(args: Dict) -> Dict:
 
 
 @mcp.tool()
-def batch_place_order(args: Dict) -> Dict:
+def batch_place_order(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Place multiple orders in parallel
 

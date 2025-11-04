@@ -8,7 +8,7 @@ services, including account validation, error handling, and API calls.
 import functools
 import sys
 import traceback
-from typing import Tuple
+from typing import Any, Callable, Optional, Tuple, Union
 
 from . import config as config_module
 
@@ -17,7 +17,7 @@ from . import config as config_module
 # =============================================================================
 
 
-def handle_exceptions(func):
+def handle_exceptions(func: Callable[..., Any]) -> Callable[..., Any]:
     """
     Exception handling decorator.
 
@@ -33,7 +33,7 @@ def handle_exceptions(func):
     """
 
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
         try:
             return func(*args, **kwargs)
         except Exception as exp:
@@ -60,7 +60,7 @@ def handle_exceptions(func):
 # =============================================================================
 
 
-def validate_and_get_account(account: str) -> Tuple[object, str]:
+def validate_and_get_account(account: str) -> Tuple[Optional[Any], Optional[str]]:
     """
     Validate account and return account object.
 
@@ -93,7 +93,7 @@ def validate_and_get_account(account: str) -> Tuple[object, str]:
     return account_obj, None
 
 
-def get_order_by_no(account_obj, order_no: str) -> Tuple[object, str]:
+def get_order_by_no(account_obj: Any, order_no: str) -> Tuple[Optional[Any], Optional[str]]:
     """
     Get order object by order number.
 
@@ -106,6 +106,9 @@ def get_order_by_no(account_obj, order_no: str) -> Tuple[object, str]:
                If failed, order_obj is None, error_message is the error message
     """
     try:
+        if not config_module.sdk or not config_module.sdk.stock:
+            return None, "SDK not initialized or stock module not available"
+
         order_results = config_module.sdk.stock.get_order_results(account_obj)
         if not (order_results and hasattr(order_results, "is_success") and order_results.is_success):
             return None, "Unable to get account order results"
@@ -131,7 +134,7 @@ def get_order_by_no(account_obj, order_no: str) -> Tuple[object, str]:
 # =============================================================================
 
 
-def _safe_api_call(api_func, error_prefix: str):
+def _safe_api_call(api_func: Callable[[], Any], error_prefix: str) -> Union[Any, str, None]:
     """
     Safely call API function with error handling.
 

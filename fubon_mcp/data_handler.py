@@ -9,7 +9,7 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
@@ -47,7 +47,7 @@ def read_local_stock_data(stock_code: str) -> Optional[pd.DataFrame]:
         return None
 
 
-def save_to_local_csv(symbol: str, new_data: List[dict]):
+def save_to_local_csv(symbol: str, new_data: List[Dict[str, Any]]) -> None:
     """
     Save new stock data to local CSV file, avoiding duplicates.
 
@@ -120,7 +120,7 @@ def process_historical_data(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def fetch_historical_data_segment(symbol: str, from_date: str, to_date: str) -> List[dict]:
+def fetch_historical_data_segment(symbol: str, from_date: str, to_date: str) -> List[Dict[str, Any]]:
     """
     Fetch a segment of historical data.
 
@@ -133,6 +133,11 @@ def fetch_historical_data_segment(symbol: str, from_date: str, to_date: str) -> 
         list: Data list, returns empty list if failed
     """
     try:
+        # Check if reststock is initialized
+        if reststock is None:
+            print("REST client not initialized", file=sys.stderr)
+            return []
+
         params = {"symbol": symbol, "from": from_date, "to": to_date}
         print(f"Fetching {symbol} data from {params['from']} to {params['to']}...", file=sys.stderr)
         response = reststock.historical.candles(**params)
@@ -141,8 +146,11 @@ def fetch_historical_data_segment(symbol: str, from_date: str, to_date: str) -> 
         if isinstance(response, dict):
             if "data" in response and response["data"]:
                 segment_data = response["data"]
-                print(f"Successfully fetched {len(segment_data)} records", file=sys.stderr)
-                return segment_data
+                if isinstance(segment_data, list):
+                    print(f"Successfully fetched {len(segment_data)} records", file=sys.stderr)
+                    return segment_data
+                else:
+                    print(f"API response data is not a list: {segment_data}", file=sys.stderr)
             else:
                 print(f"API response has no data: {response}", file=sys.stderr)
         else:

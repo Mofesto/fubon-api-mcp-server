@@ -10,7 +10,7 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
-    {name = "Fubon MCP Team", email = "mcp@fubon.com"},
+    {name = "Jimmy Cui", email = "mcp@fubon.com"},
 ]
 maintainers = [
     {name = "Mofesto.Cui", email = "mofesto.cui@gmail.com"},
@@ -128,7 +128,7 @@ disallow_untyped_defs = false  # 階段 1: 保持寬鬆
 disallow_incomplete_defs = false
 check_untyped_defs = false
 disallow_untyped_decorators = false
-no_implicit_optional = false  # 階段 2: 啟用此項
+no_implicit_optional = true  # 階段 2: 已啟用 - 要求明確的可選類型註解
 warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
