@@ -14,6 +14,31 @@
     For full CI validation, use: .\check_and_fix.ps1
 #>
 
+# Get script directory and change to project root
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectRoot = if (Test-Path (Join-Path $scriptDir "scripts")) {
+    # Running from scripts directory
+    $scriptDir
+} elseif (Test-Path (Join-Path $scriptDir ".." "fubon_mcp")) {
+    # Running from scripts subdirectory
+    Split-Path -Parent $scriptDir
+} else {
+    # Assume current directory is project root
+    Get-Location
+}
+
+# Change to project root
+Push-Location $projectRoot
+
+# Ensure we can find the source directories
+if (-not (Test-Path "fubon_mcp") -or -not (Test-Path "tests")) {
+    Write-Host "Error: Cannot find fubon_mcp or tests directory" -ForegroundColor Red
+    Write-Host "Current location: $(Get-Location)" -ForegroundColor Yellow
+    Write-Host "Please run this script from the project root or scripts directory" -ForegroundColor Yellow
+    Pop-Location
+    exit 1
+}
+
 # Color output functions
 function Write-CheckResult {
     param(
@@ -96,21 +121,31 @@ $results += Invoke-QuickCheck `
 # Quick test run (most important tests only)
 Write-Host "Running quick tests... " -NoNewline
 
-$testResult = & pytest -q --tb=no `
-    tests/test_config.py `
-    tests/test_models.py `
-    tests/test_package.py 2>&1
-
-$testSuccess = $LASTEXITCODE -eq 0
-
-if ($testSuccess) {
-    Write-Host "✓" -ForegroundColor Green
-} else {
+try {
+    $testOutput = & pytest -q --tb=no `
+        tests/test_config.py `
+        tests/test_models.py `
+        tests/test_package.py 2>&1
+    
+    $testSuccess = $LASTEXITCODE -eq 0
+    
+    if ($testSuccess) {
+        Write-Host "✓" -ForegroundColor Green
+    } else {
+        Write-Host "✗" -ForegroundColor Red
+        if ($testOutput) {
+            Write-Host "  Output:" -ForegroundColor Gray
+            $testOutput | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
+        }
+        Write-Host "  Run 'pytest -v' for details" -ForegroundColor Yellow
+    }
+    
+    $results += $testSuccess
+} catch {
     Write-Host "✗" -ForegroundColor Red
-    Write-Host "  Run 'pytest -v' for details" -ForegroundColor Yellow
+    Write-Host "  Error: $($_.Exception.Message)" -ForegroundColor Red
+    $results += $false
 }
-
-$results += $testSuccess
 
 # Summary
 Write-Host ""
@@ -118,9 +153,11 @@ Write-Host ""
 if ($results -notcontains $false) {
     Write-Host "✓ All quick checks passed!" -ForegroundColor Green
     Write-Host "Note: Run '.\check_and_fix.ps1' for full CI validation" -ForegroundColor Yellow
+    Pop-Location
     exit 0
 } else {
     Write-Host "✗ Some checks failed" -ForegroundColor Red
     Write-Host "Run '.\check_and_fix.ps1 -Fix -Verbose' for details" -ForegroundColor Yellow
+    Pop-Location
     exit 1
 }
