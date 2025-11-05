@@ -529,10 +529,19 @@ class GetIntradayVolumesArgs(BaseModel):
 
 class GetSnapshotQuotesArgs(BaseModel):
     market: str
+    type: Optional[str] = None  # 標的類型，可選 ALLBUT099 或 COMMONSTOCK
 
 
 class GetSnapshotMoversArgs(BaseModel):
     market: str
+    direction: str = "up"  # 上漲／下跌，可選 up 上漲；down 下跌
+    change: str = "percent"  # 漲跌／漲跌幅，可選 percent 漲跌幅；value 漲跌
+    gt: Optional[float] = None  # 篩選大於漲跌／漲跌幅的股票
+    gte: Optional[float] = None  # 篩選大於或等於漲跌／漲跌幅的股票
+    lt: Optional[float] = None  # 篩選小於漲跌／漲跌幅的股票
+    lte: Optional[float] = None  # 篩選小於或等於漲跌／漲跌幅的股票
+    eq: Optional[float] = None  # 篩選等於漲跌／漲跌幅的股票
+    type: Optional[str] = None  # 標的類型，可選 ALLBUT099 或 COMMONSTOCK
 
 
 class GetSnapshotActivesArgs(BaseModel):
@@ -1251,14 +1260,43 @@ def get_snapshot_quotes(args: Dict) -> dict:
     獲取股票行情快照（依市場別）
 
     Args:
-        market (str): 市場別，如 TSE, OTC
+        market (str): 市場別，可選 TSE 上市；OTC 上櫃；ESB 興櫃一般板；TIB 臺灣創新板；PSB 興櫃戰略新板
+        type (str): 標的類型，可選 ALLBUT099 包含一般股票、特別股及ETF ； COMMONSTOCK 為一般股票
     """
     try:
         validated_args = GetSnapshotQuotesArgs(**args)
         market = validated_args.market
+        type_param = validated_args.type
 
-        result = reststock.snapshot.quotes(market)
-        return {"status": "success", "data": result, "message": f"成功獲取 {market} 行情快照"}
+        # 構建API調用參數
+        api_params = {"market": market}
+        if type_param:
+            api_params["type"] = type_param
+
+        result = reststock.snapshot.quotes(**api_params)
+
+        # API 返回的是字典格式，包含 'data' 鍵
+        if isinstance(result, dict) and "data" in result:
+            data = result["data"]
+            if isinstance(data, list):
+                # 限制返回前50筆資料以避免過大回應
+                limited_data = data[:50] if len(data) > 50 else data
+                return {
+                    "status": "success",
+                    "data": limited_data,
+                    "total_count": len(data),
+                    "returned_count": len(limited_data),
+                    "market": result.get("market"),
+                    "type": result.get("type"),
+                    "date": result.get("date"),
+                    "time": result.get("time"),
+                    "message": f"成功獲取 {market} 行情快照 (顯示前 {len(limited_data)} 筆，共 {len(data)} 筆)",
+                }
+            else:
+                return {"status": "error", "data": None, "message": "API 返回的 data 欄位不是列表格式"}
+        else:
+            # 如果返回的不是預期的字典格式
+            return {"status": "success", "data": result, "message": f"成功獲取 {market} 行情快照"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"獲取行情快照失敗: {str(e)}"}
 
@@ -1269,14 +1307,77 @@ def get_snapshot_movers(args: Dict) -> dict:
     獲取股票漲跌幅排行（依市場別）
 
     Args:
-        market (str): 市場別，如 TSE, OTC
+        market (str): 市場別
+        direction (str): 上漲／下跌，可選 up 上漲；down 下跌，預設 "up"
+        change (str): 漲跌／漲跌幅，可選 percent 漲跌幅；value 漲跌，預設 "percent"
+        gt (float): 篩選大於漲跌／漲跌幅的股票
+        gte (float): 篩選大於或等於漲跌／漲跌幅的股票
+        lt (float): 篩選小於漲跌／漲跌幅的股票
+        lte (float): 篩選小於或等於漲跌／漲跌幅的股票
+        eq (float): 篩選等於漲跌／漲跌幅的股票
+        type (str): 標的類型，可選 ALLBUT099 包含一般股票、特別股及ETF ； COMMONSTOCK 為一般股票
     """
     try:
         validated_args = GetSnapshotMoversArgs(**args)
         market = validated_args.market
+        direction = validated_args.direction
+        change = validated_args.change
+        gt = validated_args.gt
+        gte = validated_args.gte
+        lt = validated_args.lt
+        lte = validated_args.lte
+        eq = validated_args.eq
+        type_param = validated_args.type
 
-        result = reststock.snapshot.movers(market)
-        return {"status": "success", "data": result, "message": f"成功獲取 {market} 漲跌幅排行"}
+        # 構建API調用參數 - 總是傳遞必要參數
+        api_params = {"market": market, "direction": direction, "change": change}
+        
+        # 篩選條件參數
+        filter_params = {}
+        if gt is not None:
+            filter_params["gt"] = gt
+        if gte is not None:
+            filter_params["gte"] = gte
+        if lt is not None:
+            filter_params["lt"] = lt
+        if lte is not None:
+            filter_params["lte"] = lte
+        if eq is not None:
+            filter_params["eq"] = eq
+        if type_param:
+            filter_params["type"] = type_param
+            
+        # 合併參數
+        api_params.update(filter_params)
+
+        # 調試輸出
+        print(f"API params: {api_params}", file=sys.stderr)
+        
+        result = reststock.snapshot.movers(**api_params)
+
+        # API 返回的是字典格式，包含 'data' 鍵
+        if isinstance(result, dict) and "data" in result:
+            data = result["data"]
+            if isinstance(data, list):
+                # 限制返回前50筆資料以避免過大回應
+                limited_data = data[:50] if len(data) > 50 else data
+                return {
+                    "status": "success",
+                    "data": limited_data,
+                    "total_count": len(data),
+                    "returned_count": len(limited_data),
+                    "market": result.get("market"),
+                    "direction": result.get("direction"),
+                    "change": result.get("change"),
+                    "date": result.get("date"),
+                    "time": result.get("time"),
+                    "message": f"成功獲取 {market} {direction} {change}排行 (顯示前 {len(limited_data)} 筆，共 {len(data)} 筆)",
+                }
+            else:
+                return {"status": "error", "data": None, "message": "API 返回的 data 欄位不是列表格式"}
+        else:
+            # 如果返回的不是預期的字典格式
+            return {"status": "success", "data": result, "message": f"成功獲取 {market} {direction} {change}排行"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"獲取漲跌幅排行失敗: {str(e)}"}
 
