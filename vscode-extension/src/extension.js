@@ -66,14 +66,25 @@ function registerMCPServerProvider(context) {
  */
 function getMCPConfigPath() {
     // VS Code MCP 配置位置 (標準 mcp.json)
+    // 支援多版本: Code (Stable), Code - Insiders, VSCodium 等
     const homeDir = os.homedir();
     
+    // 檢測當前 VS Code 版本
+    let vscodeDir = 'Code'; // 預設為 Stable
+    if (vscode.env.appName.includes('Insiders')) {
+        vscodeDir = 'Code - Insiders';
+    } else if (vscode.env.appName.includes('VSCodium')) {
+        vscodeDir = 'VSCodium';
+    } else if (vscode.env.appName.includes('Cursor')) {
+        vscodeDir = 'Cursor';
+    }
+    
     if (process.platform === 'win32') {
-        return path.join(homeDir, 'AppData', 'Roaming', 'Code', 'User', 'mcp.json');
+        return path.join(homeDir, 'AppData', 'Roaming', vscodeDir, 'User', 'mcp.json');
     } else if (process.platform === 'darwin') {
-        return path.join(homeDir, 'Library', 'Application Support', 'Code', 'User', 'mcp.json');
+        return path.join(homeDir, 'Library', 'Application Support', vscodeDir, 'User', 'mcp.json');
     } else {
-        return path.join(homeDir, '.config', 'Code', 'User', 'mcp.json');
+        return path.join(homeDir, '.config', vscodeDir, 'User', 'mcp.json');
     }
 }
 
