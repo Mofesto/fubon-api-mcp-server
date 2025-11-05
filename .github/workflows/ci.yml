@@ -42,6 +42,8 @@ jobs:
         pip install pandas fastmcp mcp pydantic python-dotenv
         pip install pytest pytest-cov pytest-xdist pytest-mock
         pip install flake8 black isort mypy pandas-stubs
+        # Install the package itself in editable mode
+        pip install -e .
 
     - name: Lint with flake8
       continue-on-error: true
