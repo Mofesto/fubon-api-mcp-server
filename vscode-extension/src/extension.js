@@ -1,6 +1,8 @@
 const vscode = require('vscode');
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
 let mcpServerProcess = null;
 let outputChannel = null;
@@ -28,12 +30,144 @@ function activate(context) {
     context.subscriptions.push(
         vscode.commands.registerCommand('fubon-mcp.showLogs', showLogs)
     );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('fubon-mcp.configure', configureMCPServer)
+    );
+
+    // 註冊 MCP Server Provider
+    registerMCPServerProvider(context);
 
     // 自動啟動 (如果配置啟用)
     const config = vscode.workspace.getConfiguration('fubon-mcp');
     if (config.get('autoStart')) {
         startMCPServer();
     }
+}
+
+/**
+ * 註冊 MCP Server Provider (for GitHub Copilot integration)
+ */
+function registerMCPServerProvider(context) {
+    // 檢查是否存在 MCP Server 配置文件
+    const mcpConfigPath = getMCPConfigPath();
+    
+    if (!fs.existsSync(mcpConfigPath)) {
+        // 提示用戶配置
+        outputChannel.appendLine('MCP Server 配置文件不存在，請執行 "Configure Fubon MCP Server" 命令');
+    } else {
+        outputChannel.appendLine(`MCP Server 配置文件: ${mcpConfigPath}`);
+    }
+}
+
+/**
+ * 獲取 MCP 配置文件路徑
+ */
+function getMCPConfigPath() {
+    // VS Code MCP 配置位置
+    const homeDir = os.homedir();
+    
+    if (process.platform === 'win32') {
+        return path.join(homeDir, 'AppData', 'Roaming', 'Code', 'User', 'globalStorage', 'github.copilot-chat', 'config.json');
+    } else if (process.platform === 'darwin') {
+        return path.join(homeDir, 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'github.copilot-chat', 'config.json');
+    } else {
+        return path.join(homeDir, '.config', 'Code', 'User', 'globalStorage', 'github.copilot-chat', 'config.json');
+    }
+}
+
+/**
+ * 配置 MCP Server
+ */
+async function configureMCPServer() {
+    const config = vscode.workspace.getConfiguration('fubon-mcp');
+    
+    // 獲取配置
+    const username = await vscode.window.showInputBox({
+        prompt: '請輸入富邦證券帳號',
+        value: config.get('username') || '',
+        placeHolder: '您的富邦證券帳號'
+    });
+    
+    if (!username) {
+        vscode.window.showWarningMessage('未輸入帳號，取消配置');
+        return;
+    }
+    
+    const pfxPath = await vscode.window.showInputBox({
+        prompt: '請輸入 PFX 憑證檔案路徑',
+        value: config.get('pfxPath') || '',
+        placeHolder: 'C:\\path\\to\\your\\certificate.pfx'
+    });
+    
+    if (!pfxPath) {
+        vscode.window.showWarningMessage('未輸入憑證路徑，取消配置');
+        return;
+    }
+    
+    const dataDir = await vscode.window.showInputBox({
+        prompt: '請輸入數據儲存目錄',
+        value: config.get('dataDir') || './data',
+        placeHolder: './data'
+    });
+    
+    // 保存配置
+    await config.update('username', username, vscode.ConfigurationTarget.Global);
+    await config.update('pfxPath', pfxPath, vscode.ConfigurationTarget.Global);
+    await config.update('dataDir', dataDir, vscode.ConfigurationTarget.Global);
+    
+    // 更新 MCP 配置文件
+    try {
+        await updateMCPConfig(username, pfxPath, dataDir);
+        vscode.window.showInformationMessage('Fubon MCP Server 配置已更新！請重新載入 VS Code 以生效。');
+    } catch (error) {
+        vscode.window.showErrorMessage(`更新 MCP 配置失敗: ${error.message}`);
+    }
+}
+
+/**
+ * 更新 MCP 配置文件
+ */
+async function updateMCPConfig(username, pfxPath, dataDir) {
+    const mcpConfigPath = getMCPConfigPath();
+    const configDir = path.dirname(mcpConfigPath);
+    
+    // 確保目錄存在
+    if (!fs.existsSync(configDir)) {
+        fs.mkdirSync(configDir, { recursive: true });
+    }
+    
+    // 讀取或創建配置
+    let mcpConfig = { mcpServers: {} };
+    
+    if (fs.existsSync(mcpConfigPath)) {
+        try {
+            const content = fs.readFileSync(mcpConfigPath, 'utf8');
+            mcpConfig = JSON.parse(content);
+            if (!mcpConfig.mcpServers) {
+                mcpConfig.mcpServers = {};
+            }
+        } catch (error) {
+            outputChannel.appendLine(`讀取 MCP 配置失敗: ${error.message}`);
+        }
+    }
+    
+    // 添加 Fubon MCP Server 配置
+    mcpConfig.mcpServers['fubon-api'] = {
+        command: 'python',
+        args: ['-m', 'fubon_mcp.server'],
+        env: {
+            FUBON_USERNAME: username,
+            FUBON_PFX_PATH: pfxPath,
+            FUBON_DATA_DIR: dataDir || './data',
+            // 密碼需要在 .env 文件中設置
+            FUBON_PASSWORD: '${env:FUBON_PASSWORD}',
+            FUBON_PFX_PASSWORD: '${env:FUBON_PFX_PASSWORD}'
+        }
+    };
+    
+    // 寫入配置
+    fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
+    outputChannel.appendLine(`MCP 配置已更新: ${mcpConfigPath}`);
 }
 
 /**

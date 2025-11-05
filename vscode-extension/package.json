@@ -2,7 +2,7 @@
   "name": "fubon-api-mcp-server",
   "displayName": "Fubon API MCP Server",
   "description": "富邦證券 MCP Server - 完整的台股交易功能與市場數據查詢",
-  "version": "1.8.6",
+  "version": "1.8.7",
   "publisher": "mofesto",
   "icon": "icon.png",
   "engines": {
@@ -41,6 +41,21 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "modelContextProtocol": {
+      "servers": {
+        "fubon-api": {
+          "command": "python",
+          "args": ["-m", "fubon_mcp.server"],
+          "env": {
+            "FUBON_USERNAME": "",
+            "FUBON_PASSWORD": "",
+            "FUBON_PFX_PATH": "",
+            "FUBON_PFX_PASSWORD": "",
+            "FUBON_DATA_DIR": "./data"
+          }
+        }
+      }
+    },
     "configuration": {
       "title": "Fubon API MCP Server",
       "properties": {
@@ -68,6 +83,11 @@
     },
     "commands": [
       {
+        "command": "fubon-mcp.configure",
+        "title": "Configure Fubon MCP Server",
+        "category": "Fubon MCP"
+      },
+      {
         "command": "fubon-mcp.start",
         "title": "Start Fubon MCP Server",
         "category": "Fubon MCP"
@@ -90,6 +110,10 @@
     ],
     "menus": {
       "commandPalette": [
+        {
+          "command": "fubon-mcp.configure",
+          "when": "true"
+        },
         {
           "command": "fubon-mcp.start",
           "when": "true"

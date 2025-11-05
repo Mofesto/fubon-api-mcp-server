@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.7] - 2025-11-05
+
+### 🔧 Fixed
+- **MCP Server 註冊問題**: 添加正確的 `modelContextProtocol` contribution point 到 package.json
+- 修正 MCP Server 無法在 GitHub Copilot "已安裝的 MCP Servers" 列表中顯示的問題
+- 修正配置檔案路徑在不同作業系統上的相容性問題
+
+### ✨ Added
+- **Configure 命令**: 新增 `Configure Fubon MCP Server` 命令,提供互動式設定流程
+- **自動配置寫入**: 自動更新 GitHub Copilot 的 MCP 配置檔案 (config.json)
+- **MCP Server Provider**: 實作標準的 MCP Server Provider 註冊機制
+- **詳細設置指南**: 添加 `MCP_SETUP_GUIDE.md` 完整的設置與疑難排解文檔
+- 支援跨平台配置檔案路徑 (Windows/macOS/Linux)
+
+### 📝 Changed
+- 優化 extension.js 的 MCP Server Provider 註冊邏輯
+- 改進配置檔案自動生成與更新機制
+- 更新 README 添加 "為什麼 MCP Server 沒有出現" 疑難排解章節
+- 添加環境變數配置範例
+
+### 🔒 Security
+- 強烈建議使用環境變數儲存敏感資訊 (密碼、憑證密碼)
+- 配置範例使用 `${env:VAR}` 語法替代硬編碼密碼
+- 添加安全最佳實踐說明
+
+### 📚 Documentation
+- 新增完整的 MCP Server 配置步驟說明
+- 添加多個配置範例 (絕對路徑、環境變數、虛擬環境)
+- 提供詳細的除錯步驟與檢查清單
+
 ## [1.8.6] - 2025-11-04
 
 ### Added
