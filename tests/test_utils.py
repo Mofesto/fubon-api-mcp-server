@@ -17,6 +17,7 @@ from fubon_api_mcp_server.server import (
     save_to_local_csv,
     validate_and_get_account,
 )
+from fubon_api_mcp_server.utils import handle_exceptions, validate_and_get_account as utils_validate_and_get_account, get_order_by_no as utils_get_order_by_no, _safe_api_call as utils_safe_api_call
 
 
 class TestValidateAndGetAccount:
@@ -217,3 +218,120 @@ class TestSaveToLocalCsv:
 
         mock_to_csv.assert_called_once()
         mock_move.assert_called_once()
+
+
+class TestHandleExceptions:
+    """Test handle_exceptions decorator."""
+
+    def test_handle_exceptions_success(self):
+        """Test decorator with successful function."""
+        @handle_exceptions
+        def test_func():
+            return "success"
+
+        result = test_func()
+        assert result == "success"
+
+    def test_handle_exceptions_failure(self, capsys):
+        """Test decorator with exception."""
+        @handle_exceptions
+        def test_func():
+            raise ValueError("test error")
+
+        result = test_func()
+        assert result is None
+
+        captured = capsys.readouterr()
+        assert "test_func exception: test error" in captured.err
+        assert "Traceback" in captured.err
+
+
+class TestUtilsValidateAndGetAccount:
+    """Test validate_and_get_account from utils.py."""
+
+    @patch("dotenv.load_dotenv")
+    @patch("fubon_neo.sdk.FubonSDK")
+    @patch.dict("os.environ", {
+        "FUBON_USERNAME": "test_user",
+        "FUBON_PASSWORD": "test_pass",
+        "FUBON_PFX_PATH": "test.pfx",
+        "FUBON_PFX_PASSWORD": "test_pfx_pass"
+    })
+    def test_utils_validate_and_get_account_success(self, mock_sdk_class, mock_load_dotenv):
+        """Test successful account validation in utils."""
+        mock_sdk = Mock()
+        mock_accounts = Mock()
+        mock_accounts.is_success = True
+        mock_accounts.data = [Mock(account="123456")]
+        mock_sdk.login.return_value = mock_accounts
+        mock_sdk_class.return_value = mock_sdk
+
+        account_obj, error = utils_validate_and_get_account("123456")
+        assert account_obj is not None
+        assert error is None
+        assert account_obj.account == "123456"
+
+    @patch("dotenv.load_dotenv")
+    @patch.dict("os.environ", {}, clear=True)
+    def test_utils_validate_and_get_account_missing_env(self, mock_load_dotenv):
+        """Test missing environment variables."""
+        account_obj, error = utils_validate_and_get_account("123456")
+        assert account_obj is None
+        assert "Account authentication failed" in error
+
+
+class TestUtilsGetOrderByNo:
+    """Test get_order_by_no from utils.py."""
+
+    @patch("fubon_api_mcp_server.utils.config_module")
+    def test_utils_get_order_by_no_success(self, mock_config):
+        """Test successful order retrieval in utils."""
+        mock_order = Mock()
+        mock_order.order_no = "12345"
+
+        mock_result = Mock()
+        mock_result.is_success = True
+        mock_result.data = [mock_order]
+
+        mock_sdk = Mock()
+        mock_sdk.stock.get_order_results.return_value = mock_result
+        mock_config.sdk = mock_sdk
+
+        mock_account = Mock()
+        order_obj, error = utils_get_order_by_no(mock_account, "12345")
+        assert order_obj is not None
+        assert error is None
+        assert order_obj.order_no == "12345"
+
+    @patch("fubon_api_mcp_server.utils.config_module")
+    def test_utils_get_order_by_no_sdk_not_init(self, mock_config):
+        """Test SDK not initialized."""
+        mock_config.sdk = None
+        mock_account = Mock()
+        order_obj, error = utils_get_order_by_no(mock_account, "12345")
+        assert order_obj is None
+        assert "SDK not initialized" in error
+
+
+class TestUtilsSafeApiCall:
+    """Test _safe_api_call from utils.py."""
+
+    def test_utils_safe_api_call_success(self):
+        """Test successful API call in utils."""
+        mock_result = Mock()
+        mock_result.is_success = True
+        mock_result.data = {"test": "data"}
+
+        def mock_api_func():
+            return mock_result
+
+        result = utils_safe_api_call(mock_api_func, "Test error")
+        assert result == {"test": "data"}
+
+    def test_utils_safe_api_call_failure(self):
+        """Test failed API call in utils."""
+        def mock_api_func():
+            raise Exception("API error")
+
+        result = utils_safe_api_call(mock_api_func, "Test error")
+        assert result == "Test error: API error"

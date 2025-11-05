@@ -1860,6 +1860,18 @@ def main():
 
         print("富邦證券MCP server運行中...", file=sys.stderr)
         mcp.run()
+    except KeyboardInterrupt:
+        print("收到中斷信號，正在優雅關閉...", file=sys.stderr)
+        if sdk:
+            try:
+                result = sdk.logout()
+                if result:
+                    print("已成功登出", file=sys.stderr)
+                else:
+                    print("登出失敗", file=sys.stderr)
+            except Exception as e:
+                print(f"登出時發生錯誤: {str(e)}", file=sys.stderr)
+        sys.exit(0)
     except Exception as e:
         print(f"啟動伺服器時發生錯誤: {str(e)}", file=sys.stderr)
         sys.exit(1)

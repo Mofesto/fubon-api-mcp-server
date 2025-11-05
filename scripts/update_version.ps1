@@ -57,8 +57,21 @@ if ($Version) {
     $targetVersion = $Version
     Write-ColorOutput "使用指定版本: $targetVersion" "Yellow"
 } else {
-    $targetVersion = $config.version.current
-    Write-ColorOutput "使用配置版本: $targetVersion" "Green"
+    # 自動從 setuptools-scm 獲取版本
+    try {
+        $scmVersion = & python -c "import setuptools_scm; print(setuptools_scm.get_version())" 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            # 移除開發版本後綴，如 .dev0+...
+            $targetVersion = $scmVersion -replace '\.dev\d+\+.*', ''
+            Write-ColorOutput "從 setuptools-scm 獲取版本: $targetVersion" "Green"
+        } else {
+            $targetVersion = $config.version.current
+            Write-ColorOutput "無法獲取 setuptools-scm 版本，使用配置版本: $targetVersion" "Yellow"
+        }
+    } catch {
+        $targetVersion = $config.version.current
+        Write-ColorOutput "無法獲取 setuptools-scm 版本，使用配置版本: $targetVersion" "Yellow"
+    }
 }
 
 $date = Get-Date -Format "yyyy-MM-dd"
@@ -152,12 +165,10 @@ foreach ($file in $filesToUpdate) {
 }
 
 # 更新配置文件中的版本
-if ($Version) {
-    $config.version.current = $targetVersion
-    $config | ConvertTo-Json -Depth 10 | Set-Content $ConfigPath
-    Write-ColorOutput "  ✓ $ConfigPath" "Green"
-    $updatedCount++
-}
+$config.version.current = $targetVersion
+$config | ConvertTo-Json -Depth 10 | Set-Content $ConfigPath
+Write-ColorOutput "  ✓ $ConfigPath" "Green"
+$updatedCount++
 
 Write-ColorOutput "`n==> 完成" "Cyan"
 Write-ColorOutput "已更新 $updatedCount 個文件" "Green"

@@ -173,7 +173,12 @@ jobs:
     - name: Update package.json version
       working-directory: ./vscode-extension
       run: |
-        npm version ${{ needs.version.outputs.version }} --no-git-tag-version
+        jq '.version = "${{ needs.version.outputs.version }}"' package.json > tmp.json && mv tmp.json package.json
+
+    - name: Update version_config.json
+      run: |
+        # 更新 scripts/version_config.json 中的版本
+        jq '.version.current = "${{ needs.version.outputs.version }}"' scripts/version_config.json > tmp.json && mv tmp.json scripts/version_config.json
 
     - name: Install dependencies
       working-directory: ./vscode-extension
