@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.8] - 2025-11-05
+
+### 🔧 Fixed
+- **編碼問題修正**: 修正 VS Code 輸出通道中文亂碼問題
+- 設置 `PYTHONIOENCODING=utf-8` 和 `PYTHONUTF8=1` 環境變數
+- 改進 stdout/stderr 數據處理,明確使用 UTF-8 解碼
+
+### 📝 Changed
+- 優化日誌輸出的錯誤處理
+- 添加編碼異常的 fallback 機制
+
 ## [1.8.7] - 2025-11-05
 
 ### 🔧 Fixed

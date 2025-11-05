@@ -7,9 +7,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fubon_mcp import config
+from fubon_api_mcp_server import config
 from fubon_neo.sdk import FubonSDK
-from fubon_mcp.account_service import get_account_info
+from fubon_api_mcp_server.account_service import get_account_info
 
 # Initialize SDK
 print("正在初始化 SDK...")

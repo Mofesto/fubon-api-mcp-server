@@ -82,16 +82,16 @@ Source = "https://github.com/mofesto/fubon-api-mcp-server"
 Tracker = "https://github.com/mofesto/fubon-api-mcp-server/issues"
 
 [project.scripts]
-fubon-api-mcp-server = "fubon_mcp.server:main"
+fubon-api-mcp-server = "fubon_api_mcp_server.server:main"
 
 [tool.setuptools_scm]
-write_to = "fubon_mcp/_version.py"
+write_to = "fubon_api_mcp_server/_version.py"
 version_scheme = "post-release"
 local_scheme = "node-and-date"
 fallback_version = "1.8.0"
 
 [tool.setuptools.package-data]
-fubon_mcp = ["*.txt", "*.md"]
+fubon_api_mcp_server = ["*.txt", "*.md"]
 
 [tool.black]
 line-length = 127
@@ -109,7 +109,7 @@ extend-exclude = '''
   | build
   | dist
   # auto-generated files
-  | fubon_mcp/_version\.py
+  | fubon_api_mcp_server/_version\.py
 )/
 '''
 
@@ -121,9 +121,9 @@ include_trailing_comma = true
 force_grid_wrap = 0
 use_parentheses = true
 ensure_newline_before_comments = true
-known_first_party = ["fubon_mcp"]
+known_first_party = ["fubon_api_mcp_server"]
 skip_gitignore = true
-skip = ["fubon_mcp/_version.py"]
+skip = ["fubon_api_mcp_server/_version.py"]
 extend_skip_glob = ["*/_version.py"]
 
 [tool.mypy]
@@ -164,13 +164,13 @@ ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = [
-    "fubon_mcp.indicators_service",
-    "fubon_mcp.market_data_service",
-    "fubon_mcp.historical_data_service",
-    "fubon_mcp.trading_service",
-    "fubon_mcp.reports_service",
-    "fubon_mcp.account_service",
-    "fubon_mcp.server",
+    "fubon_api_mcp_server.indicators_service",
+    "fubon_api_mcp_server.market_data_service",
+    "fubon_api_mcp_server.historical_data_service",
+    "fubon_api_mcp_server.trading_service",
+    "fubon_api_mcp_server.reports_service",
+    "fubon_api_mcp_server.account_service",
+    "fubon_api_mcp_server.server",
 ]
 disallow_untyped_decorators = false
 
@@ -186,7 +186,7 @@ addopts = [
     "--strict-markers",
     "--disable-warnings",
     "--durations=10",
-    "--cov=fubon_mcp",
+    "--cov=fubon_api_mcp_server",
     "--cov-report=term-missing",
     "--cov-report=xml",
 ]
@@ -197,12 +197,12 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["fubon_mcp"]
+source = ["fubon_api_mcp_server"]
 omit = [
     "*/tests/*",
     "*/test_*.py",
     "setup.py",
-    "fubon_mcp/_version.py",
+    "fubon_api_mcp_server/_version.py",
 ]
 
 [tool.coverage.report]

@@ -46,28 +46,28 @@ jobs:
     - name: Lint with flake8
       continue-on-error: true
       run: |
-        flake8 fubon_mcp tests --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 fubon_mcp tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        flake8 fubon_api_mcp_server tests --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 fubon_api_mcp_server tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
     - name: Check code formatting with black
       continue-on-error: true
       run: |
-        black --check --diff fubon_mcp tests --exclude fubon_mcp/_version.py
+        black --check --diff fubon_api_mcp_server tests --exclude fubon_api_mcp_server/_version.py
 
     - name: Check import sorting with isort
       continue-on-error: true
       run: |
-        isort --check-only --diff fubon_mcp tests --skip fubon_mcp/_version.py
+        isort --check-only --diff fubon_api_mcp_server tests --skip fubon_api_mcp_server/_version.py
 
     - name: Type check with mypy
       continue-on-error: true
       run: |
-        mypy fubon_mcp
+        mypy fubon_api_mcp_server
 
     - name: Run tests
       continue-on-error: true
       run: |
-        pytest --cov=fubon_mcp --cov-report=xml --cov-report=term-missing --cov-report=html --cov-fail-under=10
+        pytest --cov=fubon_api_mcp_server --cov-report=xml --cov-report=term-missing --cov-report=html --cov-fail-under=10
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5
@@ -105,7 +105,7 @@ jobs:
     - name: Run Bandit security linter
       continue-on-error: true
       run: |
-        bandit -r fubon_mcp -f json -o bandit-report.json
+        bandit -r fubon_api_mcp_server -f json -o bandit-report.json
 
     - name: Run Safety check
       continue-on-error: true

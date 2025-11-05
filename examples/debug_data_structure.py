@@ -7,10 +7,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fubon_mcp import config
+from fubon_api_mcp_server import config
 from fubon_neo.sdk import FubonSDK
-from fubon_mcp.account_service import get_inventory
-from fubon_mcp.market_data_service import get_intraday_quote
+from fubon_api_mcp_server.account_service import get_inventory
+from fubon_api_mcp_server.market_data_service import get_intraday_quote
 
 # Initialize SDK
 print("正在初始化 SDK...")

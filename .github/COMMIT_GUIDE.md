@@ -101,7 +101,7 @@ gh pr close 5 --comment "Changes manually applied in main branch"
 3. **本地重現問題**:
    ```powershell
    python validate_ci.py
-   pytest --cov=fubon_mcp --cov-fail-under=80
+   pytest --cov=fubon_api_mcp_server --cov-fail-under=80
    ```
 
 ### 如果 Codecov 無法上傳

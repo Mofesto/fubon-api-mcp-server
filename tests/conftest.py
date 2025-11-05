@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from fubon_mcp import config
+from fubon_api_mcp_server import config
 
 
 @pytest.fixture(scope="session")

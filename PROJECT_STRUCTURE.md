@@ -8,7 +8,7 @@ fubon-api-mcp-server/
 ├── assets/               # 資源文件 (圖片、QR Code等)
 ├── data/                 # 運行時數據目錄 (gitignore)
 ├── examples/             # 使用範例
-├── fubon_mcp/            # 核心源代碼
+├── fubon_api_mcp_server/            # 核心源代碼
 ├── log/                  # 日誌文件目錄 (gitignore)
 ├── scripts/              # 自動化腳本
 │   ├── version_config.json      # 版本和配置管理
@@ -62,7 +62,7 @@ pip install -e .[dev]
 - `.coverage`, `htmlcov/`: 測試覆蓋率報告
 - `log/`, `data/`: 運行時生成的日誌和數據
 - `.venv/`, `.env`: 虛擬環境和敏感配置
-- `fubon_mcp/_version.py`: 自動生成的版本文件
+- `fubon_api_mcp_server/_version.py`: 自動生成的版本文件
 
 ## 版本管理
 

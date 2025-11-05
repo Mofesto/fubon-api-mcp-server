@@ -23,7 +23,7 @@ from .utils import validate_and_get_account
 # =============================================================================
 
 
-@mcp.tool()
+
 def get_order_results(args: Dict) -> Dict:
     """
     Get order results for order and fill status confirmation
@@ -59,7 +59,7 @@ def get_order_results(args: Dict) -> Dict:
         return {"status": "error", "data": None, "message": f"Failed to get order results: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_order_reports(args: Dict) -> Dict:
     """
     Get latest order reports
@@ -83,7 +83,7 @@ def get_order_reports(args: Dict) -> Dict:
         return {"status": "error", "data": None, "message": f"Failed to get order reports: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_order_changed_reports(args: Dict) -> Dict:
     """
     Get latest order change reports
@@ -107,7 +107,7 @@ def get_order_changed_reports(args: Dict) -> Dict:
         return {"status": "error", "data": None, "message": f"Failed to get order change reports: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_filled_reports(args: Dict) -> Dict:
     """
     Get latest fill reports
@@ -131,7 +131,7 @@ def get_filled_reports(args: Dict) -> Dict:
         return {"status": "error", "data": None, "message": f"Failed to get fill reports: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_event_reports(args: Dict) -> Dict:
     """
     Get latest event notifications
@@ -155,7 +155,7 @@ def get_event_reports(args: Dict) -> Dict:
         return {"status": "error", "data": None, "message": f"Failed to get event reports: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_all_reports(args: Dict) -> Dict:
     """
     Get all types of active reports

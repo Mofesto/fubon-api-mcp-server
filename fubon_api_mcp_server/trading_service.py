@@ -249,7 +249,7 @@ def _summarize_batch_results(results: list[Dict[str, Any]]) -> Dict[str, Any]:
 # =============================================================================
 
 
-@mcp.tool()
+
 def place_order(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Place buy/sell stock order
@@ -352,7 +352,7 @@ def place_order(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Order placement failed: {str(e)}"}
 
 
-@mcp.tool()
+
 def modify_quantity(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Modify order quantity
@@ -374,7 +374,7 @@ def modify_quantity(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Quantity modification failed: {str(e)}"}
 
 
-@mcp.tool()
+
 def modify_price(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Modify order price
@@ -396,7 +396,7 @@ def modify_price(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Price modification failed: {str(e)}"}
 
 
-@mcp.tool()
+
 def cancel_order(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Cancel order
@@ -444,7 +444,7 @@ def cancel_order(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Order cancellation failed: {str(e)}"}
 
 
-@mcp.tool()
+
 def batch_place_order(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Place multiple orders in parallel

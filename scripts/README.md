@@ -198,8 +198,8 @@ git pull origin main
 pytest tests/test_specific.py -v
 
 # 檢查代碼格式
-black fubon_mcp --check
-flake8 fubon_mcp
+black fubon_api_mcp_server --check
+flake8 fubon_api_mcp_server
 ```
 
 ## 📚 相關文檔

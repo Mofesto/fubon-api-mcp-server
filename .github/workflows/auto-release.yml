@@ -47,15 +47,15 @@ jobs:
     - name: Run linters
       continue-on-error: true
       run: |
-        flake8 fubon_mcp tests --count --select=E9,F63,F7,F82 --show-source --statistics
-        black --check fubon_mcp tests --exclude fubon_mcp/_version.py
-        isort --check-only fubon_mcp tests --skip fubon_mcp/_version.py
-        mypy fubon_mcp
+        flake8 fubon_api_mcp_server tests --count --select=E9,F63,F7,F82 --show-source --statistics
+        black --check fubon_api_mcp_server tests --exclude fubon_api_mcp_server/_version.py
+        isort --check-only fubon_api_mcp_server tests --skip fubon_api_mcp_server/_version.py
+        mypy fubon_api_mcp_server
 
     - name: Run tests
       continue-on-error: true
       run: |
-        pytest --cov=fubon_mcp --cov-report=xml --cov-fail-under=10
+        pytest --cov=fubon_api_mcp_server --cov-report=xml --cov-fail-under=10
 
   # 計算新版本號
   version:

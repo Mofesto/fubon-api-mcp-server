@@ -39,7 +39,7 @@
 
 ```
 fubon-api-mcp-server/
-├── fubon_mcp/              # 主要程式碼
+├── fubon_api_mcp_server/              # 主要程式碼
 │   ├── __init__.py        # 包初始化
 │   └── server.py          # MCP 伺服器主程式
 ├── vscode-extension/       # VS Code Extension
@@ -106,7 +106,7 @@ pytest
 pytest tests/test_account_info.py
 
 # 運行覆蓋率測試
-pytest --cov=fubon_mcp --cov-report=html
+pytest --cov=fubon_api_mcp_server --cov-report=html
 ```
 
 ### 測試覆蓋率要求
@@ -128,12 +128,12 @@ pytest --cov=fubon_mcp --cov-report=html
 
 ```bash
 # 格式化代碼
-black fubon_mcp tests
-isort fubon_mcp tests
+black fubon_api_mcp_server tests
+isort fubon_api_mcp_server tests
 
 # 檢查代碼
-flake8 fubon_mcp tests
-mypy fubon_mcp
+flake8 fubon_api_mcp_server tests
+mypy fubon_api_mcp_server
 ```
 
 ### Pre-commit Hooks

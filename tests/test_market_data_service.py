@@ -9,8 +9,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fubon_mcp import config
-from fubon_mcp.market_data_service import (
+from fubon_api_mcp_server import config
+from fubon_api_mcp_server.market_data_service import (
     get_historical_stats,
     get_intraday_candles,
     get_intraday_quote,
@@ -278,7 +278,7 @@ class TestMarketDataServiceIntegration:
 
     def test_market_data_service_module_structure(self):
         """Test market_data_service module has expected structure."""
-        import fubon_mcp.market_data_service as market_data_module
+        import fubon_api_mcp_server.market_data_service as market_data_module
 
         # Check for expected functions
         expected_functions = [

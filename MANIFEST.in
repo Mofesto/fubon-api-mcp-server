@@ -12,7 +12,7 @@ include .pre-commit-config.yaml
 include .flake8
 include .mypy.ini
 
-recursive-include fubon_mcp *.py
+recursive-include fubon_api_mcp_server *.py
 recursive-include tests *.py
 recursive-include examples *.py
 recursive-include docs *.md *.rst

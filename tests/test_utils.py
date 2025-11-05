@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fubon_mcp import config
-from fubon_mcp.utils import _safe_api_call, get_order_by_no, handle_exceptions, validate_and_get_account
+from fubon_api_mcp_server import config
+from fubon_api_mcp_server.utils import _safe_api_call, get_order_by_no, handle_exceptions, validate_and_get_account
 
 
 class TestHandleExceptions:
@@ -200,7 +200,7 @@ class TestUtilsIntegration:
 
     def test_all_utils_functions_importable(self):
         """Test that all utility functions can be imported."""
-        from fubon_mcp.utils import (
+        from fubon_api_mcp_server.utils import (
             _safe_api_call,
             get_order_by_no,
             handle_exceptions,
@@ -215,7 +215,7 @@ class TestUtilsIntegration:
 
     def test_utils_module_structure(self):
         """Test utils module has expected structure."""
-        import fubon_mcp.utils as utils_module
+        import fubon_api_mcp_server.utils as utils_module
 
         # Check for expected functions
         expected_functions = ["handle_exceptions", "validate_and_get_account", "get_order_by_no", "_safe_api_call"]

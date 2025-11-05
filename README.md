@@ -409,7 +409,7 @@ python test_snapshot_actives.py
 pip install pytest-cov coverage
 
 # 運行測試並生成覆蓋率
-pytest --cov=fubon_mcp --cov-report=html --cov-report=term-missing
+pytest --cov=fubon_api_mcp_server --cov-report=html --cov-report=term-missing
 
 # 查看 HTML 報告
 open htmlcov/index.html
@@ -430,7 +430,7 @@ open htmlcov/index.html
 
 ```
 fubon-api-mcp-server/
-├── fubon_mcp/              # 主要程式碼包
+├── fubon_api_mcp_server/              # 主要程式碼包
 │   ├── __init__.py        # 包初始化
 │   └── server.py          # MCP 伺服器主程式
 ├── vscode-extension/       # VS Code Extension

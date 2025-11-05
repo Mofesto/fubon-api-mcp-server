@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from fubon_mcp.indicators_service import (
+from fubon_api_mcp_server.indicators_service import (
     analyze_momentum,
     analyze_stock_trend,
     analyze_trend,
@@ -194,13 +194,13 @@ def test_analyze_momentum_insufficient_data(insufficient_data):
 # =============================================================================
 
 
-@patch("fubon_mcp.indicators_service.read_local_stock_data")
+@patch("fubon_api_mcp_server.indicators_service.read_local_stock_data")
 def test_calculate_technical_indicators_success(mock_read_data, sample_price_data):
     """Test calculate_technical_indicators MCP tool"""
     mock_read_data.return_value = sample_price_data
 
     # Import the MCP function
-    from fubon_mcp import indicators_service
+    from fubon_api_mcp_server import indicators_service
 
     fn = indicators_service.calculate_technical_indicators
     result = (
@@ -216,12 +216,12 @@ def test_calculate_technical_indicators_success(mock_read_data, sample_price_dat
     assert "latest_values" in result["data"]
 
 
-@patch("fubon_mcp.indicators_service.read_local_stock_data")
+@patch("fubon_api_mcp_server.indicators_service.read_local_stock_data")
 def test_calculate_technical_indicators_no_data(mock_read_data):
     """Test calculate_technical_indicators with no data"""
     mock_read_data.return_value = None
 
-    from fubon_mcp import indicators_service
+    from fubon_api_mcp_server import indicators_service
 
     fn = indicators_service.calculate_technical_indicators
     result = (
@@ -234,12 +234,12 @@ def test_calculate_technical_indicators_no_data(mock_read_data):
     assert "No historical data found" in result["message"]
 
 
-@patch("fubon_mcp.indicators_service.read_local_stock_data")
+@patch("fubon_api_mcp_server.indicators_service.read_local_stock_data")
 def test_calculate_technical_indicators_insufficient_data(mock_read_data, insufficient_data):
     """Test calculate_technical_indicators with insufficient data"""
     mock_read_data.return_value = insufficient_data
 
-    from fubon_mcp import indicators_service
+    from fubon_api_mcp_server import indicators_service
 
     fn = indicators_service.calculate_technical_indicators
     result = (
@@ -252,12 +252,12 @@ def test_calculate_technical_indicators_insufficient_data(mock_read_data, insuff
     assert "Insufficient data" in result["message"]
 
 
-@patch("fubon_mcp.indicators_service.read_local_stock_data")
+@patch("fubon_api_mcp_server.indicators_service.read_local_stock_data")
 def test_calculate_technical_indicators_all_indicators(mock_read_data, sample_price_data):
     """Test calculate_technical_indicators with all indicators"""
     mock_read_data.return_value = sample_price_data
 
-    from fubon_mcp import indicators_service
+    from fubon_api_mcp_server import indicators_service
 
     fn = indicators_service.calculate_technical_indicators
     result = (
@@ -272,12 +272,12 @@ def test_calculate_technical_indicators_all_indicators(mock_read_data, sample_pr
     assert "sma" in data["indicators"] or "ema" in data["indicators"]
 
 
-@patch("fubon_mcp.indicators_service.read_local_stock_data")
+@patch("fubon_api_mcp_server.indicators_service.read_local_stock_data")
 def test_calculate_technical_indicators_custom_periods(mock_read_data, sample_price_data):
     """Test calculate_technical_indicators with custom periods"""
     mock_read_data.return_value = sample_price_data
 
-    from fubon_mcp import indicators_service
+    from fubon_api_mcp_server import indicators_service
 
     fn = indicators_service.calculate_technical_indicators
     custom_periods = {"sma": 10, "rsi": 7}
@@ -290,12 +290,12 @@ def test_calculate_technical_indicators_custom_periods(mock_read_data, sample_pr
     assert result["status"] == "success"
 
 
-@patch("fubon_mcp.indicators_service.read_local_stock_data")
+@patch("fubon_api_mcp_server.indicators_service.read_local_stock_data")
 def test_analyze_stock_trend_comprehensive(mock_read_data, sample_price_data):
     """Test analyze_stock_trend MCP tool with comprehensive analysis"""
     mock_read_data.return_value = sample_price_data
 
-    from fubon_mcp import indicators_service
+    from fubon_api_mcp_server import indicators_service
 
     fn = indicators_service.analyze_stock_trend
     result = (
@@ -313,12 +313,12 @@ def test_analyze_stock_trend_comprehensive(mock_read_data, sample_price_data):
     assert data["recommendation"] in ["BUY", "SELL", "HOLD"]
 
 
-@patch("fubon_mcp.indicators_service.read_local_stock_data")
+@patch("fubon_api_mcp_server.indicators_service.read_local_stock_data")
 def test_analyze_stock_trend_only_trend(mock_read_data, sample_price_data):
     """Test analyze_stock_trend with only trend analysis"""
     mock_read_data.return_value = sample_price_data
 
-    from fubon_mcp import indicators_service
+    from fubon_api_mcp_server import indicators_service
 
     fn = indicators_service.analyze_stock_trend
     result = fn.fn(symbol="2330", analysis_type="trend") if hasattr(fn, "fn") else fn(symbol="2330", analysis_type="trend")
@@ -328,12 +328,12 @@ def test_analyze_stock_trend_only_trend(mock_read_data, sample_price_data):
     assert "trend_analysis" in data
 
 
-@patch("fubon_mcp.indicators_service.read_local_stock_data")
+@patch("fubon_api_mcp_server.indicators_service.read_local_stock_data")
 def test_analyze_stock_trend_only_momentum(mock_read_data, sample_price_data):
     """Test analyze_stock_trend with only momentum analysis"""
     mock_read_data.return_value = sample_price_data
 
-    from fubon_mcp import indicators_service
+    from fubon_api_mcp_server import indicators_service
 
     fn = indicators_service.analyze_stock_trend
     result = (
@@ -345,12 +345,12 @@ def test_analyze_stock_trend_only_momentum(mock_read_data, sample_price_data):
     assert "momentum_analysis" in data
 
 
-@patch("fubon_mcp.indicators_service.read_local_stock_data")
+@patch("fubon_api_mcp_server.indicators_service.read_local_stock_data")
 def test_analyze_stock_trend_no_data(mock_read_data):
     """Test analyze_stock_trend with no data"""
     mock_read_data.return_value = None
 
-    from fubon_mcp import indicators_service
+    from fubon_api_mcp_server import indicators_service
 
     fn = indicators_service.analyze_stock_trend
     result = (
@@ -363,12 +363,12 @@ def test_analyze_stock_trend_no_data(mock_read_data):
     assert "No historical data found" in result["message"]
 
 
-@patch("fubon_mcp.indicators_service.read_local_stock_data")
+@patch("fubon_api_mcp_server.indicators_service.read_local_stock_data")
 def test_analyze_stock_trend_insufficient_data(mock_read_data, insufficient_data):
     """Test analyze_stock_trend with insufficient data"""
     mock_read_data.return_value = insufficient_data
 
-    from fubon_mcp import indicators_service
+    from fubon_api_mcp_server import indicators_service
 
     fn = indicators_service.analyze_stock_trend
     result = (

@@ -177,35 +177,35 @@ if (-not $SkipTests) {
     }
     
     Write-ColorOutput "  ├─ 檢查包導入..." "Gray"
-    python -c "import fubon_mcp; print('版本:', fubon_mcp.__version__)"
+    python -c "import fubon_api_mcp_server; print('版本:', fubon_api_mcp_server.__version__)"
     if ($LASTEXITCODE -ne 0) {
         Write-Error "包導入檢查失敗"
         exit 1
     }
     
     Write-ColorOutput "  ├─ 檢查 Black 格式化..." "Gray"
-    python -m black --check --diff fubon_mcp tests
+    python -m black --check --diff fubon_api_mcp_server tests
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Black 格式化檢查失敗"
         exit 1
     }
     
     Write-ColorOutput "  ├─ 檢查 isort 導入排序..." "Gray"
-    python -m isort --check-only --diff fubon_mcp tests --skip fubon_mcp/_version.py
+    python -m isort --check-only --diff fubon_api_mcp_server tests --skip fubon_api_mcp_server/_version.py
     if ($LASTEXITCODE -ne 0) {
         Write-Error "isort 導入排序檢查失敗"
         exit 1
     }
     
     Write-ColorOutput "  ├─ 檢查 flake8 代碼品質..." "Gray"
-    python -m flake8 fubon_mcp tests
+    python -m flake8 fubon_api_mcp_server tests
     if ($LASTEXITCODE -ne 0) {
         Write-Error "flake8 代碼品質檢查失敗"
         exit 1
     }
     
     Write-ColorOutput "  ├─ 檢查 mypy 類型檢查..." "Gray"
-    python -m mypy fubon_mcp
+    python -m mypy fubon_api_mcp_server
     if ($LASTEXITCODE -ne 0) {
         Write-Error "mypy 類型檢查失敗"
         exit 1

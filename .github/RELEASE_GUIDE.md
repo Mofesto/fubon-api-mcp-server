@@ -13,7 +13,7 @@
 
 ```toml
 [tool.setuptools_scm]
-write_to = "fubon_mcp/_version.py"
+write_to = "fubon_api_mcp_server/_version.py"
 version_scheme = "post-release"
 local_scheme = "node-and-date"
 fallback_version = "1.8.0"
@@ -151,10 +151,10 @@ python -m venv test_env
 pip install fubon-api-mcp-server
 
 # 驗證版本
-python -c "import fubon_mcp; print(fubon_mcp.__version__)"
+python -c "import fubon_api_mcp_server; print(fubon_api_mcp_server.__version__)"
 
 # 測試基本功能
-python -c "from fubon_mcp import mcp; print('MCP server loaded')"
+python -c "from fubon_api_mcp_server import mcp; print('MCP server loaded')"
 
 # 清理
 deactivate
@@ -218,7 +218,7 @@ Copy-Item CHANGELOG.md .\vscode-extension\
     "mcpServers": {
       "fubon-api": {
         "command": "python",
-        "args": ["-m", "fubon_mcp.server"]
+        "args": ["-m", "fubon_api_mcp_server.server"]
       }
     }
   }

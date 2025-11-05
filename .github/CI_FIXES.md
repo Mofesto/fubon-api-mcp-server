@@ -124,7 +124,7 @@
 # 調整 pytest timeout
 - name: Run tests
   run: |
-    pytest --cov=fubon_mcp --timeout=300 ...
+    pytest --cov=fubon_api_mcp_server --timeout=300 ...
   timeout-minutes: 10
 ```
 

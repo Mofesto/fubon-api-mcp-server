@@ -176,4 +176,4 @@ vscode-extension/*.vsix
 vscode-extension/package-lock.json
 
 # setuptools-scm version file (auto-generated)
-fubon_mcp/_version.py
+fubon_api_mcp_server/_version.py

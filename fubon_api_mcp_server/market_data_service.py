@@ -28,7 +28,7 @@ from .models import (
 # =============================================================================
 
 
-@mcp.tool()
+
 def get_realtime_quotes(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get real-time quotes
@@ -51,7 +51,7 @@ def get_realtime_quotes(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get real-time quotes: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_intraday_tickers(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock/index list (query by conditions)
@@ -73,7 +73,7 @@ def get_intraday_tickers(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get stock list: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_intraday_ticker(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock basic information (query by symbol)
@@ -95,7 +95,7 @@ def get_intraday_ticker(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get basic info: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_intraday_quote(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock real-time quote (query by symbol)
@@ -117,7 +117,7 @@ def get_intraday_quote(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get real-time quote: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_intraday_candles(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock price K-line (query by symbol)
@@ -139,7 +139,7 @@ def get_intraday_candles(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get intraday K-line: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_intraday_trades(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock trade details (query by symbol)
@@ -161,7 +161,7 @@ def get_intraday_trades(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get trade details: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_intraday_volumes(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock price-volume table (query by symbol)
@@ -183,7 +183,7 @@ def get_intraday_volumes(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get price-volume table: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_snapshot_quotes(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock market snapshot (by market type)
@@ -205,7 +205,7 @@ def get_snapshot_quotes(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get market snapshot: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_snapshot_movers(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock price change rankings (by market type)
@@ -227,7 +227,7 @@ def get_snapshot_movers(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get price change rankings: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_snapshot_actives(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get stock trading volume rankings (by market type)
@@ -271,7 +271,7 @@ def get_snapshot_actives(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get trading volume rankings: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_historical_stats(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get 52-week stock price data (query by symbol)

@@ -105,9 +105,9 @@ async function configureMCPServer() {
     }
     
     const dataDir = await vscode.window.showInputBox({
-        prompt: '請輸入數據儲存目錄',
-        value: config.get('dataDir') || './data',
-        placeHolder: './data'
+        prompt: '請輸入數據儲存目錄（留空使用預設路徑）',
+        value: config.get('dataDir') || '',
+        placeHolder: '空白表示使用預設路徑 ~/Library/Application Support/fubon-mcp/data'
     });
     
     // 保存配置
@@ -154,16 +154,20 @@ async function updateMCPConfig(username, pfxPath, dataDir) {
     // 添加 Fubon MCP Server 配置
     mcpConfig.mcpServers['fubon-api'] = {
         command: 'python',
-        args: ['-m', 'fubon_mcp.server'],
+        args: ['-m', 'fubon_api_mcp_server.server'],
         env: {
             FUBON_USERNAME: username,
             FUBON_PFX_PATH: pfxPath,
-            FUBON_DATA_DIR: dataDir || './data',
             // 密碼需要在 .env 文件中設置
             FUBON_PASSWORD: '${env:FUBON_PASSWORD}',
             FUBON_PFX_PASSWORD: '${env:FUBON_PFX_PASSWORD}'
         }
     };
+    
+    // 只在 dataDir 非空時添加
+    if (dataDir) {
+        mcpConfig.mcpServers['fubon-api'].env.FUBON_DATA_DIR = dataDir;
+    }
     
     // 寫入配置
     fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
@@ -218,26 +222,45 @@ async function startMCPServer() {
             ...process.env,
             FUBON_USERNAME: username,
             FUBON_PASSWORD: password,
-            FUBON_PFX_PATH: pfxPath,
-            FUBON_DATA_DIR: dataDir || './data'
+            FUBON_PFX_PATH: pfxPath
         };
+
+        // 只在 dataDir 非空時設置
+        if (dataDir) {
+            env.FUBON_DATA_DIR = dataDir;
+        }
 
         if (pfxPassword) {
             env.FUBON_PFX_PASSWORD = pfxPassword;
         }
 
+        // 設置 Python 環境變數以輸出 UTF-8
+        env.PYTHONIOENCODING = 'utf-8';
+        env.PYTHONUTF8 = '1';
+
         // 啟動 Python MCP Server
-        mcpServerProcess = spawn('python', ['-m', 'fubon_mcp.server'], {
+        mcpServerProcess = spawn('python', ['-m', 'fubon_api_mcp_server.server'], {
             env: env,
-            cwd: vscode.workspace.rootPath || process.cwd()
+            cwd: vscode.workspace.rootPath || process.cwd(),
+            shell: false
         });
 
         mcpServerProcess.stdout.on('data', (data) => {
-            outputChannel.appendLine(`[OUT] ${data.toString()}`);
+            try {
+                const text = data.toString('utf8');
+                outputChannel.appendLine(`[OUT] ${text}`);
+            } catch (e) {
+                outputChannel.appendLine(`[OUT] ${data.toString()}`);
+            }
         });
 
         mcpServerProcess.stderr.on('data', (data) => {
-            outputChannel.appendLine(`[ERR] ${data.toString()}`);
+            try {
+                const text = data.toString('utf8');
+                outputChannel.appendLine(`[ERR] ${text}`);
+            } catch (e) {
+                outputChannel.appendLine(`[ERR] ${data.toString()}`);
+            }
         });
 
         mcpServerProcess.on('close', (code) => {

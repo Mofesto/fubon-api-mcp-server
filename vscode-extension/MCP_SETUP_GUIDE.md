@@ -16,7 +16,7 @@ pip install -e .  # 如果你是從源碼安裝
 
 驗證安裝:
 ```bash
-python -m fubon_mcp.server --help
+python -m fubon_api_mcp_server.server --help
 ```
 
 ### 步驟 2: 手動配置 MCP Server (重要!)
@@ -49,7 +49,7 @@ VS Code 需要在特定位置的配置檔案中註冊 MCP Server。
   "mcpServers": {
     "fubon-api": {
       "command": "python",
-      "args": ["-m", "fubon_mcp.server"],
+      "args": ["-m", "fubon_api_mcp_server.server"],
       "env": {
         "FUBON_USERNAME": "你的帳號",
         "FUBON_PASSWORD": "你的密碼",
@@ -73,7 +73,7 @@ VS Code 需要在特定位置的配置檔案中註冊 MCP Server。
   "mcpServers": {
     "fubon-api": {
       "command": "python",
-      "args": ["-m", "fubon_mcp.server"],
+      "args": ["-m", "fubon_api_mcp_server.server"],
       "env": {
         "FUBON_USERNAME": "${env:FUBON_USERNAME}",
         "FUBON_PASSWORD": "${env:FUBON_PASSWORD}",
@@ -124,7 +124,7 @@ VS Code 需要在特定位置的配置檔案中註冊 MCP Server。
 
 1. 在終端測試 MCP Server:
 ```bash
-python -m fubon_mcp.server
+python -m fubon_api_mcp_server.server
 ```
 
 2. 檢查 VS Code 輸出面板:
@@ -162,7 +162,7 @@ pip show fubon-api-mcp-server
 export FUBON_USERNAME="your_username"
 export FUBON_PASSWORD="your_password"
 export FUBON_PFX_PATH="/path/to/cert.pfx"
-python -m fubon_mcp.server
+python -m fubon_api_mcp_server.server
 ```
 
 ### 問題 3: 權限錯誤
@@ -194,7 +194,7 @@ chmod 755 ~/Library/Application\ Support/Code/User/globalStorage/github.copilot-
   "mcpServers": {
     "fubon-api": {
       "command": "C:\\Users\\YourName\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
-      "args": ["-m", "fubon_mcp.server"],
+      "args": ["-m", "fubon_api_mcp_server.server"],
       "env": {
         "FUBON_USERNAME": "A123456789",
         "FUBON_PFX_PATH": "C:\\Users\\YourName\\Documents\\fubon\\cert.pfx",
@@ -212,7 +212,7 @@ chmod 755 ~/Library/Application\ Support/Code/User/globalStorage/github.copilot-
   "mcpServers": {
     "fubon-api": {
       "command": "path/to/venv/bin/python",
-      "args": ["-m", "fubon_mcp.server"],
+      "args": ["-m", "fubon_api_mcp_server.server"],
       "env": {
         "FUBON_USERNAME": "${env:FUBON_USERNAME}",
         "FUBON_PASSWORD": "${env:FUBON_PASSWORD}",

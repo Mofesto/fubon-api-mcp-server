@@ -8,7 +8,7 @@ in the Fubon API MCP Server.
 import pytest
 from pydantic import ValidationError
 
-from fubon_mcp.models import (
+from fubon_api_mcp_server.models import (
     BatchPlaceOrderArgs,
     CancelOrderArgs,
     GetAccountInfoArgs,

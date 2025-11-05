@@ -12,10 +12,10 @@ import asyncio
 import sys
 from pathlib import Path
 
-# Add parent directory to path to import fubon_mcp
+# Add parent directory to path to import fubon_api_mcp_server
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fubon_mcp import config
+from fubon_api_mcp_server import config
 
 
 def initialize_sdk():
@@ -71,7 +71,7 @@ async def test_account_info():
     print("="*60)
     
     try:
-        from fubon_mcp.account_service import get_account_info
+        from fubon_api_mcp_server.account_service import get_account_info
         
         # Call the function wrapper (MCP tool) with empty args dict
         result = get_account_info.fn({})
@@ -103,7 +103,7 @@ async def test_inventory():
     print("="*60)
     
     try:
-        from fubon_mcp.account_service import get_inventory
+        from fubon_api_mcp_server.account_service import get_inventory
         
         if not config.accounts or not hasattr(config.accounts, 'data') or not config.accounts.data:
             print("⚠️  無可用帳戶，跳過測試")
@@ -146,7 +146,7 @@ async def test_market_data():
     print("="*60)
     
     try:
-        from fubon_mcp.market_data_service import get_intraday_quote
+        from fubon_api_mcp_server.market_data_service import get_intraday_quote
         
         # Test with a common stock (台積電 2330)
         result = get_intraday_quote.fn({"symbol": "2330"})

@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fubon_mcp import config
-from fubon_mcp.trading_service import (
+from fubon_api_mcp_server import config
+from fubon_api_mcp_server.trading_service import (
     _create_modify_object,
     _execute_batch_orders,
     _execute_modify_operation,
@@ -385,7 +385,7 @@ class TestBatchOperationsHelpers:
         assert len(summary["successful_orders_detail"]) == 2
         assert len(summary["failed_orders_detail"]) == 1
 
-    @patch("fubon_mcp.trading_service.concurrent.futures.ThreadPoolExecutor")
+    @patch("fubon_api_mcp_server.trading_service.concurrent.futures.ThreadPoolExecutor")
     def test_execute_batch_orders(self, mock_executor_class, mock_sdk, mock_accounts):
         """Test batch order execution."""
         config.sdk = mock_sdk
@@ -400,7 +400,7 @@ class TestBatchOperationsHelpers:
         mock_executor.submit.return_value = mock_future
 
         # Mock as_completed to return the future
-        with patch("fubon_mcp.trading_service.concurrent.futures.as_completed") as mock_as_completed:
+        with patch("fubon_api_mcp_server.trading_service.concurrent.futures.as_completed") as mock_as_completed:
             mock_as_completed.return_value = [mock_future]
 
             orders = [{"symbol": "2330", "quantity": 1000, "price": 500.0, "buy_sell": "Buy"}]
@@ -417,7 +417,7 @@ class TestTradingServiceIntegration:
 
     def test_all_trading_functions_importable(self):
         """Test that all trading service functions can be imported."""
-        from fubon_mcp.trading_service import (
+        from fubon_api_mcp_server.trading_service import (
             _create_modify_object,
             _execute_batch_orders,
             _execute_modify_operation,
@@ -446,7 +446,7 @@ class TestTradingServiceIntegration:
 
     def test_trading_service_module_structure(self):
         """Test trading_service module has expected structure."""
-        import fubon_mcp.trading_service as trading_module
+        import fubon_api_mcp_server.trading_service as trading_module
 
         # Check for expected functions
         expected_functions = [

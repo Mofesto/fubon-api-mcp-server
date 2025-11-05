@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from fubon_mcp.callbacks import (
+from fubon_api_mcp_server.callbacks import (
     latest_event_reports,
     latest_filled_reports,
     latest_order_changed_reports,

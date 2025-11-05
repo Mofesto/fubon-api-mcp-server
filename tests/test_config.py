@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-from fubon_mcp import config
+from fubon_api_mcp_server import config
 
 
 class TestDataDirectoryConfiguration:
@@ -131,7 +131,7 @@ class TestConfigurationIntegration:
     def test_all_components_importable(self):
         """Test that all configuration components can be imported."""
         # Test imports work
-        from fubon_mcp.config import (
+        from fubon_api_mcp_server.config import (
             BASE_DATA_DIR,
             DEFAULT_DATA_DIR,
             accounts,

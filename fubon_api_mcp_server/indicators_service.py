@@ -269,7 +269,7 @@ def analyze_momentum(data: pd.DataFrame) -> Dict:
 # =============================================================================
 
 
-@mcp.tool()
+
 def calculate_technical_indicators(
     symbol: str, indicators: Optional[List[str]] = None, periods: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
@@ -401,7 +401,7 @@ def calculate_technical_indicators(
         return {"status": "error", "data": None, "message": f"Failed to calculate indicators: {str(e)}"}
 
 
-@mcp.tool()
+
 def analyze_stock_trend(symbol: str, analysis_type: str = "comprehensive") -> Dict:
     """# noqa: C901
     Perform comprehensive trend and momentum analysis for a stock

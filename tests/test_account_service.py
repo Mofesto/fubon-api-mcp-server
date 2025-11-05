@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
-from fubon_mcp import config
-from fubon_mcp.account_service import (
+from fubon_api_mcp_server import config
+from fubon_api_mcp_server.account_service import (
     _get_account_financial_info,
     _get_all_accounts_basic_info,
     _get_basic_account_info,
@@ -64,7 +64,7 @@ class TestAccountServiceIntegration:
 
     def test_account_service_module_structure(self):
         """Test account_service module has expected structure."""
-        import fubon_mcp.account_service as account_module
+        import fubon_api_mcp_server.account_service as account_module
 
         # Check for expected functions
         expected_functions = ["_get_all_accounts_basic_info"]
@@ -112,7 +112,7 @@ class TestAccountFinancialInfo:
     def test_get_account_financial_info_with_exception(self):
         """Test account financial info with SDK not initialized."""
         # Mock config.sdk to be None
-        with patch("fubon_mcp.account_service.config_module.sdk", None):
+        with patch(""fubon_api_mcp_server.account_service.config_module.sdk", None):
             mock_account = MagicMock()
             result = _get_account_financial_info(mock_account)
 
@@ -123,7 +123,7 @@ class TestAccountFinancialInfo:
 class TestGetAccountInfo:
     """Test get_account_info function."""
 
-    @patch("fubon_mcp.account_service._get_all_accounts_basic_info")
+    @patch("fubon_api_mcp_server.account_service._get_all_accounts_basic_info")
     def test_get_account_info_success(self, mock_get_all):
         """Test successful account info retrieval."""
         mock_get_all.return_value = {"status": "success", "data": [{"account": "12345678"}]}
@@ -134,7 +134,7 @@ class TestGetAccountInfo:
         assert result["status"] == "success"
         assert len(result["data"]) == 1
 
-    @patch("fubon_mcp.account_service._get_all_accounts_basic_info")
+    @patch("fubon_api_mcp_server.account_service._get_all_accounts_basic_info")
     def test_get_account_info_error(self, mock_get_all):
         """Test account info retrieval with error."""
         mock_get_all.return_value = {"status": "error", "data": None}

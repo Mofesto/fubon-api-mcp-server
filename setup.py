@@ -28,7 +28,7 @@ setup(
     # 包基本資訊
     name="fubon-api-mcp-server",
     use_scm_version={
-        "write_to": "fubon_mcp/_version.py",
+        "write_to": "fubon_api_mcp_server/_version.py",
         "version_scheme": "post-release",
         "local_scheme": "node-and-date",
         "fallback_version": "1.8.0",
@@ -42,7 +42,7 @@ setup(
     long_description_content_type="text/markdown",
     # 專案連結
     url="https://github.com/Mofesto/fubon-api-mcp-server",
-    # 自動發現包（會找到 fubon_mcp 包）
+    # 自動發現包（會找到 fubon_api_mcp_server 包）
     packages=find_packages(),
     # PyPI 分類器，用於描述包的特性和適用性
     classifiers=[
@@ -73,7 +73,7 @@ setup(
     # 命令行入口點，允許通過 `fubon-api-mcp-server` 命令啟動服務器
     entry_points={
         "console_scripts": [
-            "fubon-api-mcp-server=fubon_mcp.server:main",
+            "fubon-api-mcp-server=fubon_api_mcp_server.server:main",
         ],
     },
     # 包含包數據文件（如配置文件）

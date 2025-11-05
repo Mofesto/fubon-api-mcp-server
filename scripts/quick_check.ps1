@@ -19,7 +19,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = if (Test-Path (Join-Path $scriptDir "scripts")) {
     # Running from scripts directory
     $scriptDir
-} elseif (Test-Path (Join-Path $scriptDir ".." "fubon_mcp")) {
+} elseif (Test-Path (Join-Path $scriptDir ".." "fubon_api_mcp_server")) {
     # Running from scripts subdirectory
     Split-Path -Parent $scriptDir
 } else {
@@ -31,8 +31,8 @@ $projectRoot = if (Test-Path (Join-Path $scriptDir "scripts")) {
 Push-Location $projectRoot
 
 # Ensure we can find the source directories
-if (-not (Test-Path "fubon_mcp") -or -not (Test-Path "tests")) {
-    Write-Host "Error: Cannot find fubon_mcp or tests directory" -ForegroundColor Red
+if (-not (Test-Path "fubon_api_mcp_server") -or -not (Test-Path "tests")) {
+    Write-Host "Error: Cannot find fubon_api_mcp_server or tests directory" -ForegroundColor Red
     Write-Host "Current location: $(Get-Location)" -ForegroundColor Yellow
     Write-Host "Please run this script from the project root or scripts directory" -ForegroundColor Yellow
     Pop-Location
@@ -100,23 +100,23 @@ $results = @()
 $results += Invoke-QuickCheck `
     -Name "Code formatting (black)" `
     -Command "black" `
-    -Arguments @("--check", "--quiet", "fubon_mcp", "tests", "--exclude", "_version.py") `
+    -Arguments @("--check", "--quiet", "fubon_api_mcp_server", "tests", "--exclude", "_version.py") `
     -FixCommand "black" `
-    -FixArguments @("--quiet", "fubon_mcp", "tests", "--exclude", "_version.py")
+    -FixArguments @("--quiet", "fubon_api_mcp_server", "tests", "--exclude", "_version.py")
 
 # Import sorting (auto-fix)
 $results += Invoke-QuickCheck `
     -Name "Import sorting (isort)" `
     -Command "isort" `
-    -Arguments @("--check-only", "fubon_mcp", "tests", "--skip", "_version.py") `
+    -Arguments @("--check-only", "fubon_api_mcp_server", "tests", "--skip", "_version.py") `
     -FixCommand "isort" `
-    -FixArguments @("fubon_mcp", "tests", "--skip", "_version.py")
+    -FixArguments @("fubon_api_mcp_server", "tests", "--skip", "_version.py")
 
 # Flake8 critical errors (no auto-fix)
 $results += Invoke-QuickCheck `
     -Name "Critical code errors (flake8)" `
     -Command "flake8" `
-    -Arguments @("fubon_mcp", "tests", "--select=E9,F63,F7,F82", "--quiet")
+    -Arguments @("fubon_api_mcp_server", "tests", "--select=E9,F63,F7,F82", "--quiet")
 
 # Quick test run (most important tests only)
 Write-Host "Running quick tests... " -NoNewline

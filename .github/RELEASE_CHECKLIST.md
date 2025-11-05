@@ -81,7 +81,7 @@ gh release create v1.8.0 --title "Release v1.8.0" --notes "參考 .github/RELEAS
 python -m venv test_env
 .\test_env\Scripts\activate
 pip install fubon-api-mcp-server==1.8.0
-python -c "import fubon_mcp; print(fubon_mcp.__version__)"
+python -c "import fubon_api_mcp_server; print(fubon_api_mcp_server.__version__)"
 deactivate
 Remove-Item -Recurse test_env
 ```
@@ -217,8 +217,8 @@ VSIX 附加到 GitHub Release
 ### PyPI 驗證
 - [ ] PyPI 頁面版本正確: https://pypi.org/project/fubon-api-mcp-server/
 - [ ] pip install 成功
-- [ ] import fubon_mcp 成功
-- [ ] 版本號匹配: `fubon_mcp.__version__`
+- [ ] import fubon_api_mcp_server 成功
+- [ ] 版本號匹配: `fubon_api_mcp_server.__version__`
 - [ ] 所有依賴正確安裝
 
 ### VS Code Extension 驗證

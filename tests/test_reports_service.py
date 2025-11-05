@@ -9,8 +9,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from fubon_mcp import config
-from fubon_mcp.reports_service import (
+from fubon_api_mcp_server import config
+from fubon_api_mcp_server.reports_service import (
     get_all_reports,
     get_event_reports,
     get_filled_reports,
@@ -64,7 +64,7 @@ class TestReportsServices:
 
     def test_get_order_reports_success(self, mock_sdk):
         """Test successful order reports retrieval."""
-        from fubon_mcp import callbacks
+        from fubon_api_mcp_server import callbacks
 
         # Set up test data in callbacks module
         callbacks.latest_order_reports = [{"order_no": "12345", "timestamp": "2024-01-01 09:00:00", "action": "Buy"}]
@@ -77,7 +77,7 @@ class TestReportsServices:
 
     def test_get_order_changed_reports_success(self, mock_sdk):
         """Test successful order changed reports retrieval."""
-        from fubon_mcp import callbacks
+        from fubon_api_mcp_server import callbacks
 
         callbacks.latest_order_changed_reports = [
             {"order_no": "12345", "change_type": "Price", "old_value": 500.0, "new_value": 505.0}
@@ -95,7 +95,7 @@ class TestReportsServices:
 
     def test_get_filled_reports_success(self, mock_sdk):
         """Test successful filled reports retrieval."""
-        from fubon_mcp import callbacks
+        from fubon_api_mcp_server import callbacks
 
         callbacks.latest_filled_reports = [
             {"order_no": "12345", "fill_price": 500.0, "fill_quantity": 1000, "fill_time": "2024-01-01 09:00:00"}
@@ -111,7 +111,7 @@ class TestReportsServices:
 
     def test_get_event_reports_success(self, mock_sdk):
         """Test successful event reports retrieval."""
-        from fubon_mcp import callbacks
+        from fubon_api_mcp_server import callbacks
 
         callbacks.latest_event_reports = [
             {"event_type": "OrderFilled", "order_no": "12345", "timestamp": "2024-01-01 09:00:00"}
@@ -125,7 +125,7 @@ class TestReportsServices:
 
     def test_get_all_reports_success(self, mock_sdk):
         """Test successful all reports retrieval."""
-        from fubon_mcp import callbacks
+        from fubon_api_mcp_server import callbacks
 
         # Set up test data for all report types
         callbacks.latest_order_reports = [{"type": "order", "order_no": "12345"}]
@@ -145,7 +145,7 @@ class TestReportsServices:
 
     def test_reports_api_failure(self, mock_sdk):
         """Test reports retrieval with empty callbacks."""
-        from fubon_mcp import callbacks
+        from fubon_api_mcp_server import callbacks
 
         # Ensure callbacks are empty
         callbacks.latest_order_reports = []
@@ -157,7 +157,7 @@ class TestReportsServices:
 
     def test_reports_sdk_not_initialized(self):
         """Test reports when callbacks are empty (normal case without SDK initialization)."""
-        from fubon_mcp import callbacks
+        from fubon_api_mcp_server import callbacks
 
         # Reports functions don't need SDK, they read from callbacks
         callbacks.latest_order_reports = []
@@ -173,7 +173,7 @@ class TestReportsServiceIntegration:
 
     def test_all_reports_functions_importable(self):
         """Test that all reports service functions can be imported."""
-        from fubon_mcp.reports_service import (
+        from fubon_api_mcp_server.reports_service import (
             get_all_reports,
             get_event_reports,
             get_filled_reports,
@@ -200,7 +200,7 @@ class TestReportsServiceIntegration:
 
     def test_reports_service_module_structure(self):
         """Test reports_service module has expected structure."""
-        import fubon_mcp.reports_service as reports_module
+        import fubon_api_mcp_server.reports_service as reports_module
 
         # Check for expected functions
         expected_functions = [

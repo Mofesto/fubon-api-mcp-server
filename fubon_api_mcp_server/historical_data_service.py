@@ -69,7 +69,7 @@ def _fetch_api_historical_data(symbol: str, from_date: str, to_date: str) -> lis
 # =============================================================================
 
 
-@mcp.tool()
+
 def historical_candles(args: Dict) -> Dict:
     """
     Get historical data, prioritizing local data, then API if not available

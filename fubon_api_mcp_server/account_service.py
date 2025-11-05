@@ -90,7 +90,6 @@ def _get_account_financial_info(account_obj: Any) -> Dict[str, Any]:
     return info
 
 
-@mcp.tool()
 def get_account_info(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get account information including balance, inventory, P&L, etc.
@@ -125,7 +124,7 @@ def get_account_info(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get account info: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_inventory(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get account inventory information
@@ -161,7 +160,7 @@ def get_inventory(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get inventory: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_unrealized_pnl(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get unrealized P&L information
@@ -197,7 +196,7 @@ def get_unrealized_pnl(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get unrealized P&L: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_settlement_info(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get settlement information (receivables/payables)
@@ -235,7 +234,7 @@ def get_settlement_info(args: Dict[str, Any]) -> Dict[str, Any]:
         return {"status": "error", "data": None, "message": f"Failed to get settlement info: {str(e)}"}
 
 
-@mcp.tool()
+
 def get_bank_balance(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get account bank balance (funds balance)
@@ -259,9 +258,12 @@ def get_bank_balance(args: Dict[str, Any]) -> Dict[str, Any]:
         # Get bank balance information
         bank_balance = config_module.sdk.accounting.bank_remain(account_obj)
         if bank_balance and hasattr(bank_balance, "is_success") and bank_balance.is_success:
+            # Convert BankRemain object to dictionary
+            balance_data = bank_balance.data if hasattr(bank_balance, "data") else bank_balance
+            data_dict = str(balance_data)
             return {
                 "status": "success",
-                "data": bank_balance.data if hasattr(bank_balance, "data") else bank_balance,
+                "data": data_dict,
                 "message": f"Successfully retrieved bank balance for account {account}",
             }
         else:

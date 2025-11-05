@@ -39,7 +39,7 @@ repos:
     rev: 1.7.6
     hooks:
       - id: bandit
-        args: ["-r", "fubon_mcp"]
+        args: ["-r", "fubon_api_mcp_server"]
         exclude: tests/
 
   - repo: https://github.com/Lucas-C/pre-commit-hooks
