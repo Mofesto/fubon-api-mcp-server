@@ -38,7 +38,8 @@
   },
   "main": "./src/extension.js",
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "*"
   ],
   "contributes": {
     "modelContextProtocol": {
@@ -50,10 +51,11 @@
             "fubon_api_mcp_server.server"
           ],
           "env": {
-            "FUBON_USERNAME": "",
-            "FUBON_PASSWORD": "",
-            "FUBON_PFX_PATH": "",
-            "FUBON_PFX_PASSWORD": ""
+            "FUBON_USERNAME": "${config:fubon-mcp.username}",
+            "FUBON_PASSWORD": "${env:FUBON_PASSWORD}",
+            "FUBON_PFX_PATH": "${config:fubon-mcp.pfxPath}",
+            "FUBON_PFX_PASSWORD": "${env:FUBON_PFX_PASSWORD}",
+            "FUBON_DATA_DIR": "${config:fubon-mcp.dataDir}"
           }
         }
       }

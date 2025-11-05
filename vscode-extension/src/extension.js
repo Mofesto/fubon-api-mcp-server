@@ -40,7 +40,9 @@ function activate(context) {
     // 自動啟動 (如果配置啟用)
     const config = vscode.workspace.getConfiguration('fubon-mcp');
     if (config.get('autoStart')) {
-        startMCPServer();
+        setTimeout(() => {
+            startMCPServer();
+        }, 1000);
     }
 }
 
@@ -63,15 +65,15 @@ function registerMCPServerProvider(context) {
  * 獲取 MCP 配置文件路徑
  */
 function getMCPConfigPath() {
-    // VS Code MCP 配置位置
+    // VS Code MCP 配置位置 (標準 mcp.json)
     const homeDir = os.homedir();
     
     if (process.platform === 'win32') {
-        return path.join(homeDir, 'AppData', 'Roaming', 'Code', 'User', 'globalStorage', 'github.copilot-chat', 'config.json');
+        return path.join(homeDir, 'AppData', 'Roaming', 'Code', 'User', 'mcp.json');
     } else if (process.platform === 'darwin') {
-        return path.join(homeDir, 'Library', 'Application Support', 'Code', 'User', 'globalStorage', 'github.copilot-chat', 'config.json');
+        return path.join(homeDir, 'Library', 'Application Support', 'Code', 'User', 'mcp.json');
     } else {
-        return path.join(homeDir, '.config', 'Code', 'User', 'globalStorage', 'github.copilot-chat', 'config.json');
+        return path.join(homeDir, '.config', 'Code', 'User', 'mcp.json');
     }
 }
 
@@ -104,10 +106,17 @@ async function configureMCPServer() {
         return;
     }
     
+    // 根據平台設定預設路徑提示
+    const defaultDataDirHint = process.platform === 'win32'
+        ? '%USERPROFILE%\\AppData\\Local\\fubon-mcp\\data'
+        : process.platform === 'darwin'
+            ? '~/Library/Application Support/fubon-mcp/data'
+            : '~/.local/share/fubon-mcp/data';
+
     const dataDir = await vscode.window.showInputBox({
         prompt: '請輸入數據儲存目錄（留空使用預設路徑）',
         value: config.get('dataDir') || '',
-        placeHolder: '空白表示使用預設路徑 ~/Library/Application Support/fubon-mcp/data'
+        placeHolder: `空白表示使用預設路徑 ${defaultDataDirHint}`
     });
     
     // 保存配置
@@ -125,53 +134,71 @@ async function configureMCPServer() {
 }
 
 /**
- * 更新 MCP 配置文件
+ * 更新 MCP 配置文件 (標準 mcp.json 格式)
  */
 async function updateMCPConfig(username, pfxPath, dataDir) {
     const mcpConfigPath = getMCPConfigPath();
     const configDir = path.dirname(mcpConfigPath);
     
+    outputChannel.appendLine(`準備寫入 MCP 註冊檔: ${mcpConfigPath}`);
+    
     // 確保目錄存在
     if (!fs.existsSync(configDir)) {
         fs.mkdirSync(configDir, { recursive: true });
+        outputChannel.appendLine(`已建立目錄: ${configDir}`);
     }
     
     // 讀取或創建配置
-    let mcpConfig = { mcpServers: {} };
+    let mcpConfig = { servers: {}, inputs: [] };
     
     if (fs.existsSync(mcpConfigPath)) {
         try {
             const content = fs.readFileSync(mcpConfigPath, 'utf8');
             mcpConfig = JSON.parse(content);
-            if (!mcpConfig.mcpServers) {
-                mcpConfig.mcpServers = {};
+            if (!mcpConfig.servers) {
+                mcpConfig.servers = {};
+            }
+            if (!mcpConfig.inputs) {
+                mcpConfig.inputs = [];
             }
         } catch (error) {
             outputChannel.appendLine(`讀取 MCP 配置失敗: ${error.message}`);
         }
     }
     
-    // 添加 Fubon MCP Server 配置
-    mcpConfig.mcpServers['fubon-api'] = {
+    // 添加 Fubon MCP Server 配置 (使用 python -m 啟動)
+    mcpConfig.servers['fubon-api-mcp-server'] = {
+        type: 'stdio',
         command: 'python',
         args: ['-m', 'fubon_api_mcp_server.server'],
         env: {
-            FUBON_USERNAME: username,
-            FUBON_PFX_PATH: pfxPath,
-            // 密碼需要在 .env 文件中設置
-            FUBON_PASSWORD: '${env:FUBON_PASSWORD}',
-            FUBON_PFX_PASSWORD: '${env:FUBON_PFX_PASSWORD}'
+            FUBON_USERNAME: '${input:fubon_username}',
+            FUBON_PASSWORD: '${input:fubon_password}',
+            FUBON_PFX_PATH: '${input:fubon_pfx_path}',
+            FUBON_PFX_PASSWORD: '${input:fubon_pfx_password}',
+            FUBON_DATA_DIR: '${input:fubon_data_dir}'
         }
     };
     
-    // 只在 dataDir 非空時添加
-    if (dataDir) {
-        mcpConfig.mcpServers['fubon-api'].env.FUBON_DATA_DIR = dataDir;
+    // 更新 inputs (確保不重複)
+    const inputIds = new Set(mcpConfig.inputs.map(i => i.id));
+    const newInputs = [
+        { id: 'fubon_username', type: 'promptString', description: 'FUBON_USERNAME (富邦證券帳號)' },
+        { id: 'fubon_password', type: 'promptString', description: 'FUBON_PASSWORD (富邦證券密碼)' },
+        { id: 'fubon_pfx_path', type: 'promptString', description: 'FUBON_PFX_PATH (電子憑證路徑 .pfx)' },
+        { id: 'fubon_pfx_password', type: 'promptString', description: 'FUBON_PFX_PASSWORD (電子憑證密碼)' },
+        { id: 'fubon_data_dir', type: 'promptString', description: 'FUBON_DATA_DIR (數據快取目錄, 預設 ./data)' }
+    ];
+    
+    for (const input of newInputs) {
+        if (!inputIds.has(input.id)) {
+            mcpConfig.inputs.push(input);
+        }
     }
     
     // 寫入配置
     fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
-    outputChannel.appendLine(`MCP 配置已更新: ${mcpConfigPath}`);
+    outputChannel.appendLine(`MCP 註冊檔已寫入: ${mcpConfigPath}`);
 }
 
 /**
