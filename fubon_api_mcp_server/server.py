@@ -534,10 +534,12 @@ class GetIntradayTickersArgs(BaseModel):
 
 class GetIntradayTickerArgs(BaseModel):
     symbol: str
+    type: Optional[str] = None  # 類型，可選 oddlot 盤中零股
 
 
 class GetIntradayQuoteArgs(BaseModel):
     symbol: str
+    type: Optional[str] = None  # 類型，可選 oddlot 盤中零股
 
 
 class GetIntradayCandlesArgs(BaseModel):
@@ -1493,15 +1495,80 @@ def get_intraday_ticker(args: Dict) -> dict:
 
     Args:
         symbol (str): 股票代碼
+        type (str, optional): 類型，可選 oddlot 盤中零股
     """
     try:
         validated_args = GetIntradayTickerArgs(**args)
         symbol = validated_args.symbol
+        type_param = validated_args.type
 
-        result = reststock.intraday.ticker(symbol)
+        # 構建API調用參數
+        api_params = {"symbol": symbol}
+        if type_param:
+            api_params["type"] = type_param
+
+        result = reststock.intraday.ticker(**api_params)
+        
+        # 處理返回數據
+        data = result.dict() if hasattr(result, "dict") else result
+        
+        # 證券類型代碼對照表
+        security_type_mapping = {
+            "01": "一般股票",
+            "02": "轉換公司債",
+            "03": "交換公司債或交換金融債",
+            "04": "一般特別股",
+            "05": "可交換特別股",
+            "06": "認股權憑證",
+            "07": "附認股權特別股",
+            "08": "附認股權公司債",
+            "09": "附認股權公司債履約或分拆後之公司債",
+            "10": "國內標的認購權證",
+            "11": "國內標的認售權證",
+            "12": "外國標的認購權證",
+            "13": "外國標的認售權證",
+            "14": "國內標的下限型認購權證",
+            "15": "國內標的上限型認售權證",
+            "16": "國內標的可展延下限型認購權證",
+            "17": "國內標的可展延上限型認售權證",
+            "18": "受益憑證(封閉式基金)",
+            "19": "存託憑證",
+            "20": "存託憑證可轉換公司債",
+            "21": "存託憑證附認股權公司債",
+            "22": "存託憑證附認股權公司債履約或分拆後之公司債",
+            "23": "存託憑證認股權憑證",
+            "24": "ETF",
+            "25": "ETF（外幣計價）",
+            "26": "槓桿型ETF",
+            "27": "槓桿型 ETF（外幣計價）",
+            "28": "反向型 ETF",
+            "29": "反向型 ETF（外幣計價）",
+            "30": "期信託 ETF",
+            "31": "期信託 ETF（外幣計價）",
+            "32": "債券 ETF",
+            "33": "債券 ETF（外幣計價）",
+            "34": "金融資產證券化受益證券",
+            "35": "不動產資產信託受益證券",
+            "36": "不動產投資信託受益證券",
+            "37": "ETN",
+            "38": "槓桿型 ETN",
+            "39": "反向型 ETN",
+            "40": "債券型 ETN",
+            "41": "期權策略型 ETN",
+            "42": "中央登錄公債",
+            "43": "外國債券",
+            "44": "黃金現貨",
+            "00": "未知或保留代碼"
+        }
+        
+        # 如果數據是字典且包含 securityType，進行轉換
+        if isinstance(data, dict) and "securityType" in data:
+            security_type_code = str(data["securityType"])
+            data["securityTypeName"] = security_type_mapping.get(security_type_code, f"未知代碼({security_type_code})")
+        
         return {
             "status": "success",
-            "data": result.dict() if hasattr(result, "dict") else result,
+            "data": data,
             "message": f"成功獲取 {symbol} 基本資料",
         }
     except Exception as e:
@@ -1515,12 +1582,19 @@ def get_intraday_quote(args: Dict) -> dict:
 
     Args:
         symbol (str): 股票代碼
+        type (str, optional): 類型，可選 oddlot 盤中零股
     """
     try:
         validated_args = GetIntradayQuoteArgs(**args)
         symbol = validated_args.symbol
+        type_param = validated_args.type
 
-        result = reststock.intraday.quote(symbol)
+        # 構建API調用參數
+        api_params = {"symbol": symbol}
+        if type_param:
+            api_params["type"] = type_param
+
+        result = reststock.intraday.quote(**api_params)
         return {
             "status": "success",
             "data": result.dict() if hasattr(result, "dict") else result,
@@ -1560,7 +1634,7 @@ def get_intraday_trades(args: Dict) -> dict:
         validated_args = GetIntradayTradesArgs(**args)
         symbol = validated_args.symbol
 
-        result = reststock.intraday.trades(symbol)
+        result = reststock.intraday.trades(symbol=symbol)
         return {"status": "success", "data": result, "message": f"成功獲取 {symbol} 成交明細"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"獲取成交明細失敗: {str(e)}"}

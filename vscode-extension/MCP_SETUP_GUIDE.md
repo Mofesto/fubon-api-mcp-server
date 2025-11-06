@@ -247,6 +247,15 @@ chmod 755 ~/Library/Application\ Support/Code/User/globalStorage/github.copilot-
 - 定期檢查 Python 套件更新: `pip install --upgrade fubon-api-mcp-server`
 - 可以配置多個 MCP Server,只需在 `mcpServers` 下添加更多項目
 
+## ☕ 支持專案
+
+如果這個專案對您有幫助，歡迎請我喝杯咖啡支持開發！
+
+<div align="center">
+  <img src="images/support-qrcode.png" alt="Buy me a coffee" width="200"/>
+  <p><i>掃描 QR Code 支持專案</i></p>
+</div>
+
 ---
 
 如果仍有問題,請到 [GitHub Issues](https://github.com/Mofesto/fubon-api-mcp-server/issues) 回報。

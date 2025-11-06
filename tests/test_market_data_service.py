@@ -75,13 +75,23 @@ class TestGetIntradayTicker:
     def test_get_intraday_ticker_success(self, mock_server_globals, mock_sdk):
         """Test get_intraday_ticker success."""
         mock_response = Mock()
-        mock_response.dict.return_value = {"symbol": "2330", "name": "台積電"}
+        mock_response.dict.return_value = {
+            "symbol": "2330", 
+            "name": "台積電",
+            "securityType": "01"
+        }
         mock_sdk.marketdata.rest_client.stock.intraday.ticker.return_value = mock_response
 
         result = get_intraday_ticker({"symbol": "2330"})
 
         assert result["status"] == "success"
-        assert result["data"] == {"symbol": "2330", "name": "台積電"}
+        expected_data = {
+            "symbol": "2330", 
+            "name": "台積電",
+            "securityType": "01",
+            "securityTypeName": "一般股票"
+        }
+        assert result["data"] == expected_data
         assert "成功獲取 2330 基本資料" in result["message"]
 
     def test_get_intraday_quote_success(self, mock_server_globals, mock_sdk):

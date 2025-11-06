@@ -84,6 +84,11 @@ class TestMarketDataArgs:
         """Test GetIntradayTickerArgs with valid data."""
         args = GetIntradayTickerArgs(symbol="2330")
         assert args.symbol == "2330"
+        assert args.type is None
+
+        args = GetIntradayTickerArgs(symbol="2330", type="oddlot")
+        assert args.symbol == "2330"
+        assert args.type == "oddlot"
 
     def test_get_intraday_quote_args_valid(self):
         """Test GetIntradayQuoteArgs with valid data."""
