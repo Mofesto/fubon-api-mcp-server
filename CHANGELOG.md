@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.3] - 2025-11-05
+## [2.0.4] - 2025-11-05
 
 ### Fixed
 - 🐛 **CI Build Error**: Fixed ModuleNotFoundError in GitHub Actions by adding `pip install -e .` to install the package for testing

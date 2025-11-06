@@ -874,7 +874,7 @@ fubon-api-mcp-server/
 - 🔒 **網路安全**: 確保網路連線的安全性
 
 ## 📝 更新日誌
-### v2.0.3 (2025-11-05)
+### v2.0.4 (2025-11-05)
 - 🐛 **CI 修復**: 修復 GitHub Actions 中 ModuleNotFoundError，通過添加可編輯安裝解決測試時模組找不到的問題
 - 📚 **文檔清理**: 移除不必要的舊版 release notes 和重複的安裝指南，簡化專案結構
 
@@ -993,14 +993,14 @@ flake8 .
 
 ### PyPI Package
 - **套件名稱**: `fubon-api-mcp-server`
-- **最新版本**: 2.0.3
+- **最新版本**: 2.0.4
 - **安裝**: `pip install fubon-api-mcp-server`
 - **PyPI**: https://pypi.org/project/fubon-api-mcp-server/
 
 ### VS Code Extension
 - **Extension ID**: `mofesto.fubon-api-mcp-server`
 - **Publisher**: mofesto
-- **版本**: 2.0.3
+- **版本**: 2.0.4
 - **Marketplace**: https://marketplace.visualstudio.com/items?itemName=mofesto.fubon-api-mcp-server
 - **安裝方式**: 在 VS Code 中搜尋 "Fubon API MCP Server"
 
