@@ -4,8 +4,6 @@ Test utility functions from server.py.
 
 from unittest.mock import MagicMock, Mock, patch
 
-import pytest
-
 from fubon_api_mcp_server.server import (
     _convert_order_data_to_enums,
     _create_order_object,
