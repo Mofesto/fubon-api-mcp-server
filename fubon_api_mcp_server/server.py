@@ -548,6 +548,9 @@ class GetIntradayCandlesArgs(BaseModel):
 
 class GetIntradayTradesArgs(BaseModel):
     symbol: str
+    type: Optional[str] = None  # Ticker 類型，可選 oddlot 盤中零股
+    offset: Optional[int] = None  # 偏移量
+    limit: Optional[int] = None  # 限制量
 
 
 class GetIntradayVolumesArgs(BaseModel):
@@ -1629,12 +1632,27 @@ def get_intraday_trades(args: Dict) -> dict:
 
     Args:
         symbol (str): 股票代碼
+        type (str, optional): Ticker 類型，可選 oddlot 盤中零股
+        offset (int, optional): 偏移量
+        limit (int, optional): 限制量
     """
     try:
         validated_args = GetIntradayTradesArgs(**args)
         symbol = validated_args.symbol
+        type_param = validated_args.type
+        offset = validated_args.offset
+        limit = validated_args.limit
 
-        result = reststock.intraday.trades(symbol=symbol)
+        # 構建API調用參數
+        api_params = {"symbol": symbol}
+        if type_param:
+            api_params["type"] = type_param
+        if offset is not None:
+            api_params["offset"] = offset
+        if limit is not None:
+            api_params["limit"] = limit
+
+        result = reststock.intraday.trades(**api_params)
         return {"status": "success", "data": result, "message": f"成功獲取 {symbol} 成交明細"}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"獲取成交明細失敗: {str(e)}"}
@@ -1791,10 +1809,44 @@ def get_snapshot_actives(args: Dict) -> dict:
     """
     獲取股票成交量值排行（依市場別）
 
+    對應富邦官方 API: snapshot/actives/{market}
+
     Args:
         market (str): 市場別，可選 TSE 上市；OTC 上櫃；ESB 興櫃一般板；TIB 臺灣創新板；PSB 興櫃戰略新板
         trade (str): 成交量／成交值，可選 volume 成交量；value 成交值，預設 "volume"
-        type (str): 標的類型，可選 ALLBUT099 包含一般股票、特別股及ETF ； COMMONSTOCK 為一般股票
+        type (str, optional): 標的類型，可選 ALLBUT099 包含一般股票、特別股及ETF；COMMONSTOCK 為一般股票
+
+    Returns:
+        dict: 成功時返回包含以下字段的字典：
+            - status: "success"
+            - data: 排行數據列表（限制前50筆）
+            - total_count: 總筆數
+            - returned_count: 返回筆數
+            - market: 市場別
+            - trade: 成交量/值類型
+            - date: 日期
+            - time: 時間
+            - message: 成功訊息
+
+        每筆排行數據包含：
+            - type: Ticker 類型
+            - symbol: 股票代碼
+            - name: 股票簡稱
+            - openPrice: 開盤價
+            - highPrice: 最高價
+            - lowPrice: 最低價
+            - closePrice: 收盤價
+            - change: 漲跌
+            - changePercent: 漲跌幅
+            - tradeVolume: 成交量
+            - tradeValue: 成交金額
+            - lastUpdated: 快照時間
+
+    Example:
+        {
+            "market": "TSE",
+            "trade": "value"
+        }
     """
     try:
         validated_args = GetSnapshotActivesArgs(**args)

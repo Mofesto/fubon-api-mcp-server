@@ -104,6 +104,16 @@ class TestMarketDataArgs:
         """Test GetIntradayTradesArgs with valid data."""
         args = GetIntradayTradesArgs(symbol="2330")
         assert args.symbol == "2330"
+        assert args.type is None
+        assert args.offset is None
+        assert args.limit is None
+
+        # Test with optional parameters
+        args = GetIntradayTradesArgs(symbol="2330", type="oddlot", offset=0, limit=100)
+        assert args.symbol == "2330"
+        assert args.type == "oddlot"
+        assert args.offset == 0
+        assert args.limit == 100
 
     def test_get_intraday_volumes_args_valid(self):
         """Test GetIntradayVolumesArgs with valid data."""
