@@ -66,6 +66,14 @@ from fubon_neo.sdk import Condition, ConditionDayTrade, ConditionOrder, FubonSDK
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
+# 本地模組導入
+from .enums import (
+    to_bs_action, to_market_type, to_order_type, to_price_type, to_time_in_force,
+    to_trading_type, to_trigger_content, to_operator, to_condition_market_type,
+    to_condition_order_type, to_condition_price_type, to_stop_sign, to_direction,
+    to_time_slice_order_type, to_condition_status, to_history_status
+)
+
 # 加載環境變數配置
 load_dotenv()
 
@@ -483,7 +491,7 @@ class HistoricalCandlesArgs(BaseModel):
 class PlaceOrderArgs(BaseModel):
     account: str
     symbol: str
-    quantity: int
+    quantity: int  # 委託數量（股）
     price: float
     buy_sell: str  # 'Buy' or 'Sell'
     market_type: str = "Common"  # 市場別，預設 "Common"
@@ -608,7 +616,7 @@ class ModifyPriceArgs(BaseModel):
 class ModifyQuantityArgs(BaseModel):
     account: str
     order_no: str
-    new_quantity: int
+    new_quantity: int  # 新數量（股）
 
 
 class BatchPlaceOrderArgs(BaseModel):
@@ -621,11 +629,11 @@ class TPSLOrderArgs(BaseModel):
     """停損停利單參數模型"""
 
     time_in_force: str = "ROD"  # ROD, IOC, FOK
-    price_type: str = "Limit"  # Limit, Market
-    order_type: str = "Stock"  # Stock, Margin, Short, DayTrade
-    target_price: str  # 觸發價格
-    price: str  # 委託價格，若為市價則填空值""
-    trigger: Optional[str] = "MatchedPrice"  # v2.2.0+ 觸發內容，預設為成交價
+    price_type: str = "Limit"  # BidPrice, AskPrice, MatchedPrice, Limit, LimitUp, LimitDown, Market, Reference
+    order_type: str = "Stock"  # Stock, Margin, Short
+    target_price: str  # 停損/停利觸發價
+    price: str  # 停損/停利委託價，若為市價則填空值""
+    trigger: Optional[str] = "MatchedPrice"  # 停損/停利觸發條件，可選 MatchedPrice, BidPrice, AskPrice，預設 MatchedPrice
 
 
 class TPSLWrapperArgs(BaseModel):
@@ -641,14 +649,14 @@ class TPSLWrapperArgs(BaseModel):
 class ConditionArgs(BaseModel):
     """條件單觸發條件參數模型"""
 
-    market_type: str = "Reference"  # 對應 ConditionMarketType：Reference, Scheduled
+    market_type: str = "Reference"  # 對應 TradingType：Reference, LastPrice
     symbol: str  # 股票代碼
     trigger: str = (
-        "MatchedPrice"  # 觸發內容：BidPrice(買價), AskPrice(賣價), MatchedPrice(成交價), TotalQuantity(累計成交量), Time(時間)
+        "MatchedPrice"  # 觸發內容：MatchedPrice(成交價), BuyPrice(買價), SellPrice(賣價), TotalQuantity(累計成交量), Time(時間)
     )
     trigger_value: str  # 觸發值
     comparison: str = (
-        "LessThan"  # 比較運算子：LessThan(<), LessThanOrEqual(<=), Equal(=), GreaterThan(>), GreaterThanOrEqual(>=)
+        "LessThan"  # 比較運算子：LessThan(<), LessOrEqual(<=), Equal(=), Greater(>), GreaterOrEqual(>=)
     )
 
 
@@ -695,9 +703,9 @@ class TrailOrderArgs(BaseModel):
     symbol: str
     price: str  # 基準價，至多小數兩位
     direction: str  # Up 或 Down
-    percentage: float  # 漲跌百分比
-    buy_sell: str  # Buy 或 Sell
-    quantity: int
+    percentage: int  # 漲跌百分比（整數）
+    buysell: str  # Buy 或 Sell (官方參數名稱)
+    quantity: int  # 委託數量（股）
     price_type: str = "MatchedPrice"
     diff: int  # 追價 tick 數（向下為負值）
     time_in_force: str = "ROD"
@@ -713,9 +721,18 @@ class TrailOrderArgs(BaseModel):
                 raise ValueError("TrailOrder.price 只可至多小數點後兩位")
         return value
 
+    @classmethod
+    def _validate_direction(cls, value: str) -> str:
+        """驗證 direction 字段是否為有效的 Direction 枚舉值"""
+        if value not in ["Up", "Down"]:
+            raise ValueError("TrailOrder.direction 必須是 'Up' 或 'Down'")
+        return value
+
     def model_post_init(self, __context):
         # 執行 price 小數位數檢核
         self.price = self._validate_two_decimals(self.price)
+        # 驗證 direction
+        self.direction = self._validate_direction(self.direction)
 
 
 class GetTrailOrderArgs(BaseModel):
@@ -737,10 +754,15 @@ class TimeSliceSplitArgs(BaseModel):
 
     method: str  # TimeSliceOrderType 成員名稱，例如 Type1/Type2/Type3
     interval: int  # 間隔秒數 (>0)
-    single_quantity: int  # 每次委託張數（股數，>0）
-    total_quantity: Optional[int] = None  # 總委託張數（股數，選填）
+    single_quantity: int  # 每次委託股數（必須為1000的倍數，>0）
+    total_quantity: Optional[int] = None  # 總委託股數（必須為1000的倍數，選填）
     start_time: str  # 開始時間，格式如 '083000'
     end_time: Optional[str] = None  # 結束時間，Type2/Type3 必填
+
+    # 支援更靈活的輸入格式
+    split_type: Optional[str] = None  # 向後兼容字段
+    split_count: Optional[int] = None  # 總拆單次數，用於計算 total_quantity
+    split_unit: Optional[int] = None  # 每單位數量（通常等於 single_quantity）
 
     def model_post_init(self, __context):
         # 基本檢核
@@ -748,15 +770,39 @@ class TimeSliceSplitArgs(BaseModel):
             raise ValueError("interval 必須為正整數")
         if self.single_quantity is None or self.single_quantity <= 0:
             raise ValueError("single_quantity 必須為正整數")
+
+        # 驗證股數必須為1000的倍數
+        if self.single_quantity % 1000 != 0:
+            raise ValueError(f"single_quantity 必須為1000的倍數（張數），輸入值 {self.single_quantity} 股無效")
+
+        # 如果提供了 split_count，自動計算 total_quantity
+        if self.split_count is not None and self.split_count > 0:
+            if self.total_quantity is None:
+                self.total_quantity = self.split_count * self.single_quantity
+            elif self.total_quantity != self.split_count * self.single_quantity:
+                raise ValueError(f"total_quantity ({self.total_quantity}) 與 split_count * single_quantity ({self.split_count * self.single_quantity}) 不一致")
+
         if self.total_quantity is not None and self.total_quantity <= self.single_quantity:
             raise ValueError("total_quantity 必須大於 single_quantity")
+
+        # 驗證總股數也必須為1000的倍數
+        if self.total_quantity is not None and self.total_quantity % 1000 != 0:
+            raise ValueError(f"total_quantity 必須為1000的倍數（張數），輸入值 {self.total_quantity} 股無效")
+
         # 針對 method 類型的檢核
         try:
             from fubon_neo.constant import TimeSliceOrderType as _TS
 
+            # 如果用戶傳入 "TimeSlice"，根據參數自動推斷類型
+            if self.method == "TimeSlice":
+                if self.end_time:
+                    self.method = "Type2"  # 有結束時間，使用 Type2
+                else:
+                    self.method = "Type1"  # 無結束時間，使用 Type1
+
             m = getattr(_TS, self.method)
         except Exception:
-            raise ValueError("method 無效，必須是 TimeSliceOrderType 的成員名稱")
+            raise ValueError("method 無效，必須是 TimeSliceOrderType 的成員名稱 (Type1/Type2/Type3) 或 'TimeSlice' (自動推斷)")
         if m in (_TS.Type2, _TS.Type3):
             if not self.end_time:
                 raise ValueError("Type2/Type3 必須提供 end_time")
@@ -947,7 +993,7 @@ def place_order(args: Dict) -> dict:
     Args:
         account (str): 帳戶號碼
         symbol (str): 股票代碼
-        quantity (int): 數量
+        quantity (int): 委託數量（股）
         price (float): 價格
         buy_sell (str): 'Buy' 或 'Sell'
         market_type (str): 市場別，預設 "Common"
@@ -990,11 +1036,11 @@ def place_order(args: Dict) -> dict:
         from fubon_neo.sdk import Order
 
         # 將字串轉換為對應的枚舉值
-        buy_sell_enum = BSAction.Buy if buy_sell == "Buy" else BSAction.Sell
-        market_type_enum = getattr(MarketType, market_type, MarketType.Common)
-        price_type_enum = getattr(PriceType, price_type, PriceType.Limit)
-        time_in_force_enum = getattr(TimeInForce, time_in_force, TimeInForce.ROD)
-        order_type_enum = getattr(OrderType, order_type, OrderType.Stock)
+        buy_sell_enum = to_bs_action(buy_sell)
+        market_type_enum = to_market_type(market_type)
+        price_type_enum = to_price_type(price_type)
+        time_in_force_enum = to_time_in_force(time_in_force)
+        order_type_enum = to_order_type(order_type)
 
         order = Order(
             buy_sell=buy_sell_enum,
@@ -1106,7 +1152,7 @@ def modify_quantity(args: Dict) -> dict:
     Args:
         account (str): 帳戶號碼
         order_no (str): 委託單號
-        new_quantity (int): 新數量
+        new_quantity (int): 新數量（股）
     """
     try:
         validated_args = ModifyQuantityArgs(**args)
@@ -1940,22 +1986,20 @@ def cancel_order(args: Dict) -> dict:
 
 def _convert_order_data_to_enums(order_data):
     """將訂單數據轉換為枚舉值"""
-    from fubon_neo.constant import BSAction, MarketType, OrderType, PriceType, TimeInForce
-
     buy_sell_str = order_data.get("buy_sell", "Buy")
-    buy_sell_enum = BSAction.Buy if buy_sell_str == "Buy" else BSAction.Sell
+    buy_sell_enum = to_bs_action(buy_sell_str)
 
     market_type_str = order_data.get("market_type", "Common")
-    market_type_enum = getattr(MarketType, market_type_str, MarketType.Common)
+    market_type_enum = to_market_type(market_type_str)
 
     price_type_str = order_data.get("price_type", "Limit")
-    price_type_enum = getattr(PriceType, price_type_str, PriceType.Limit)
+    price_type_enum = to_price_type(price_type_str)
 
     time_in_force_str = order_data.get("time_in_force", "ROD")
-    time_in_force_enum = getattr(TimeInForce, time_in_force_str, TimeInForce.ROD)
+    time_in_force_enum = to_time_in_force(time_in_force_str)
 
     order_type_str = order_data.get("order_type", "Stock")
-    order_type_enum = getattr(OrderType, order_type_str, OrderType.Stock)
+    order_type_enum = to_order_type(order_type_str)
 
     return {
         "buy_sell": buy_sell_enum,
@@ -2039,7 +2083,7 @@ def batch_place_order(args: Dict) -> dict:
         orders (List[Dict]): 訂單列表，每筆訂單包含 symbol, quantity, price, buy_sell 等參數
             支援的參數：
             - symbol (str): 股票代碼
-            - quantity (int): 數量
+            - quantity (int): 委託數量（股）
             - price (float): 價格
             - buy_sell (str): 'Buy' 或 'Sell'
             - market_type (str): 市場別，預設 "Common"
@@ -2198,24 +2242,24 @@ def place_condition_order(args: Dict) -> dict:
         # 建立條件對象
         condition_data = ConditionArgs(**validated_args.condition)
         condition = Condition(
-            market_type=getattr(TradingType, condition_data.market_type),
+            market_type=to_trading_type(condition_data.market_type),
             symbol=condition_data.symbol,
-            trigger=getattr(TriggerContent, condition_data.trigger),
+            trigger=to_trigger_content(condition_data.trigger),
             trigger_value=condition_data.trigger_value,
-            comparison=getattr(Operator, condition_data.comparison),
+            comparison=to_operator(condition_data.comparison),
         )
 
         # 建立委託單對象
         order_data = ConditionOrderArgs(**validated_args.order)
         order = ConditionOrder(
-            buy_sell=getattr(BSAction, order_data.buy_sell),
+            buy_sell=to_bs_action(order_data.buy_sell),
             symbol=order_data.symbol,
             price=order_data.price,
             quantity=order_data.quantity,
-            market_type=getattr(ConditionMarketType, order_data.market_type),
-            price_type=getattr(ConditionPriceType, order_data.price_type),
-            time_in_force=getattr(TimeInForce, order_data.time_in_force),
-            order_type=getattr(ConditionOrderType, order_data.order_type),
+            market_type=to_condition_market_type(order_data.market_type),
+            price_type=to_condition_price_type(order_data.price_type),
+            time_in_force=to_time_in_force(order_data.time_in_force),
+            order_type=to_condition_order_type(order_data.order_type),
         )
 
         # 建立停損停利對象（如果有提供）
@@ -2228,12 +2272,12 @@ def place_condition_order(args: Dict) -> dict:
             if tpsl_data.tp:
                 tp_data = TPSLOrderArgs(**tpsl_data.tp)
                 tp = TPSLOrder(
-                    time_in_force=getattr(TimeInForce, tp_data.time_in_force),
-                    price_type=getattr(ConditionPriceType, tp_data.price_type),
-                    order_type=getattr(ConditionOrderType, tp_data.order_type),
+                    time_in_force=to_time_in_force(tp_data.time_in_force),
+                    price_type=to_condition_price_type(tp_data.price_type),
+                    order_type=to_condition_order_type(tp_data.order_type),
                     target_price=tp_data.target_price,
                     price=tp_data.price,
-                    trigger=getattr(TriggerContent, tp_data.trigger) if tp_data.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(tp_data.trigger) if tp_data.trigger else TriggerContent.MatchedPrice,
                 )
 
             # 建立停損單（如果有）
@@ -2241,17 +2285,17 @@ def place_condition_order(args: Dict) -> dict:
             if tpsl_data.sl:
                 sl_data = TPSLOrderArgs(**tpsl_data.sl)
                 sl = TPSLOrder(
-                    time_in_force=getattr(TimeInForce, sl_data.time_in_force),
-                    price_type=getattr(ConditionPriceType, sl_data.price_type),
-                    order_type=getattr(ConditionOrderType, sl_data.order_type),
+                    time_in_force=to_time_in_force(sl_data.time_in_force),
+                    price_type=to_condition_price_type(sl_data.price_type),
+                    order_type=to_condition_order_type(sl_data.order_type),
                     target_price=sl_data.target_price,
                     price=sl_data.price,
-                    trigger=getattr(TriggerContent, sl_data.trigger) if sl_data.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(sl_data.trigger) if sl_data.trigger else TriggerContent.MatchedPrice,
                 )
 
             # 建立停損停利包裝器
             tpsl = TPSLWrapper(
-                stop_sign=getattr(StopSign, tpsl_data.stop_sign),
+                stop_sign=to_stop_sign(tpsl_data.stop_sign),
                 tp=tp,
                 sl=sl,
                 end_date=tpsl_data.end_date,
@@ -2263,7 +2307,7 @@ def place_condition_order(args: Dict) -> dict:
             account_obj,
             start_date,
             end_date,
-            getattr(StopSign, stop_sign),
+            to_stop_sign(stop_sign),
             condition,
             order,
             tpsl,  # 停損停利參數（可為 None）
@@ -2461,25 +2505,25 @@ def place_multi_condition_order(args: Dict) -> dict:
         for cond_dict in validated_args.conditions:
             condition_data = ConditionArgs(**cond_dict)
             condition = Condition(
-                market_type=getattr(TradingType, condition_data.market_type),
+                market_type=to_trading_type(condition_data.market_type),
                 symbol=condition_data.symbol,
-                trigger=getattr(TriggerContent, condition_data.trigger),
+                trigger=to_trigger_content(condition_data.trigger),
                 trigger_value=condition_data.trigger_value,
-                comparison=getattr(Operator, condition_data.comparison),
+                comparison=to_operator(condition_data.comparison),
             )
             conditions.append(condition)
 
         # 建立委託單對象
         order_data = ConditionOrderArgs(**validated_args.order)
         order = ConditionOrder(
-            buy_sell=getattr(BSAction, order_data.buy_sell),
+            buy_sell=to_bs_action(order_data.buy_sell),
             symbol=order_data.symbol,
             price=order_data.price,
             quantity=order_data.quantity,
-            market_type=getattr(ConditionMarketType, order_data.market_type),
-            price_type=getattr(ConditionPriceType, order_data.price_type),
-            time_in_force=getattr(TimeInForce, order_data.time_in_force),
-            order_type=getattr(ConditionOrderType, order_data.order_type),
+            market_type=to_condition_market_type(order_data.market_type),
+            price_type=to_condition_price_type(order_data.price_type),
+            time_in_force=to_time_in_force(order_data.time_in_force),
+            order_type=to_condition_order_type(order_data.order_type),
         )
 
         # 建立停損停利對象（如果有提供）
@@ -2492,12 +2536,12 @@ def place_multi_condition_order(args: Dict) -> dict:
             if tpsl_data.tp:
                 tp_data = TPSLOrderArgs(**tpsl_data.tp)
                 tp = TPSLOrder(
-                    time_in_force=getattr(TimeInForce, tp_data.time_in_force),
-                    price_type=getattr(ConditionPriceType, tp_data.price_type),
-                    order_type=getattr(ConditionOrderType, tp_data.order_type),
+                    time_in_force=to_time_in_force(tp_data.time_in_force),
+                    price_type=to_condition_price_type(tp_data.price_type),
+                    order_type=to_condition_order_type(tp_data.order_type),
                     target_price=tp_data.target_price,
                     price=tp_data.price,
-                    trigger=getattr(TriggerContent, tp_data.trigger) if tp_data.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(tp_data.trigger) if tp_data.trigger else TriggerContent.MatchedPrice,
                 )
 
             # 建立停損單（如果有）
@@ -2505,17 +2549,17 @@ def place_multi_condition_order(args: Dict) -> dict:
             if tpsl_data.sl:
                 sl_data = TPSLOrderArgs(**tpsl_data.sl)
                 sl = TPSLOrder(
-                    time_in_force=getattr(TimeInForce, sl_data.time_in_force),
-                    price_type=getattr(ConditionPriceType, sl_data.price_type),
-                    order_type=getattr(ConditionOrderType, sl_data.order_type),
+                    time_in_force=to_time_in_force(sl_data.time_in_force),
+                    price_type=to_condition_price_type(sl_data.price_type),
+                    order_type=to_condition_order_type(sl_data.order_type),
                     target_price=sl_data.target_price,
                     price=sl_data.price,
-                    trigger=getattr(TriggerContent, sl_data.trigger) if sl_data.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(sl_data.trigger) if sl_data.trigger else TriggerContent.MatchedPrice,
                 )
 
             # 建立停損停利包裝器
             tpsl = TPSLWrapper(
-                stop_sign=getattr(StopSign, tpsl_data.stop_sign),
+                stop_sign=to_stop_sign(tpsl_data.stop_sign),
                 tp=tp,
                 sl=sl,
                 end_date=tpsl_data.end_date,
@@ -2666,24 +2710,24 @@ def place_daytrade_condition_order(args: Dict) -> dict:
         # 建立條件對象
         cond_args = ConditionArgs(**validated_args.condition)
         condition = Condition(
-            market_type=getattr(TradingType, cond_args.market_type),
+            market_type=to_trading_type(cond_args.market_type),
             symbol=cond_args.symbol,
-            trigger=getattr(TriggerContent, cond_args.trigger),
+            trigger=to_trigger_content(cond_args.trigger),
             trigger_value=cond_args.trigger_value,
-            comparison=getattr(Operator, cond_args.comparison),
+            comparison=to_operator(cond_args.comparison),
         )
 
         # 建立主單委託對象
         ord_args = ConditionOrderArgs(**validated_args.order)
         order = ConditionOrder(
-            buy_sell=getattr(BSAction, ord_args.buy_sell),
+            buy_sell=to_bs_action(ord_args.buy_sell),
             symbol=ord_args.symbol,
             price=ord_args.price,
             quantity=ord_args.quantity,
-            market_type=getattr(ConditionMarketType, ord_args.market_type),
-            price_type=getattr(ConditionPriceType, ord_args.price_type),
-            time_in_force=getattr(TimeInForce, ord_args.time_in_force),
-            order_type=getattr(ConditionOrderType, ord_args.order_type),
+            market_type=to_condition_market_type(ord_args.market_type),
+            price_type=to_condition_price_type(ord_args.price_type),
+            time_in_force=to_time_in_force(ord_args.time_in_force),
+            order_type=to_condition_order_type(ord_args.order_type),
         )
 
         # 建立當沖對象
@@ -2704,28 +2748,28 @@ def place_daytrade_condition_order(args: Dict) -> dict:
             if tpsl_args.tp:
                 tp_args = TPSLOrderArgs(**tpsl_args.tp)
                 tp = TPSLOrder(
-                    time_in_force=getattr(TimeInForce, tp_args.time_in_force),
-                    price_type=getattr(ConditionPriceType, tp_args.price_type),
-                    order_type=getattr(ConditionOrderType, tp_args.order_type),
+                    time_in_force=to_time_in_force(tp_args.time_in_force),
+                    price_type=to_condition_price_type(tp_args.price_type),
+                    order_type=to_condition_order_type(tp_args.order_type),
                     target_price=tp_args.target_price,
                     price=tp_args.price,
-                    trigger=getattr(TriggerContent, tp_args.trigger) if tp_args.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(tp_args.trigger) if tp_args.trigger else TriggerContent.MatchedPrice,
                 )
 
             sl = None
             if tpsl_args.sl:
                 sl_args = TPSLOrderArgs(**tpsl_args.sl)
                 sl = TPSLOrder(
-                    time_in_force=getattr(TimeInForce, sl_args.time_in_force),
-                    price_type=getattr(ConditionPriceType, sl_args.price_type),
-                    order_type=getattr(ConditionOrderType, sl_args.order_type),
+                    time_in_force=to_time_in_force(sl_args.time_in_force),
+                    price_type=to_condition_price_type(sl_args.price_type),
+                    order_type=to_condition_order_type(sl_args.order_type),
                     target_price=sl_args.target_price,
                     price=sl_args.price,
-                    trigger=getattr(TriggerContent, sl_args.trigger) if sl_args.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(sl_args.trigger) if sl_args.trigger else TriggerContent.MatchedPrice,
                 )
 
             tpsl = TPSLWrapper(
-                stop_sign=getattr(StopSign, tpsl_args.stop_sign),
+                stop_sign=to_stop_sign(tpsl_args.stop_sign),
                 tp=tp,
                 sl=sl,
                 end_date=tpsl_args.end_date,
@@ -2735,7 +2779,7 @@ def place_daytrade_condition_order(args: Dict) -> dict:
         # 呼叫 SDK：single_condition_day_trade
         result = sdk.stock.single_condition_day_trade(
             account_obj,
-            getattr(StopSign, validated_args.stop_sign),
+            to_stop_sign(validated_args.stop_sign),
             validated_args.end_time,
             condition,
             order,
@@ -2873,25 +2917,25 @@ def place_daytrade_multi_condition_order(args: Dict) -> dict:
             c = ConditionArgs(**cond)
             conditions.append(
                 Condition(
-                    market_type=getattr(TradingType, c.market_type),
+                    market_type=to_trading_type(c.market_type),
                     symbol=c.symbol,
-                    trigger=getattr(TriggerContent, c.trigger),
+                    trigger=to_trigger_content(c.trigger),
                     trigger_value=c.trigger_value,
-                    comparison=getattr(Operator, c.comparison),
+                    comparison=to_operator(c.comparison),
                 )
             )
 
         # 主單
         ord_args = ConditionOrderArgs(**validated.order)
         order = ConditionOrder(
-            buy_sell=getattr(BSAction, ord_args.buy_sell),
+            buy_sell=to_bs_action(ord_args.buy_sell),
             symbol=ord_args.symbol,
             price=ord_args.price,
             quantity=ord_args.quantity,
-            market_type=getattr(ConditionMarketType, ord_args.market_type),
-            price_type=getattr(ConditionPriceType, ord_args.price_type),
-            time_in_force=getattr(TimeInForce, ord_args.time_in_force),
-            order_type=getattr(ConditionOrderType, ord_args.order_type),
+            market_type=to_condition_market_type(ord_args.market_type),
+            price_type=to_condition_price_type(ord_args.price_type),
+            time_in_force=to_time_in_force(ord_args.time_in_force),
+            order_type=to_condition_order_type(ord_args.order_type),
         )
 
         # 當沖設定
@@ -2911,26 +2955,26 @@ def place_daytrade_multi_condition_order(args: Dict) -> dict:
             if wrap.tp:
                 tpa = TPSLOrderArgs(**wrap.tp)
                 tp = TPSLOrder(
-                    time_in_force=getattr(TimeInForce, tpa.time_in_force),
-                    price_type=getattr(ConditionPriceType, tpa.price_type),
-                    order_type=getattr(ConditionOrderType, tpa.order_type),
+                    time_in_force=to_time_in_force(tpa.time_in_force),
+                    price_type=to_condition_price_type(tpa.price_type),
+                    order_type=to_condition_order_type(tpa.order_type),
                     target_price=tpa.target_price,
                     price=tpa.price,
-                    trigger=getattr(TriggerContent, tpa.trigger) if tpa.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(tpa.trigger) if tpa.trigger else TriggerContent.MatchedPrice,
                 )
             sl = None
             if wrap.sl:
                 sla = TPSLOrderArgs(**wrap.sl)
                 sl = TPSLOrder(
-                    time_in_force=getattr(TimeInForce, sla.time_in_force),
-                    price_type=getattr(ConditionPriceType, sla.price_type),
-                    order_type=getattr(ConditionOrderType, sla.order_type),
+                    time_in_force=to_time_in_force(sla.time_in_force),
+                    price_type=to_condition_price_type(sla.price_type),
+                    order_type=to_condition_order_type(sla.order_type),
                     target_price=sla.target_price,
                     price=sla.price,
-                    trigger=getattr(TriggerContent, sla.trigger) if sla.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(sla.trigger) if sla.trigger else TriggerContent.MatchedPrice,
                 )
             tpsl = TPSLWrapper(
-                stop_sign=getattr(StopSign, wrap.stop_sign),
+                stop_sign=to_stop_sign(wrap.stop_sign),
                 tp=tp,
                 sl=sl,
                 end_date=wrap.end_date,
@@ -2940,7 +2984,7 @@ def place_daytrade_multi_condition_order(args: Dict) -> dict:
         # 呼叫 SDK：multi_condition_day_trade
         result = sdk.stock.multi_condition_day_trade(
             account_obj,
-            getattr(StopSign, validated.stop_sign),
+            to_stop_sign(validated.stop_sign),
             validated.end_time,
             conditions,
             order,
@@ -3041,14 +3085,14 @@ def place_trail_profit(args: Dict) -> dict:
         trail = TrailOrder(
             symbol=trail_args.symbol,
             price=trail_args.price,
-            direction=getattr(Direction, trail_args.direction),
+            direction=to_direction(trail_args.direction),
             percentage=trail_args.percentage,
-            buy_sell=getattr(BSAction, trail_args.buy_sell),
+            buy_sell=to_bs_action(trail_args.buysell),
             quantity=trail_args.quantity,
-            price_type=getattr(ConditionPriceType, trail_args.price_type),
+            price_type=to_condition_price_type(trail_args.price_type),
             diff=trail_args.diff,
-            time_in_force=getattr(TimeInForce, trail_args.time_in_force),
-            order_type=getattr(ConditionOrderType, trail_args.order_type),
+            time_in_force=to_time_in_force(trail_args.time_in_force),
+            order_type=to_condition_order_type(trail_args.order_type),
         )
 
         # 呼叫 SDK
@@ -3056,7 +3100,7 @@ def place_trail_profit(args: Dict) -> dict:
             account_obj,
             start_date,
             end_date,
-            getattr(StopSign, stop_sign),
+            to_stop_sign(stop_sign),
             trail,
         )
 
@@ -3068,7 +3112,7 @@ def place_trail_profit(args: Dict) -> dict:
                     "guid": guid,
                     "condition_no": guid,
                     "symbol": trail_args.symbol,
-                    "buy_sell": trail_args.buy_sell,
+                    "buy_sell": trail_args.buysell,
                     "quantity": trail_args.quantity,
                     "direction": trail_args.direction,
                     "percentage": trail_args.percentage,
@@ -3199,16 +3243,74 @@ def place_time_slice_order(args: Dict) -> dict:
 
     依據 `SplitDescription` 拆單策略與 `ConditionOrder` 委託內容，於指定期間內按時間分批送單。
 
+    ⚠️ 重要提醒：
+    - 數量單位為「股」，必須為1000的倍數（即張數）
+    - 例如：5張 = 5000股，10張 = 10000股
+
     Args:
         account (str): 帳號
         start_date (str): 監控開始日 YYYYMMDD
         end_date (str): 監控結束日 YYYYMMDD
         stop_sign (str): Full / Partial / UntilEnd
         split (dict): 分時分量設定（TimeSliceSplitArgs）
+            基本字段:
+            - method (str): 分單類型 - "Type1"/"Type2"/"Type3" 或 "TimeSlice"(自動推斷)
+            - interval (int): 間隔秒數
+            - single_quantity (int): 每次委託股數（必須為1000的倍數）
+            - start_time (str): 開始時間，格式如 '083000' **（必填）**
+            - end_time (str, optional): 結束時間，Type2/Type3 必填 **（使用 TimeSlice 時通常必填）**
+            - total_quantity (int, optional): 總委託股數（必須為1000的倍數）
+
+            便捷字段（可選，會自動計算 total_quantity）:
+            - split_count (int): 總拆單次數，會自動計算 total_quantity = split_count * single_quantity **（推薦使用，替代 total_quantity）**
         order (dict): 委託內容（ConditionOrderArgs）
+            - quantity (int): 總委託股數（必須為1000的倍數）
 
     Returns:
         dict: 成功時回傳 guid 與摘要資訊
+
+    Example:
+        # 使用基本字段（5張 = 5000股）
+        {
+            "account": "123456",
+            "start_date": "20241106",
+            "end_date": "20241107",
+            "stop_sign": "Full",
+            "split": {
+                "method": "Type1",
+                "interval": 30,
+                "single_quantity": 1000,  # 1張 = 1000股
+                "total_quantity": 5000,   # 5張 = 5000股
+                "start_time": "090000"
+            },
+            "order": {
+                "buy_sell": "Buy",
+                "symbol": "2867",
+                "price": "6.41",
+                "quantity": 5000,  # 總數量5張 = 5000股
+                "market_type": "Common",
+                "price_type": "Limit",
+                "time_in_force": "ROD",
+                "order_type": "Stock"
+            }
+        }
+
+        # 使用便捷字段（自動計算總量）
+        {
+            "account": "123456",
+            "start_date": "20241106",
+            "end_date": "20241107",
+            "stop_sign": "Full",
+            "split": {
+                "method": "Type2",
+                "interval": 30,
+                "single_quantity": 1000,  # 每次1張
+                "split_count": 5,         # 總共5次，自動計算 total_quantity = 5 * 1000 = 5000
+                "start_time": "090000",
+                "end_time": "133000"
+            },
+            "order": {...}
+        }
     """
     try:
         from fubon_neo.constant import BSAction, TimeInForce
@@ -3223,7 +3325,7 @@ def place_time_slice_order(args: Dict) -> dict:
         # 建立 SplitDescription
         split_args = TimeSliceSplitArgs(**validated.split)
         split_kwargs = {
-            "method": getattr(TimeSliceOrderType, split_args.method),
+            "method": to_time_slice_order_type(split_args.method),
             "interval": split_args.interval,
             "single_quantity": split_args.single_quantity,
             "start_time": split_args.start_time,
@@ -3237,14 +3339,14 @@ def place_time_slice_order(args: Dict) -> dict:
         # 建立 ConditionOrder
         ord_args = ConditionOrderArgs(**validated.order)
         order = ConditionOrder(
-            buy_sell=getattr(BSAction, ord_args.buy_sell),
+            buy_sell=to_bs_action(ord_args.buy_sell),
             symbol=ord_args.symbol,
             price=ord_args.price,
             quantity=ord_args.quantity,
-            market_type=getattr(ConditionMarketType, ord_args.market_type),
-            price_type=getattr(ConditionPriceType, ord_args.price_type),
-            time_in_force=getattr(TimeInForce, ord_args.time_in_force),
-            order_type=getattr(ConditionOrderType, ord_args.order_type),
+            market_type=to_condition_market_type(ord_args.market_type),
+            price_type=to_condition_price_type(ord_args.price_type),
+            time_in_force=to_time_in_force(ord_args.time_in_force),
+            order_type=to_condition_order_type(ord_args.order_type),
         )
 
         # 呼叫 SDK：time_slice_order
@@ -3252,13 +3354,30 @@ def place_time_slice_order(args: Dict) -> dict:
             account_obj,
             validated.start_date,
             validated.end_date,
-            getattr(StopSign, validated.stop_sign),
+            to_stop_sign(validated.stop_sign),
             split,
             order,
         )
 
         if result and hasattr(result, "is_success") and result.is_success:
-            guid = getattr(result.data, "guid", None) if hasattr(result, "data") else None
+            # Handle different response structures
+            data = getattr(result, "data", None)
+            guid = None
+            
+            if data:
+                # Try direct attribute access first
+                guid = getattr(data, "guid", None)
+                
+                # If not found, check if it's a dict with SmartOrderResponse
+                if guid is None and isinstance(data, dict):
+                    smart_order_response = data.get("SmartOrderResponse")
+                    if smart_order_response:
+                        guid = getattr(smart_order_response, "guid", None)
+                
+                # If still not found, try accessing as dict key
+                if guid is None and isinstance(data, dict):
+                    guid = data.get("guid")
+            
             resp = {
                 "guid": guid,
                 "condition_no": guid,
@@ -3421,8 +3540,8 @@ def get_condition_order(args: Dict) -> dict:
         # 呼叫 SDK（依是否提供條件狀態決定簽名）
         if validated.condition_status:
             try:
-                status_enum = getattr(ConditionStatus, validated.condition_status)
-            except AttributeError:
+                status_enum = to_condition_status(validated.condition_status)
+            except ValueError:
                 return {"status": "error", "message": f"不支援的條件單狀態: {validated.condition_status}"}
             result = sdk.stock.get_condition_order(account_obj, status_enum)
         else:
@@ -3538,8 +3657,8 @@ def get_condition_history(args: Dict) -> dict:
         # 呼叫 SDK（依是否提供歷史狀態決定簽名）
         if validated.condition_history_status:
             try:
-                hist_enum = getattr(HistoryStatus, validated.condition_history_status)
-            except AttributeError:
+                hist_enum = to_history_status(validated.condition_history_status)
+            except ValueError:
                 return {"status": "error", "message": f"不支援的歷史條件單狀態: {validated.condition_history_status}"}
             result = sdk.stock.get_condition_history(account_obj, validated.start_date, validated.end_date, hist_enum)
         else:
