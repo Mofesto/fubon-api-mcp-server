@@ -1426,8 +1426,23 @@ def get_order_results(args: Dict) -> dict:
     """
     獲取委託結果，用於確認委託與成交狀態
 
+    查詢帳戶下的所有委託單狀態，對應官方 SDK `get_order_results(account)`。
+
+    ⚠️ 重要用途：
+    - 確認普通委託單的狀態
+    - **查詢分時分量條件單產生的子委託單**（用於取消操作）
+    - 監控委託單的執行進度
+
     Args:
         account (str): 帳戶號碼
+
+    Returns:
+        dict: 成功時返回委託結果列表
+
+    Note:
+        **用於取消分時分量條件單**:
+        分時分量條件單會產生多個子委託單，此函數返回的結果包含所有委託單，
+        可從中找到對應的 order_no 用於 cancel_order 操作。
     """
     try:
         validated_args = GetOrderResultsArgs(**args)
@@ -1945,9 +1960,25 @@ def cancel_order(args: Dict) -> dict:
     """
     取消委託單
 
+    取消指定的普通委託單，對應官方 SDK `cancel_order(account, order)`。
+
+    ⚠️ 適用範圍：
+    - 普通現股委託單
+    - 分時分量條件單產生的各個子委託單（請先用 get_order_results 查詢）
+    - 其他已送出的市場委託單
+
     Args:
         account (str): 帳戶號碼
         order_no (str): 委託單號
+
+    Returns:
+        dict: 成功時回傳取消結果
+
+    Note:
+        **取消分時分量條件單的正確方式**:
+        1. 先用 `get_order_results(account)` 獲取所有委託單
+        2. 從結果中找到對應的分時分量委託單（依 symbol、quantity 等識別）
+        3. 對每個委託單調用此函數取消：`cancel_order(account, order_no)`
     """
     try:
         validated_args = CancelOrderArgs(**args)
@@ -3246,6 +3277,8 @@ def place_time_slice_order(args: Dict) -> dict:
     ⚠️ 重要提醒：
     - 數量單位為「股」，必須為1000的倍數（即張數）
     - 例如：5張 = 5000股，10張 = 10000股
+    - **取消方式特殊**：分時分量條件單會立即產生多個普通委託單，不適用 `cancel_condition_order`
+      請使用 `get_order_results` 查詢委託結果，然後用 `cancel_order` 逐筆取消各個委託單
 
     Args:
         account (str): 帳號
@@ -3311,6 +3344,13 @@ def place_time_slice_order(args: Dict) -> dict:
             },
             "order": {...}
         }
+
+    Note:
+        **取消分時分量條件單的正確流程**:
+        1. 使用 `get_order_results(account)` 獲取所有委託結果
+        2. 從結果中找到對應的分時分量委託單（可依 symbol、quantity 等識別）
+        3. 對每個委託單使用 `cancel_order(account, order_no)` 取消
+        4. **不要使用** `cancel_condition_order(account, guid)` 因為分時分量條件單不屬於一般條件單類型
     """
     try:
         from fubon_neo.constant import BSAction, TimeInForce
@@ -3412,12 +3452,24 @@ def get_time_slice_order(args: Dict) -> dict:
     查詢指定分時分量條件單號的明細列表，對應官方 SDK
     `get_time_slice_order(account, batch_no)`。
 
+    ⚠️ 查詢用途：
+    - 查看分時分量條件單的設定和狀態
+    - 監控拆單進度
+    - **注意**：此函數查詢的是條件單本身，不是產生的委託單
+      如需取消，請使用 get_order_results + cancel_order
+
     Args:
         account (str): 帳號
         batch_no (str): 分時分量條件單號
 
     Returns:
         dict: 成功時回傳展開的明細陣列（ConditionDetail list）
+
+    Note:
+        此函數返回條件單的設定資訊，但**無法用於取消操作**。
+        分時分量條件單會立即產生多個普通委託單，取消時需要：
+        1. 用 get_order_results 查詢所有委託單
+        2. 用 cancel_order 逐筆取消各個子委託單
     """
     try:
         validated = GetTimeSliceOrderArgs(**args)
@@ -3469,12 +3521,23 @@ def cancel_condition_order(args: Dict) -> dict:
 
     對應官方 SDK `cancel_condition_orders(account, guid)`，用於取消指定條件單號。
 
+    ⚠️ 適用範圍：
+    - 單一條件單（single_condition）
+    - 多條件單（multi_condition）
+    - 當沖條件單（single_condition_day_trade, multi_condition_day_trade）
+    - 移動鎖利條件單（trail_profit）
+    - **不適用**：分時分量條件單（time_slice_order）請使用 cancel_order
+
     Args:
         account (str): 帳號
         guid (str): 條件單號
 
     Returns:
         dict: 成功時回傳 `advisory` 等資訊
+
+    Note:
+        分時分量條件單不適用此函數，因為它會立即產生多個普通委託單，
+        請改用 get_order_results + cancel_order 的組合來取消。
     """
     try:
         validated = CancelConditionOrderArgs(**args)
