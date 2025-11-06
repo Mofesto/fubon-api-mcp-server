@@ -19,6 +19,7 @@ from fubon_neo.constant import (
     OrderType,
     PriceType,
     StopSign,
+    StockType,
     TimeInForce,
     TimeSliceOrderType,
     TradingType,
@@ -138,6 +139,27 @@ def to_condition_status(value: str) -> ConditionStatus:
 def to_history_status(value: str) -> HistoryStatus:
     """將字串轉換為 HistoryStatus 枚舉"""
     return safe_enum_conversion(HistoryStatus, value)
+
+
+def to_stock_types(values: list) -> list:
+    """將字串列表轉換為 StockType 枚舉列表"""
+    if not values:
+        return [StockType.Stock]  # 預設值
+    
+    result = []
+    for value in values:
+        # 處理用戶文檔中的名稱映射
+        if value == "ConvertBond":
+            value = "CovertBond"  # 修正拼寫
+        elif value == "ETF_and_ETN":
+            value = "EtfAndEtn"
+        # "Stock" 保持不變
+        
+        enum_value = safe_enum_conversion(StockType, value)
+        if enum_value:
+            result.append(enum_value)
+    
+    return result if result else [StockType.Stock]
 
 
 # 枚舉值到字串的轉換函數（用於序列化）

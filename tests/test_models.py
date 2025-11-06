@@ -10,6 +10,7 @@ from fubon_api_mcp_server.server import (
     CancelOrderArgs,
     GetAccountInfoArgs,
     GetBankBalanceArgs,
+    GetDayTradeStockInfoArgs,
     GetEventReportsArgs,
     GetFilledReportsArgs,
     GetHistoricalStatsArgs,
@@ -20,9 +21,11 @@ from fubon_api_mcp_server.server import (
     GetIntradayTradesArgs,
     GetIntradayVolumesArgs,
     GetInventoryArgs,
+    GetMarginQuotaArgs,
     GetOrderChangedReportsArgs,
     GetOrderReportsArgs,
     GetOrderResultsArgs,
+    GetOrderResultsDetailArgs,
     GetRealtimeQuotesArgs,
     GetSettlementArgs,
     GetSnapshotActivesArgs,
@@ -33,6 +36,8 @@ from fubon_api_mcp_server.server import (
     ModifyPriceArgs,
     ModifyQuantityArgs,
     PlaceOrderArgs,
+    QuerySymbolQuoteArgs,
+    QuerySymbolSnapshotArgs,
 )
 
 
@@ -70,6 +75,18 @@ class TestAccountArgs:
         """Test GetUnrealizedPnLArgs with valid data."""
         args = GetUnrealizedPnLArgs(account="123456")
         assert args.account == "123456"
+
+    def test_get_margin_quota_args_valid(self):
+        """Test GetMarginQuotaArgs with valid data."""
+        args = GetMarginQuotaArgs(account="123456", stock_no="2330")
+        assert args.account == "123456"
+        assert args.stock_no == "2330"
+
+    def test_get_daytrade_stock_info_args_valid(self):
+        """Test GetDayTradeStockInfoArgs with valid data."""
+        args = GetDayTradeStockInfoArgs(account="123456", stock_no="2330")
+        assert args.account == "123456"
+        assert args.stock_no == "2330"
 
 
 class TestMarketDataArgs:
@@ -145,6 +162,42 @@ class TestMarketDataArgs:
         args = GetRealtimeQuotesArgs(symbol="2330")
         assert args.symbol == "2330"
 
+    def test_query_symbol_quote_args_valid(self):
+        """Test QuerySymbolQuoteArgs with valid data."""
+        args = QuerySymbolQuoteArgs(account="123456", symbol="2330")
+        assert args.account == "123456"
+        assert args.symbol == "2330"
+        assert args.market_type == "Common"
+
+        # Test with custom market_type
+        args = QuerySymbolQuoteArgs(account="123456", symbol="2330", market_type="IntradayOdd")
+        assert args.account == "123456"
+        assert args.symbol == "2330"
+        assert args.market_type == "IntradayOdd"
+
+    def test_query_symbol_snapshot_args_valid(self):
+        """Test QuerySymbolSnapshotArgs with valid data."""
+        args = QuerySymbolSnapshotArgs(account="123456")
+        assert args.account == "123456"
+        assert args.market_type == "Common"
+        assert args.stock_type == ["Stock"]
+
+        # Test with custom parameters
+        args = QuerySymbolSnapshotArgs(
+            account="123456",
+            market_type="IntradayOdd",
+            stock_type=["Stock", "CovertBond"]
+        )
+        assert args.account == "123456"
+        assert args.market_type == "IntradayOdd"
+        assert args.stock_type == ["Stock", "CovertBond"]
+
+        # Test with single stock type
+        args = QuerySymbolSnapshotArgs(account="123456", stock_type=["EtfAndEtn"])
+        assert args.account == "123456"
+        assert args.market_type == "Common"
+        assert args.stock_type == ["EtfAndEtn"]
+
 
 class TestTradingArgs:
     """Test trading-related argument models."""
@@ -197,6 +250,11 @@ class TestReportsArgs:
     def test_get_order_results_args_valid(self):
         """Test GetOrderResultsArgs with valid data."""
         args = GetOrderResultsArgs(account="123456")
+        assert args.account == "123456"
+
+    def test_get_order_results_detail_args_valid(self):
+        """Test GetOrderResultsDetailArgs with valid data."""
+        args = GetOrderResultsDetailArgs(account="123456")
         assert args.account == "123456"
 
     def test_get_order_reports_args_valid(self):

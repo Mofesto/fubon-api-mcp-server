@@ -71,7 +71,7 @@ from .enums import (
     to_bs_action, to_market_type, to_order_type, to_price_type, to_time_in_force,
     to_trading_type, to_trigger_content, to_operator, to_condition_market_type,
     to_condition_order_type, to_condition_price_type, to_stop_sign, to_direction,
-    to_time_slice_order_type, to_condition_status, to_history_status
+    to_time_slice_order_type, to_condition_status, to_history_status, to_stock_types
 )
 
 # 加載環境變數配置
@@ -528,6 +528,28 @@ class GetBankBalanceArgs(BaseModel):
     account: str
 
 
+class GetMarginQuotaArgs(BaseModel):
+    account: str
+    stock_no: str
+
+
+class GetDayTradeStockInfoArgs(BaseModel):
+    account: str
+    stock_no: str
+
+
+class QuerySymbolQuoteArgs(BaseModel):
+    account: str
+    symbol: str
+    market_type: Optional[str] = "Common"
+
+
+class QuerySymbolSnapshotArgs(BaseModel):
+    account: str
+    market_type: Optional[str] = "Common"
+    stock_type: Optional[List[str]] = ["Stock"]
+
+
 class GetIntradayTickersArgs(BaseModel):
     market: str  # e.g., TSE, OTC
 
@@ -609,6 +631,10 @@ class GetEventReportsArgs(BaseModel):
 
 
 class GetOrderResultsArgs(BaseModel):
+    account: str
+
+
+class GetOrderResultsDetailArgs(BaseModel):
     account: str
 
 
@@ -1007,6 +1033,49 @@ def place_order(args: Dict) -> dict:
         order_type (str): 委託類型，預設 "Stock"
         user_def (str): 使用者自定義欄位，可選
         is_non_blocking (bool): 是否使用非阻塞模式，預設False
+
+    Returns:
+        dict: 成功時返回委託結果，包含以下字段：
+            - status: "success"
+            - data: OrderResult 對象，包含委託單詳細資訊
+                - function_type (str): 功能類型
+                - date (str): 日期
+                - seq_no (str): 序號
+                - branch_no (str): 分行號碼
+                - account (str): 帳戶號碼
+                - order_no (str): 委託單號
+                - asset_type (str): 資產類型
+                - market (str): 市場
+                - market_type (str): 市場類型
+                - stock_no (str): 股票代碼
+                - buy_sell (str): 買賣別
+                - price_type (str): 價格類型
+                - price (str): 委託價格
+                - quantity (int): 原始委託數量
+                - time_in_force (str): 有效期間
+                - order_type (str): 委託類型
+                - is_pre_order (bool): 是否預約單
+                - status (str): 委託狀態
+                - after_price_type (str): 後續價格類型
+                - after_price (str): 後續價格
+                - unit (str): 單位
+                - after_qty (int): 有效數量（剩餘可成交數量）
+                - filled_qty (int): 已成交數量
+                - filled_money (float): 已成交金額
+                - before_qty (int): 原始數量
+                - before_price (str): 原始價格
+                - user_def (str): 使用者自定義欄位
+                - last_time (str): 最後更新時間
+                - details (list): 詳細資訊
+                - error_message (str): 錯誤訊息
+            - message: 成功訊息
+
+    Note:
+        **委託單狀態監控**:
+        - filled_qty: 已成交數量，用於判斷部分成交或全部成交
+        - filled_money: 已成交金額，計算已實現損益
+        - after_qty: 剩餘有效數量，0表示已全部成交或取消
+        - order_no: 委託單號，可用於後續的改價、改量或取消操作
     """
     try:
         validated_args = PlaceOrderArgs(**args)
@@ -1062,12 +1131,23 @@ def place_order(args: Dict) -> dict:
         # 使用非阻塞或阻塞模式下單
         result = sdk.stock.place_order(account_obj, order, is_non_blocking)
 
-        mode_desc = "非阻塞" if is_non_blocking else "阻塞"
-        return {
-            "status": "success",
-            "data": result,
-            "message": f"成功使用{mode_desc}模式下單 {buy_sell} {symbol} {quantity} 股",
-        }
+        # 檢查 API 返回結果
+        if result and hasattr(result, "is_success") and result.is_success:
+            mode_desc = "非阻塞" if is_non_blocking else "阻塞"
+            return {
+                "status": "success",
+                "data": result.data if hasattr(result, "data") else result,
+                "message": f"成功使用{mode_desc}模式下單 {buy_sell} {symbol} {quantity} 股",
+            }
+        else:
+            # 提取錯誤訊息
+            error_msg = "下單失敗"
+            if result and hasattr(result, "message"):
+                error_msg = f"下單失敗: {result.message}"
+            elif result:
+                error_msg = f"下單失敗: {str(result)}"
+
+            return {"status": "error", "data": None, "message": error_msg}
     except Exception as e:
         return {"status": "error", "data": None, "message": f"下單失敗: {str(e)}"}
 
@@ -1087,7 +1167,7 @@ def _create_modify_object(target_order, modify_value, modify_type: str):
     if modify_type == "quantity":
         return sdk.stock.make_modify_quantity_obj(target_order, modify_value)
     elif modify_type == "price":
-        return sdk.stock.make_modify_price_obj(target_order, str(modify_value))
+        return sdk.stock.make_modify_price_obj(target_order, str(modify_value), None)
     else:
         raise ValueError(f"不支援的修改類型: {modify_type}")
 
@@ -1442,12 +1522,27 @@ def get_order_results(args: Dict) -> dict:
         account (str): 帳戶號碼
 
     Returns:
-        dict: 成功時返回委託結果列表
+        dict: 成功時返回委託結果列表，每筆委託單包含以下關鍵字段：
+            - order_no (str): 委託單號
+            - symbol (str): 股票代碼
+            - buy_sell (str): 買賣別
+            - quantity (int): 原始委託數量
+            - filled_qty (int): 已成交數量
+            - filled_money (float): 已成交金額
+            - after_qty (int): 有效數量（剩餘可成交數量）
+            - price (float): 委託價格
+            - status (str): 委託狀態
+            - order_time (str): 委託時間
 
     Note:
         **用於取消分時分量條件單**:
         分時分量條件單會產生多個子委託單，此函數返回的結果包含所有委託單，
         可從中找到對應的 order_no 用於 cancel_order 操作。
+
+        **委託單狀態監控**:
+        - filled_qty: 已成交數量，用於判斷部分成交或全部成交
+        - filled_money: 已成交金額，計算已實現損益
+        - after_qty: 剩餘有效數量，0表示已全部成交或取消
     """
     try:
         validated_args = GetOrderResultsArgs(**args)
@@ -1474,7 +1569,485 @@ def get_order_results(args: Dict) -> dict:
 
 
 @mcp.tool()
-def get_intraday_tickers(args: Dict) -> dict:
+def get_order_results_detail(args: Dict) -> dict:
+    """
+    獲取委託結果詳細資訊（包含修改歷史）
+
+    查詢帳戶下的所有委託單狀態及詳細資訊，對應官方 SDK `get_order_results_detail(account)`。
+    與 get_order_results 不同，此函數返回包含委託單修改歷史的詳細資訊。
+
+    ⚠️ 重要用途：
+    - 確認普通委託單的狀態及修改歷史
+    - **查詢分時分量條件單產生的子委託單**（用於取消操作）
+    - 監控委託單的執行進度及所有修改記錄
+
+    Args:
+        account (str): 帳戶號碼
+
+    Returns:
+        dict: 成功時返回委託結果詳細列表，每筆委託單包含以下關鍵字段：
+            - function_type (str): 功能類型
+            - date (str): 日期
+            - seq_no (str): 序號
+            - branch_no (str): 分行號碼
+            - account (str): 帳戶號碼
+            - order_no (str): 委託單號
+            - asset_type (str): 資產類型
+            - market (str): 市場
+            - market_type (str): 市場類型
+            - stock_no (str): 股票代碼
+            - buy_sell (str): 買賣別
+            - price_type (str): 價格類型
+            - price (str): 委託價格
+            - quantity (int): 原始委託數量
+            - time_in_force (str): 有效期間
+            - order_type (str): 委託類型
+            - status (str): 委託狀態
+            - filled_qty (int): 已成交數量
+            - filled_money (float): 已成交金額
+            - details (list): 詳細資訊及修改歷史
+                - function_type (str): 功能類型
+                - modified_time (str): 修改時間
+                - before_qty (int): 修改前數量
+                - after_qty (int): 修改後數量
+                - status (str): 狀態
+                - error_message (str): 錯誤訊息（如有）
+            - error_message (str): 錯誤訊息
+
+    Note:
+        **委託單修改歷史追蹤**:
+        - details 陣列記錄了委託單的所有修改操作
+        - 包括改價、改量、取消等操作的詳細記錄
+        - 可追蹤委託單從建立到最終狀態的完整生命週期
+
+        **用於取消分時分量條件單**:
+        分時分量條件單會產生多個子委託單，此函數返回的結果包含所有委託單，
+        可從中找到對應的 order_no 用於 cancel_order 操作。
+    """
+    try:
+        validated_args = GetOrderResultsDetailArgs(**args)
+        account = validated_args.account
+
+        # 驗證並獲取帳戶對象
+        account_obj, error = validate_and_get_account(account)
+        if error:
+            return {"status": "error", "data": None, "message": error}
+
+        # 獲取委託結果詳細資訊
+        order_results_detail = sdk.stock.get_order_results_detail(account_obj)
+        if order_results_detail and hasattr(order_results_detail, "is_success") and order_results_detail.is_success:
+            return {
+                "status": "success",
+                "data": order_results_detail.data if hasattr(order_results_detail, "data") else order_results_detail,
+                "message": f"成功獲取帳戶 {account} 委託結果詳細資訊",
+            }
+        else:
+            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 委託結果詳細資訊"}
+
+    except Exception as e:
+        return {"status": "error", "data": None, "message": f"獲取委託結果詳細資訊失敗: {str(e)}"}
+
+
+@mcp.tool()
+def margin_quota(args: Dict) -> dict:
+    """
+    查詢資券配額
+
+    查詢指定帳戶和股票代碼的資券配額資訊，對應官方 SDK `margin_quota(account, stock_no)`。
+
+    ⚠️ 重要用途：
+    - 確認股票的融資融券可用額度
+    - 檢查是否可以進行信用交易
+    - 監控資券配額使用狀況
+
+    Args:
+        account (str): 帳戶號碼
+        stock_no (str): 股票代碼
+
+    Returns:
+        dict: 成功時返回資券配額資訊，包含以下關鍵字段：
+            - stock_no (str): 股票代碼
+            - date (str): 資料日期
+            - shortsell_orig_quota (int): 融券原始額度
+                - 0: 無融券額度
+                - >0: 有融券額度
+                - None: 融券無上限
+            - shortsell_tradable_quota (int): 融券可交易額度
+                - 0: 無融券額度
+                - >0: 有融券額度
+                - None: 融券無上限
+            - margin_orig_quota (int): 融資原始額度
+                - 0: 無融資額度
+                - >0: 有融資額度
+                - None: 融資無上限
+            - margin_tradable_quota (int): 融資可交易額度
+                - 0: 無融資額度
+                - >0: 有融資額度
+                - None: 融資無上限
+            - margin_ratio (float): 融資比率
+                - None: 融資暫停
+                - 數值: 融資比率（如 0.6 表示60%）
+            - short_ratio (float): 融券比率
+                - None: 融券暫停
+                - 數值: 融券比率（如 0.4 表示40%）
+
+    Note:
+        **資券配額解釋**:
+        - **融資額度**: 用於買入股票時向券商借錢
+        - **融券額度**: 用於賣出股票時向券商借股票
+        - **原始額度 vs 可交易額度**: 原始額度是總額度，可交易額度是扣除已使用後的剩餘額度
+        - **額度為0**: 表示沒有該項資券配額
+        - **額度為None**: 表示該項資券無上限
+        - **比率為None**: 表示該項資券交易暫停
+        - **所有額度為0且比率為None**: 表示該股票資券交易停止
+
+        **交易限制檢查**:
+        - 融資交易需要 margin_tradable_quota > 0 且 margin_ratio 不為 None
+        - 融券交易需要 shortsell_tradable_quota > 0 且 short_ratio 不為 None
+    """
+    try:
+        validated_args = GetMarginQuotaArgs(**args)
+        account = validated_args.account
+        stock_no = validated_args.stock_no
+
+        # 驗證並獲取帳戶對象
+        account_obj, error = validate_and_get_account(account)
+        if error:
+            return {"status": "error", "data": None, "message": error}
+
+        # 查詢資券配額
+        margin_quota_result = sdk.stock.margin_quota(account_obj, stock_no)
+        if margin_quota_result and hasattr(margin_quota_result, "is_success") and margin_quota_result.is_success:
+            return {
+                "status": "success",
+                "data": margin_quota_result.data if hasattr(margin_quota_result, "data") else margin_quota_result,
+                "message": f"成功獲取帳戶 {account} 股票 {stock_no} 資券配額",
+            }
+        else:
+            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 股票 {stock_no} 資券配額"}
+
+    except Exception as e:
+        return {"status": "error", "data": None, "message": f"獲取資券配額失敗: {str(e)}"}
+
+
+@mcp.tool()
+def daytrade_and_stock_info(args: Dict) -> dict:
+    """
+    查詢現沖券配額資訊
+
+    查詢指定帳戶和股票代碼的現沖券配額及相關資訊，對應官方 SDK `daytrade_and_stock_info(account, stock_no)`。
+
+    ⚠️ 重要用途：
+    - 確認股票的現沖券可用額度
+    - 檢查是否可以進行現沖交易
+    - 了解股票的警示狀態和交易限制
+    - 監控預收股數資訊
+
+    Args:
+        account (str): 帳戶號碼
+        stock_no (str): 股票代碼
+
+    Returns:
+        dict: 成功時返回現沖券配額資訊，包含以下關鍵字段：
+            - stock_no (str): 股票代號
+            - date (str): 日期
+            - daytrade_orig_quota (int): 原始現沖券餘額
+                - 0: 無現沖券額度
+                - >0: 有現沖券額度
+            - daytrade_tradable_quota (int): 可用現沖券餘額
+                - 0: 無可用額度
+                - >0: 有可用額度
+            - precollect_single (int): 單筆預收股數
+                - None: 不需預收
+                - 數值: 預收股數
+            - precollect_accumulate (int): 累積預收股數
+                - None: 不需預收
+                - 數值: 累積預收股數
+            - status (int): 狀態 (bitmask)
+                - 0: 全禁
+                - 1: 平盤下可融券賣出
+                - 2: 平盤下可借券賣出
+                - 4: 可先買後賣當沖
+                - 8: 可先賣後買當沖
+                - 狀態值為上述數值的加總
+            - disposition_status (str): 警示股註記
+                - {"SETTYPE": 1}: 全額交割
+                - {"MARK-W": 1}: 警示
+                - {"MARK-P": 1}: 注意
+                - {"MARK-L": 1}: 委託受限
+
+    Note:
+        **狀態值解釋**:
+        - status 是 bitmask 值，需要按位解析：
+          * 0 = 全禁（無法進行任何相關交易）
+          * 1 = 平盤下可融券賣出
+          * 2 = 平盤下可借券賣出
+          * 4 = 可先買後賣當沖
+          * 8 = 可先賣後買當沖
+        - 例如：status=15 表示可進行所有交易 (1+2+4+8)
+        - status=3 表示僅可進行平盤下融券和借券賣出 (1+2)
+
+        **警示股註記說明**:
+        - SETTYPE: 全額交割股
+        - MARK-W: 警示股
+        - MARK-P: 注意股
+        - MARK-L: 委託受限股
+
+        **預收股數說明**:
+        - precollect_single: 單筆交易預收股數
+        - precollect_accumulate: 累計預收股數
+        - None 表示該股票不需預收股款
+    """
+    try:
+        validated_args = GetDayTradeStockInfoArgs(**args)
+        account = validated_args.account
+        stock_no = validated_args.stock_no
+
+        # 驗證並獲取帳戶對象
+        account_obj, error = validate_and_get_account(account)
+        if error:
+            return {"status": "error", "data": None, "message": error}
+
+        # 查詢現沖券配額資訊
+        daytrade_info = sdk.stock.daytrade_and_stock_info(account_obj, stock_no)
+        if daytrade_info and hasattr(daytrade_info, "is_success") and daytrade_info.is_success:
+            return {
+                "status": "success",
+                "data": daytrade_info.data if hasattr(daytrade_info, "data") else daytrade_info,
+                "message": f"成功獲取帳戶 {account} 股票 {stock_no} 現沖券配額資訊",
+            }
+        else:
+            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 股票 {stock_no} 現沖券配額資訊"}
+
+    except Exception as e:
+        return {"status": "error", "data": None, "message": f"獲取現沖券配額資訊失敗: {str(e)}"}
+
+
+@mcp.tool()
+def query_symbol_quote(args: Dict) -> dict:
+    """
+    查詢商品漲跌幅報表（單筆）
+
+    查詢指定股票的即時報價和交易資訊，對應官方 SDK `query_symbol_quote(account, symbol, market_type)`。
+    此為 2.2.5 版新增功能。
+
+    ⚠️ 重要用途：
+    - 獲取股票的即時價格和交易資訊
+    - 查詢漲跌停價格和參考價格
+    - 了解市場狀態和交易權限
+    - 監控買賣價量資訊
+
+    Args:
+        account (str): 帳戶號碼
+        symbol (str): 股票代碼
+        market_type (str, optional): 市場類型，預設 "Common"
+            - "Common": 整股市場
+            - "IntradayOdd": 盤中零股
+            - "Fixing": 定盤
+
+    Returns:
+        dict: 成功時返回股票報價資訊，包含以下關鍵字段：
+            - market (str): 市場別
+            - symbol (str): 股票代碼
+            - is_tib_or_psb (bool): 是否為創新版或戰略新板
+            - market_type (str): 市場類型
+            - status (int): 狀態 (bitmask)
+                - 0: 全禁
+                - 1: 平盤下可融券賣出
+                - 2: 平盤下可借券賣出
+                - 4: 可先買後賣當沖
+                - 8: 可先賣後買當沖
+                - 狀態值為上述數值的加總
+            - reference_price (float): 參考價格
+            - unit (int): 交易單位
+            - update_time (str): 更新時間
+            - limitup_price (float): 漲停價
+            - limitdown_price (float): 跌停價
+            - open_price (float): 開盤價
+            - high_price (float): 最高價
+            - low_price (float): 最低價
+            - last_price (float): 最新成交價
+            - total_volume (int): 總成交量
+            - total_transaction (int): 總成交筆數
+            - total_value (float): 總成交金額
+            - last_size (int): 最新成交量
+            - last_transaction (int): 最新成交筆數
+            - last_value (float): 最新成交金額
+            - bid_price (float): 買1價格
+            - bid_volume (int): 買1數量
+            - ask_price (float): 賣1價格
+            - ask_volume (int): 賣1數量
+
+    Note:
+        **狀態值解釋**:
+        - status 是 bitmask 值，需要按位解析：
+          * 0 = 全禁（無法進行任何相關交易）
+          * 1 = 平盤下可融券賣出
+          * 2 = 平盤下可借券賣出
+          * 4 = 可先買後賣當沖
+          * 8 = 可先賣後買當沖
+        - 例如：status=15 表示可進行所有交易 (1+2+4+8)
+        - status=3 表示僅可進行平盤下融券和借券賣出 (1+2)
+
+        **市場類型說明**:
+        - Common: 整股市場（預設）
+        - IntradayOdd: 盤中零股市場
+        - Fixing: 定盤市場
+
+        **價格資訊說明**:
+        - reference_price: 參考價格（通常為昨收價）
+        - limitup_price/limitdown_price: 漲跌停價格
+        - open_price/high_price/low_price: 當日開高低價
+        - last_price: 最新成交價
+
+        **成交資訊說明**:
+        - total_*: 當日累計成交統計
+        - last_*: 最新一筆成交資訊
+        - bid_price/bid_volume: 買方最佳價格和數量
+        - ask_price/ask_volume: 賣方最佳價格和數量
+    """
+    try:
+        validated_args = QuerySymbolQuoteArgs(**args)
+        account = validated_args.account
+        symbol = validated_args.symbol
+        market_type = validated_args.market_type
+
+        # 驗證並獲取帳戶對象
+        account_obj, error = validate_and_get_account(account)
+        if error:
+            return {"status": "error", "data": None, "message": error}
+
+        # 轉換市場類型枚舉
+        market_type_enum = to_market_type(market_type)
+
+        # 查詢商品報價
+        quote_result = sdk.stock.query_symbol_quote(account_obj, symbol, market_type_enum)
+        if quote_result and hasattr(quote_result, "is_success") and quote_result.is_success:
+            return {
+                "status": "success",
+                "data": quote_result.data if hasattr(quote_result, "data") else quote_result,
+                "message": f"成功獲取股票 {symbol} 報價資訊",
+            }
+        else:
+            return {"status": "error", "data": None, "message": f"無法獲取股票 {symbol} 報價資訊"}
+
+    except Exception as e:
+        return {"status": "error", "data": None, "message": f"獲取商品報價失敗: {str(e)}"}
+
+
+@mcp.tool()
+def query_symbol_snapshot(args: Dict) -> dict:
+    """
+    查詢商品漲跌幅報表（批量）
+
+    批量查詢多個股票的即時報價和交易資訊，對應官方 SDK `query_symbol_snapshot(account, market_type, stock_type)`。
+    此為 2.2.5 版新增功能。
+
+    ⚠️ 重要用途：
+    - 批量獲取多個股票的即時價格和交易資訊
+    - 查詢漲跌停價格和參考價格
+    - 了解市場狀態和交易權限
+    - 監控買賣價量資訊
+
+    Args:
+        account (str): 帳戶號碼
+        market_type (str, optional): 市場類型，預設 "Common"
+            - "Common": 整股市場
+            - "IntradayOdd": 盤中零股
+            - "Fixing": 定盤
+        stock_type (List[str], optional): 股票類型列表，預設 ["Stock"]
+            - "Stock": 一般股票
+            - "CovertBond": 轉換公司債
+            - "EtfAndEtn": ETF及ETN
+
+    Returns:
+        dict: 成功時返回 SymbolSnapshotResponse，包含以下關鍵字段：
+            - symbols (List[SymbolQuote]): 股票報價資訊列表，每筆包含：
+                - market (str): 市場別
+                - symbol (str): 股票代碼
+                - is_tib_or_psb (bool): 是否為創新版或戰略新板
+                - market_type (str): 市場類型
+                - status (int): 狀態 (bitmask)
+                    - 0: 全禁
+                    - 1: 平盤下可融券賣出
+                    - 2: 平盤下可借券賣出
+                    - 4: 可先買後賣當沖
+                    - 8: 可先賣後買當沖
+                    - 狀態值為上述數值的加總
+                - reference_price (float): 參考價格
+                - unit (int): 交易單位
+                - update_time (str): 更新時間
+                - limitup_price (float): 漲停價
+                - limitdown_price (float): 跌停價
+                - open_price (float): 開盤價
+                - high_price (float): 最高價
+                - low_price (float): 最低價
+                - last_price (float): 最新成交價
+                - total_volume (int): 總成交量
+                - total_transaction (int): 總成交筆數
+                - total_value (float): 總成交金額
+                - last_size (int): 最新成交量
+                - last_transaction (int): 最新成交筆數
+                - last_value (float): 最新成交金額
+                - bid_price (float): 買1價格
+                - bid_volume (int): 買1數量
+                - ask_price (float): 賣1價格
+                - ask_volume (int): 賣1數量
+
+    Note:
+        **狀態值解釋**:
+        - status 是 bitmask 值，需要按位解析：
+          * 0 = 全禁（無法進行任何相關交易）
+          * 1 = 平盤下可融券賣出
+          * 2 = 平盤下可借券賣出
+          * 4 = 可先買後賣當沖
+          * 8 = 可先賣後買當沖
+        - 例如：status=15 表示可進行所有交易 (1+2+4+8)
+        - status=3 表示僅可進行平盤下融券和借券賣出 (1+2)
+
+        **市場類型說明**:
+        - Common: 整股市場（預設）
+        - IntradayOdd: 盤中零股市場
+        - Fixing: 定盤市場
+
+        **股票類型說明**:
+        - Stock: 一般股票（預設）
+        - CovertBond: 轉換公司債
+        - EtfAndEtn: ETF及ETN
+
+        **批量查詢特性**:
+        - 一次可查詢多個股票類型的報價資訊
+        - 返回的 symbols 陣列包含所有符合條件的股票
+        - 適用於市場概覽和批量數據分析
+    """
+    try:
+        validated_args = QuerySymbolSnapshotArgs(**args)
+        account = validated_args.account
+        market_type = validated_args.market_type
+        stock_type = validated_args.stock_type
+
+        # 驗證並獲取帳戶對象
+        account_obj, error = validate_and_get_account(account)
+        if error:
+            return {"status": "error", "data": None, "message": error}
+
+        # 轉換枚舉值
+        market_type_enum = to_market_type(market_type)
+        stock_type_enums = to_stock_types(stock_type)
+
+        # 批量查詢商品報價
+        snapshot_result = sdk.stock.query_symbol_snapshot(account_obj, market_type_enum, stock_type_enums)
+        if snapshot_result and hasattr(snapshot_result, "is_success") and snapshot_result.is_success:
+            return {
+                "status": "success",
+                "data": snapshot_result.data if hasattr(snapshot_result, "data") else snapshot_result,
+                "message": f"成功批量獲取股票報價資訊，市場類型: {market_type}，股票類型: {stock_type}",
+            }
+        else:
+            return {"status": "error", "data": None, "message": f"無法批量獲取股票報價資訊"}
+
+    except Exception as e:
+        return {"status": "error", "data": None, "message": f"批量獲取商品報價失敗: {str(e)}"}
     """
     獲取股票或指數列表（依條件查詢）
 
@@ -2196,7 +2769,18 @@ def _place_single_order(account_obj, order_data):
         # 下單
         result = sdk.stock.place_order(account_obj, order, is_non_blocking)
 
-        return {"order_data": order_data, "result": result, "success": True, "error": None}
+        # 檢查 API 返回結果
+        if result and hasattr(result, "is_success") and result.is_success:
+            return {"order_data": order_data, "result": result, "success": True, "error": None}
+        else:
+            # 提取錯誤訊息
+            error_msg = "下單失敗"
+            if result and hasattr(result, "message"):
+                error_msg = f"下單失敗: {result.message}"
+            elif result:
+                error_msg = f"下單失敗: {str(result)}"
+
+            return {"order_data": order_data, "result": result, "success": False, "error": error_msg}
     except Exception as e:
         return {"order_data": order_data, "result": None, "success": False, "error": str(e)}
 
