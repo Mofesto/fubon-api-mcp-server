@@ -5,7 +5,7 @@
 [![VS Code Extension](https://img.shields.io/visual-studio-marketplace/v/mofesto.fubon-api-mcp-server?label=VS%20Code%20Extension)](https://marketplace.visualstudio.com/items?itemName=mofesto.fubon-api-mcp-server)
 [![PyPI downloads](https://img.shields.io/pypi/dm/fubon-api-mcp-server.svg)](https://pypi.org/project/fubon-api-mcp-server/)
 [![codecov](https://codecov.io/gh/Mofesto/fubon-api-mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/Mofesto/fubon-api-mcp-server)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 富邦證券市場資料 MCP (Model Communication Protocol) 伺服器，提供完整的台股交易功能與市場數據查詢。
 
@@ -988,7 +988,7 @@ flake8 .
 
 ## 📄 授權條款
 
-本專案採用 [MIT License](LICENSE) 授權。
+本專案採用 [Apache License 2.0](LICENSE) 授權。
 ## 📦 發佈資訊
 
 ### PyPI Package

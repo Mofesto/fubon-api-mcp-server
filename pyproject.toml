@@ -7,7 +7,7 @@ name = "fubon-api-mcp-server"
 dynamic = ["version"]
 description = "富邦證券 MCP 服務器 - Model Context Protocol 服務器用於富邦證券 API，提供完整的台股交易功能與市場數據查詢"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
 authors = [
     {name = "Jimmy Cui", email = "mcp@fubon.com"},
@@ -28,7 +28,7 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Financial and Insurance Industry",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
