@@ -6,6 +6,7 @@
 """
 
 from typing import Optional, Union
+
 from fubon_neo.constant import (
     BSAction,
     ConditionMarketType,
@@ -18,14 +19,13 @@ from fubon_neo.constant import (
     Operator,
     OrderType,
     PriceType,
-    StopSign,
     StockType,
+    StopSign,
     TimeInForce,
     TimeSliceOrderType,
     TradingType,
     TriggerContent,
 )
-
 
 # 類型別名定義
 EnumType = Union[

@@ -8,19 +8,21 @@ This module tests the core trading functionality including:
 - Order status and results
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from fubon_api_mcp_server.server import (
-    place_order,
+    batch_place_order,
     cancel_order,
-    modify_price,
-    modify_quantity,
     get_account_info,
-    get_inventory,
     get_bank_balance,
+    get_inventory,
     get_order_results,
     get_order_results_detail,
-    batch_place_order,
+    modify_price,
+    modify_quantity,
+    place_order,
 )
 
 

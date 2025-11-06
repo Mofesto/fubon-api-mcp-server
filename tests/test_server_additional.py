@@ -2,24 +2,25 @@
 Additional tests for server.py functions with low coverage.
 """
 
-from unittest.mock import MagicMock, Mock, patch, call
-import pytest
-import pandas as pd
 from datetime import datetime
+from unittest.mock import MagicMock, Mock, call, patch
+
+import pandas as pd
+import pytest
 
 from fubon_api_mcp_server.server import (
+    _fetch_api_historical_data,
+    _get_local_historical_data,
     fetch_historical_data_segment,
+    get_historical_data,
+    historical_candles,
+    on_event,
+    on_filled,
+    on_order,
+    on_order_changed,
     process_historical_data,
     read_local_stock_data,
     save_to_local_csv,
-    on_order,
-    on_order_changed,
-    on_filled,
-    on_event,
-    get_historical_data,
-    _get_local_historical_data,
-    _fetch_api_historical_data,
-    historical_candles,
 )
 
 

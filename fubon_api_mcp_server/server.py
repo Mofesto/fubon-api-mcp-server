@@ -69,22 +69,22 @@ from pydantic import BaseModel, Field
 # 本地模組導入
 from .enums import (
     to_bs_action,
-    to_market_type,
-    to_order_type,
-    to_price_type,
-    to_time_in_force,
-    to_trading_type,
-    to_trigger_content,
-    to_operator,
     to_condition_market_type,
     to_condition_order_type,
     to_condition_price_type,
-    to_stop_sign,
-    to_direction,
-    to_time_slice_order_type,
     to_condition_status,
+    to_direction,
     to_history_status,
+    to_market_type,
+    to_operator,
+    to_order_type,
+    to_price_type,
     to_stock_types,
+    to_stop_sign,
+    to_time_in_force,
+    to_time_slice_order_type,
+    to_trading_type,
+    to_trigger_content,
 )
 
 # 加載環境變數配置
@@ -95,7 +95,9 @@ load_dotenv()
 # =============================================================================
 
 # 數據目錄配置 - 用於儲存本地快取的股票歷史數據
-DEFAULT_DATA_DIR = Path.home() / "Library" / "Application Support" / "fubon-mcp" / "data"
+DEFAULT_DATA_DIR = (
+    Path.home() / "Library" / "Application Support" / "fubon-mcp" / "data"
+)
 BASE_DATA_DIR = Path(os.getenv("FUBON_DATA_DIR", DEFAULT_DATA_DIR))
 
 # 確保數據目錄存在
@@ -151,7 +153,11 @@ def get_order_by_no(account_obj, order_no: str) -> tuple:
     """
     try:
         order_results = sdk.stock.get_order_results(account_obj)
-        if not (order_results and hasattr(order_results, "is_success") and order_results.is_success):
+        if not (
+            order_results
+            and hasattr(order_results, "is_success")
+            and order_results.is_success
+        ):
             return None, "無法獲取帳戶委託結果"
 
         # 找到對應的委託單
@@ -184,7 +190,10 @@ def fetch_historical_data_segment(symbol: str, from_date: str, to_date: str) -> 
     """
     try:
         params = {"symbol": symbol, "from": from_date, "to": to_date}
-        print(f"正在獲取 {symbol} 從 {params['from']} 到 {params['to']} 的數據...", file=sys.stderr)
+        print(
+            f"正在獲取 {symbol} 從 {params['from']} 到 {params['to']} 的數據...",
+            file=sys.stderr,
+        )
         response = reststock.historical.candles(**params)
         print(f"API 回應內容: {response}", file=sys.stderr)
 
@@ -240,6 +249,8 @@ sdk = None
 accounts = None
 # REST API 客戶端（用於股票數據查詢）
 reststock = None
+# REST API 客戶端（用於期貨/選擇權數據查詢）
+restfutopt = None
 
 # =============================================================================
 # 主動回報數據存儲（全局變數，線程安全）
@@ -282,10 +293,14 @@ def handle_exceptions(func):
             tb_lines = traceback.format_exc().splitlines()
 
             # Find the index of the line related to the original function
-            func_line_index = next((i for i, line in enumerate(tb_lines) if func.__name__ in line), -1)
+            func_line_index = next(
+                (i for i, line in enumerate(tb_lines) if func.__name__ in line), -1
+            )
 
             # Highlight the specific part in the traceback where the exception occurred
-            relevant_tb = "\n".join(tb_lines[func_line_index:])  # Include traceback from the function name
+            relevant_tb = "\n".join(
+                tb_lines[func_line_index:]
+            )  # Include traceback from the function name
 
             error_text = f"{func.__name__} exception: {exp}\nTraceback (most recent call last):\n{relevant_tb}"
             print(error_text, file=sys.stderr)
@@ -341,7 +356,10 @@ def on_order_changed(order_changed_data):
     global latest_order_changed_reports  # noqa: F824 - SDK 回調函數需要修改全局變數
     try:
         # 添加時間戳到數據中
-        timestamped_data = {"timestamp": datetime.now().isoformat(), "data": order_changed_data}
+        timestamped_data = {
+            "timestamp": datetime.now().isoformat(),
+            "data": order_changed_data,
+        }
         latest_order_changed_reports.append(timestamped_data)
 
         # 限制列表長度，最多保留10筆記錄
@@ -367,7 +385,10 @@ def on_filled(filled_data):
     global latest_filled_reports  # noqa: F824 - SDK 回調函數需要修改全局變數
     try:
         # 添加時間戳到數據中
-        timestamped_data = {"timestamp": datetime.now().isoformat(), "data": filled_data}
+        timestamped_data = {
+            "timestamp": datetime.now().isoformat(),
+            "data": filled_data,
+        }
         latest_filled_reports.append(timestamped_data)
 
         # 限制列表長度，最多保留10筆記錄
@@ -449,7 +470,9 @@ def save_to_local_csv(symbol: str, new_data: list):
         new_df["date"] = pd.to_datetime(new_df["date"])
 
         # 創建臨時檔案進行原子寫入
-        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv") as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="w", delete=False, suffix=".csv"
+        ) as temp_file:
             temp_path = Path(temp_file.name)
 
             try:
@@ -460,7 +483,9 @@ def save_to_local_csv(symbol: str, new_data: list):
 
                     # 合併數據並刪除重複項（以日期為鍵）
                     combined_df = pd.concat([existing_df, new_df])
-                    combined_df = combined_df.drop_duplicates(subset=["date"], keep="last")
+                    combined_df = combined_df.drop_duplicates(
+                        subset=["date"], keep="last"
+                    )
                     combined_df = combined_df.sort_values(by="date", ascending=False)
                 else:
                     combined_df = new_df.sort_values(by="date", ascending=False)
@@ -488,11 +513,23 @@ def get_historical_data(symbol):
     try:
         data = read_local_stock_data(symbol)
         if data is None:
-            return {"status": "error", "data": [], "message": f"找不到股票代碼 {symbol} 的數據"}
+            return {
+                "status": "error",
+                "data": [],
+                "message": f"找不到股票代碼 {symbol} 的數據",
+            }
 
-        return {"status": "success", "data": data.to_dict("records"), "message": f"成功獲取 {symbol} 的歷史數據"}
+        return {
+            "status": "success",
+            "data": data.to_dict("records"),
+            "message": f"成功獲取 {symbol} 的歷史數據",
+        }
     except Exception as e:
-        return {"status": "error", "data": [], "message": f"獲取數據時發生錯誤: {str(e)}"}
+        return {
+            "status": "error",
+            "data": [],
+            "message": f"獲取數據時發生錯誤: {str(e)}",
+        }
 
 
 class HistoricalCandlesArgs(BaseModel):
@@ -569,7 +606,9 @@ class QuerySymbolSnapshotArgs(BaseModel):
 
 class GetIntradayTickersArgs(BaseModel):
     market: str  # 市場別，可選 TSE 上市；OTC 上櫃；ESB 興櫃一般板；TIB 臺灣創新板；PSB 興櫃戰略新板
-    type: Optional[str] = None  # 類型，可選 ALLBUT099 包含一般股票、特別股及ETF ； COMMONSTOCK 為一般股票
+    type: Optional[str] = (
+        None  # 類型，可選 ALLBUT099 包含一般股票、特別股及ETF ； COMMONSTOCK 為一般股票
+    )
     exchange: Optional[str] = None  # 交易所，可選 TSE 或 OTC
     industry: Optional[str] = None  # 行業別
     isNormal: Optional[bool] = None  # 是否為普通股
@@ -630,6 +669,60 @@ class GetHistoricalStatsArgs(BaseModel):
     symbol: str
 
 
+class GetIntradayProductsArgs(BaseModel):
+    type: str  # 類型，可選 FUTURE 期貨；OPTION 選擇權
+    exchange: Optional[str] = None  # 交易所，可選 TAIFEX 臺灣期貨交易所
+    session: Optional[str] = (
+        None  # 交易時段，可選 REGULAR 一般交易 或 AFTERHOURS 盤後交易
+    )
+    contractType: Optional[str] = (
+        None  # 契約類別，可選 I 指數類；R 利率類；B 債券類；C 商品類；S 股票類；E 匯率類
+    )
+    status: Optional[str] = None  # 契約狀態，可選 N 正常；P 暫停交易；U 即將上市
+
+
+class GetIntradayFutOptTickersArgs(BaseModel):
+    type: str  # 類型，可選 FUTURE 期貨；OPTION 選擇權
+    exchange: Optional[str] = None  # 交易所，可選 TAIFEX 臺灣期貨交易所
+    session: Optional[str] = (
+        None  # 交易時段，可選 REGULAR 一般交易 或 AFTERHOURS 盤後交易
+    )
+    product: Optional[str] = None  # 產品代碼
+    contractType: Optional[str] = (
+        None  # 契約類別，可選 I 指數類；R 利率類；B 債券類；C 商品類；S 股票類；E 匯率類
+    )
+
+
+class GetIntradayFutOptTickerArgs(BaseModel):
+    symbol: str  # 商品代碼
+    session: Optional[str] = (
+        None  # 交易時段，可選 REGULAR 一般交易 或 AFTERHOURS 盤後交易
+    )
+
+
+class GetIntradayFutOptQuoteArgs(BaseModel):
+    symbol: str  # 期權代碼
+    session: Optional[str] = None  # 交易時段，可選 afterhours 盤後交易
+
+
+class GetIntradayFutOptCandlesArgs(BaseModel):
+    symbol: str  # 期權代碼
+    session: Optional[str] = None  # 交易時段，可選 afterhours 盤後交易
+    timeframe: Optional[str] = None  # K線週期，可選 1m, 5m, 15m, 30m, 1h, 1d
+
+
+class GetIntradayFutOptTradesArgs(BaseModel):
+    symbol: str  # 期權代碼
+    session: Optional[str] = None  # 交易時段，可選 afterhours 盤後交易
+    offset: Optional[int] = None  # 偏移量
+    limit: Optional[int] = None  # 限制量
+
+
+class GetIntradayFutOptVolumesArgs(BaseModel):
+    symbol: str  # 期權代碼
+    session: Optional[str] = None  # 交易時段，可選 afterhours 盤後交易
+
+
 class GetRealtimeQuotesArgs(BaseModel):
     symbol: str
 
@@ -688,7 +781,9 @@ class TPSLOrderArgs(BaseModel):
     order_type: str = "Stock"  # Stock, Margin, Short
     target_price: str  # 停損/停利觸發價
     price: str  # 停損/停利委託價，若為市價則填空值""
-    trigger: Optional[str] = "MatchedPrice"  # 停損/停利觸發條件，可選 MatchedPrice, BidPrice, AskPrice，預設 MatchedPrice
+    trigger: Optional[str] = (
+        "MatchedPrice"  # 停損/停利觸發條件，可選 MatchedPrice, BidPrice, AskPrice，預設 MatchedPrice
+    )
 
 
 class TPSLWrapperArgs(BaseModel):
@@ -706,9 +801,7 @@ class ConditionArgs(BaseModel):
 
     market_type: str = "Reference"  # 對應 TradingType：Reference, LastPrice
     symbol: str  # 股票代碼
-    trigger: str = (
-        "MatchedPrice"  # 觸發內容：MatchedPrice(成交價), BuyPrice(買價), SellPrice(賣價), TotalQuantity(累計成交量), Time(時間)
-    )
+    trigger: str = "MatchedPrice"  # 觸發內容：MatchedPrice(成交價), BuyPrice(買價), SellPrice(賣價), TotalQuantity(累計成交量), Time(時間)
     trigger_value: str  # 觸發值
     comparison: str = "LessThan"  # 比較運算子：LessThan(<), LessOrEqual(<=), Equal(=), Greater(>), GreaterOrEqual(>=)
 
@@ -826,7 +919,9 @@ class TimeSliceSplitArgs(BaseModel):
 
         # 驗證股數必須為1000的倍數
         if self.single_quantity % 1000 != 0:
-            raise ValueError(f"single_quantity 必須為1000的倍數（張數），輸入值 {self.single_quantity} 股無效")
+            raise ValueError(
+                f"single_quantity 必須為1000的倍數（張數），輸入值 {self.single_quantity} 股無效"
+            )
 
         # 如果提供了 split_count，自動計算 total_quantity
         if self.split_count is not None and self.split_count > 0:
@@ -837,12 +932,17 @@ class TimeSliceSplitArgs(BaseModel):
                     f"total_quantity ({self.total_quantity}) 與 split_count * single_quantity ({self.split_count * self.single_quantity}) 不一致"
                 )
 
-        if self.total_quantity is not None and self.total_quantity <= self.single_quantity:
+        if (
+            self.total_quantity is not None
+            and self.total_quantity <= self.single_quantity
+        ):
             raise ValueError("total_quantity 必須大於 single_quantity")
 
         # 驗證總股數也必須為1000的倍數
         if self.total_quantity is not None and self.total_quantity % 1000 != 0:
-            raise ValueError(f"total_quantity 必須為1000的倍數（張數），輸入值 {self.total_quantity} 股無效")
+            raise ValueError(
+                f"total_quantity 必須為1000的倍數（張數），輸入值 {self.total_quantity} 股無效"
+            )
 
         # 針對 method 類型的檢核
         try:
@@ -857,7 +957,9 @@ class TimeSliceSplitArgs(BaseModel):
 
             m = getattr(_TS, self.method)
         except Exception:
-            raise ValueError("method 無效，必須是 TimeSliceOrderType 的成員名稱 (Type1/Type2/Type3) 或 'TimeSlice' (自動推斷)")
+            raise ValueError(
+                "method 無效，必須是 TimeSliceOrderType 的成員名稱 (Type1/Type2/Type3) 或 'TimeSlice' (自動推斷)"
+            )
         if m in (_TS.Type2, _TS.Type3):
             if not self.end_time:
                 raise ValueError("Type2/Type3 必須提供 end_time")
@@ -1082,10 +1184,18 @@ def historical_candles(args: Dict) -> dict:
                 "message": f"成功獲取 {symbol} 從 {from_date} 到 {to_date} 的數據",
             }
 
-        return {"status": "error", "data": [], "message": f"無法獲取 {symbol} 的歷史數據"}
+        return {
+            "status": "error",
+            "data": [],
+            "message": f"無法獲取 {symbol} 的歷史數據",
+        }
 
     except Exception as e:
-        return {"status": "error", "data": [], "message": f"獲取數據時發生錯誤: {str(e)}"}
+        return {
+            "status": "error",
+            "data": [],
+            "message": f"獲取數據時發生錯誤: {str(e)}",
+        }
 
 
 def _get_local_historical_data(symbol: str, from_date: str, to_date: str) -> dict:
@@ -1123,7 +1233,9 @@ def _fetch_api_historical_data(symbol: str, from_date: str, to_date: str) -> lis
         while current_from < to_datetime:
             current_to = min(current_from + pd.Timedelta(days=365), to_datetime)
             segment_data = fetch_historical_data_segment(
-                symbol, current_from.strftime("%Y-%m-%d"), current_to.strftime("%Y-%m-%d")
+                symbol,
+                current_from.strftime("%Y-%m-%d"),
+                current_to.strftime("%Y-%m-%d"),
             )
             all_data.extend(segment_data)
             current_from = current_to + pd.Timedelta(days=1)
@@ -1210,8 +1322,16 @@ def place_order(args: Dict) -> dict:
         is_non_blocking = validated_args.is_non_blocking
 
         # 檢查 accounts 是否成功
-        if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
-            return {"status": "error", "data": None, "message": "帳戶認證失敗，請檢查憑證是否過期"}
+        if (
+            not accounts
+            or not hasattr(accounts, "is_success")
+            or not accounts.is_success
+        ):
+            return {
+                "status": "error",
+                "data": None,
+                "message": "帳戶認證失敗，請檢查憑證是否過期",
+            }
 
         # 找到對應的帳戶對象
         account_obj = None
@@ -1224,7 +1344,13 @@ def place_order(args: Dict) -> dict:
         if not account_obj:
             return {"status": "error", "data": None, "message": f"找不到帳戶 {account}"}
 
-        from fubon_neo.constant import BSAction, MarketType, OrderType, PriceType, TimeInForce
+        from fubon_neo.constant import (
+            BSAction,
+            MarketType,
+            OrderType,
+            PriceType,
+            TimeInForce,
+        )
         from fubon_neo.sdk import Order
 
         # 將字串轉換為對應的枚舉值
@@ -1318,33 +1444,61 @@ def _modify_order(account: str, order_no: str, modify_value, modify_type: str) -
 
         # 獲取委託結果
         order_results = sdk.stock.get_order_results(account_obj)
-        if not (order_results and hasattr(order_results, "is_success") and order_results.is_success):
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 委託結果"}
+        if not (
+            order_results
+            and hasattr(order_results, "is_success")
+            and order_results.is_success
+        ):
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取帳戶 {account} 委託結果",
+            }
 
         # 找到對應的委託單
         target_order = _find_target_order(order_results, order_no)
         if not target_order:
-            return {"status": "error", "data": None, "message": f"找不到委託單號 {order_no}"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"找不到委託單號 {order_no}",
+            }
 
         # 創建修改對象並執行修改
         modify_obj = _create_modify_object(target_order, modify_value, modify_type)
         result = _execute_modify_operation(account_obj, modify_obj, modify_type)
 
         if result and hasattr(result, "is_success") and result.is_success:
-            value_desc = f"數量為 {modify_value}" if modify_type == "quantity" else f"價格為 {modify_value}"
+            value_desc = (
+                f"數量為 {modify_value}"
+                if modify_type == "quantity"
+                else f"價格為 {modify_value}"
+            )
             return {
                 "status": "success",
                 "data": result.data if hasattr(result, "data") else result,
                 "message": f"成功修改委託 {order_no} {value_desc}",
             }
         else:
-            return {"status": "error", "data": None, "message": f"修改委託 {order_no} {modify_type} 失敗"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"修改委託 {order_no} {modify_type} 失敗",
+            }
 
     except Exception as modify_error:
-        return {"status": "error", "data": None, "message": f"修改{modify_type}時發生錯誤: {str(modify_error)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"修改{modify_type}時發生錯誤: {str(modify_error)}",
+        }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"修改{modify_type}失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"修改{modify_type}失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -1394,17 +1548,29 @@ def get_account_info(args: Dict) -> dict:
         account_details = _get_basic_account_info(account_obj)
         account_details.update(_get_account_financial_info(account_obj))
 
-        return {"status": "success", "data": account_details, "message": f"成功獲取帳戶 {account} 詳細資訊"}
+        return {
+            "status": "success",
+            "data": account_details,
+            "message": f"成功獲取帳戶 {account} 詳細資訊",
+        }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取帳戶資訊失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取帳戶資訊失敗: {str(e)}",
+        }
 
 
 def _get_all_accounts_basic_info() -> dict:
     """獲取所有帳戶基本資訊"""
     # 檢查 accounts 是否成功
     if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
-        return {"status": "error", "data": None, "message": "帳戶認證失敗，請檢查憑證是否過期"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": "帳戶認證失敗，請檢查憑證是否過期",
+        }
 
     account_list = []
     if hasattr(accounts, "data") and accounts.data:
@@ -1441,15 +1607,20 @@ def _get_account_financial_info(account_obj) -> dict:
     info = {}
 
     # 獲取銀行水位
-    info["bank_balance"] = _safe_api_call(lambda: sdk.accounting.bank_remain(account_obj), "獲取銀行水位失敗")
+    info["bank_balance"] = _safe_api_call(
+        lambda: sdk.accounting.bank_remain(account_obj), "獲取銀行水位失敗"
+    )
 
     # 獲取未實現損益
     info["unrealized_pnl"] = _safe_api_call(
-        lambda: sdk.accounting.unrealized_gains_and_loses(account_obj), "獲取未實現損益失敗"
+        lambda: sdk.accounting.unrealized_gains_and_loses(account_obj),
+        "獲取未實現損益失敗",
     )
 
     # 獲取交割資訊 (今日)
-    info["settlement_today"] = _safe_api_call(lambda: sdk.accounting.query_settlement(account_obj, "0d"), "獲取交割資訊失敗")
+    info["settlement_today"] = _safe_api_call(
+        lambda: sdk.accounting.query_settlement(account_obj, "0d"), "獲取交割資訊失敗"
+    )
 
     return info
 
@@ -1492,42 +1663,18 @@ def get_inventory(args: Dict) -> dict:
                 "message": f"成功獲取帳戶 {account} 庫存資訊",
             }
         else:
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 庫存資訊"}
-
-    except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取庫存資訊失敗: {str(e)}"}
-
-
-@mcp.tool()
-def get_unrealized_pnl(args: Dict) -> dict:
-    """
-    獲取未實現損益資訊
-
-    Args:
-        account (str): 帳戶號碼
-    """
-    try:
-        validated_args = GetUnrealizedPnLArgs(**args)
-        account = validated_args.account
-
-        # 驗證並獲取帳戶對象
-        account_obj, error = validate_and_get_account(account)
-        if error:
-            return {"status": "error", "data": None, "message": error}
-
-        # 獲取未實現損益
-        unrealized_pnl = sdk.accounting.unrealized_gains_and_loses(account_obj)
-        if unrealized_pnl and hasattr(unrealized_pnl, "is_success") and unrealized_pnl.is_success:
             return {
-                "status": "success",
-                "data": unrealized_pnl.data if hasattr(unrealized_pnl, "data") else unrealized_pnl,
-                "message": f"成功獲取帳戶 {account} 未實現損益",
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取帳戶 {account} 庫存資訊",
             }
-        else:
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 未實現損益"}
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取未實現損益失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取庫存資訊失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -1558,10 +1705,18 @@ def get_settlement_info(args: Dict) -> dict:
                 "message": f"成功獲取帳戶 {account} {range_param} 交割資訊",
             }
         else:
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 交割資訊"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取帳戶 {account} 交割資訊",
+            }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取交割資訊失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取交割資訊失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -1583,17 +1738,31 @@ def get_bank_balance(args: Dict) -> dict:
 
         # 獲取銀行水位資訊
         bank_balance = sdk.accounting.bank_remain(account_obj)
-        if bank_balance and hasattr(bank_balance, "is_success") and bank_balance.is_success:
+        if (
+            bank_balance
+            and hasattr(bank_balance, "is_success")
+            and bank_balance.is_success
+        ):
             return {
                 "status": "success",
-                "data": bank_balance.data if hasattr(bank_balance, "data") else bank_balance,
+                "data": bank_balance.data
+                if hasattr(bank_balance, "data")
+                else bank_balance,
                 "message": f"成功獲取帳戶 {account} 銀行水位資訊",
             }
         else:
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 銀行水位資訊"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取帳戶 {account} 銀行水位資訊",
+            }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取銀行水位失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取銀行水位失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -1621,7 +1790,11 @@ def get_realtime_quotes(args: Dict) -> dict:
         except FugleAPIError as e:
             return {"status": "error", "data": None, "message": f"API 錯誤: {e}"}
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取即時行情失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取即時行情失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -1673,17 +1846,31 @@ def get_order_results(args: Dict) -> dict:
 
         # 獲取委託結果
         order_results = sdk.stock.get_order_results(account_obj)
-        if order_results and hasattr(order_results, "is_success") and order_results.is_success:
+        if (
+            order_results
+            and hasattr(order_results, "is_success")
+            and order_results.is_success
+        ):
             return {
                 "status": "success",
-                "data": order_results.data if hasattr(order_results, "data") else order_results,
+                "data": order_results.data
+                if hasattr(order_results, "data")
+                else order_results,
                 "message": f"成功獲取帳戶 {account} 委託結果",
             }
         else:
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 委託結果"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取帳戶 {account} 委託結果",
+            }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取委託結果失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取委託結果失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -1753,17 +1940,31 @@ def get_order_results_detail(args: Dict) -> dict:
 
         # 獲取委託結果詳細資訊
         order_results_detail = sdk.stock.get_order_results_detail(account_obj)
-        if order_results_detail and hasattr(order_results_detail, "is_success") and order_results_detail.is_success:
+        if (
+            order_results_detail
+            and hasattr(order_results_detail, "is_success")
+            and order_results_detail.is_success
+        ):
             return {
                 "status": "success",
-                "data": order_results_detail.data if hasattr(order_results_detail, "data") else order_results_detail,
+                "data": order_results_detail.data
+                if hasattr(order_results_detail, "data")
+                else order_results_detail,
                 "message": f"成功獲取帳戶 {account} 委託結果詳細資訊",
             }
         else:
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 委託結果詳細資訊"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取帳戶 {account} 委託結果詳細資訊",
+            }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取委託結果詳細資訊失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取委託結果詳細資訊失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -1835,17 +2036,31 @@ def margin_quota(args: Dict) -> dict:
 
         # 查詢資券配額
         margin_quota_result = sdk.stock.margin_quota(account_obj, stock_no)
-        if margin_quota_result and hasattr(margin_quota_result, "is_success") and margin_quota_result.is_success:
+        if (
+            margin_quota_result
+            and hasattr(margin_quota_result, "is_success")
+            and margin_quota_result.is_success
+        ):
             return {
                 "status": "success",
-                "data": margin_quota_result.data if hasattr(margin_quota_result, "data") else margin_quota_result,
+                "data": margin_quota_result.data
+                if hasattr(margin_quota_result, "data")
+                else margin_quota_result,
                 "message": f"成功獲取帳戶 {account} 股票 {stock_no} 資券配額",
             }
         else:
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 股票 {stock_no} 資券配額"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取帳戶 {account} 股票 {stock_no} 資券配額",
+            }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取資券配額失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取資券配額失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -1928,17 +2143,31 @@ def daytrade_and_stock_info(args: Dict) -> dict:
 
         # 查詢現沖券配額資訊
         daytrade_info = sdk.stock.daytrade_and_stock_info(account_obj, stock_no)
-        if daytrade_info and hasattr(daytrade_info, "is_success") and daytrade_info.is_success:
+        if (
+            daytrade_info
+            and hasattr(daytrade_info, "is_success")
+            and daytrade_info.is_success
+        ):
             return {
                 "status": "success",
-                "data": daytrade_info.data if hasattr(daytrade_info, "data") else daytrade_info,
+                "data": daytrade_info.data
+                if hasattr(daytrade_info, "data")
+                else daytrade_info,
                 "message": f"成功獲取帳戶 {account} 股票 {stock_no} 現沖券配額資訊",
             }
         else:
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 股票 {stock_no} 現沖券配額資訊"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取帳戶 {account} 股票 {stock_no} 現沖券配額資訊",
+            }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取現沖券配額資訊失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取現沖券配額資訊失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2039,18 +2268,34 @@ def query_symbol_quote(args: Dict) -> dict:
         market_type_enum = to_market_type(market_type)
 
         # 查詢商品報價
-        quote_result = sdk.stock.query_symbol_quote(account_obj, symbol, market_type_enum)
-        if quote_result and hasattr(quote_result, "is_success") and quote_result.is_success:
+        quote_result = sdk.stock.query_symbol_quote(
+            account_obj, symbol, market_type_enum
+        )
+        if (
+            quote_result
+            and hasattr(quote_result, "is_success")
+            and quote_result.is_success
+        ):
             return {
                 "status": "success",
-                "data": quote_result.data if hasattr(quote_result, "data") else quote_result,
+                "data": quote_result.data
+                if hasattr(quote_result, "data")
+                else quote_result,
                 "message": f"成功獲取股票 {symbol} 報價資訊",
             }
         else:
-            return {"status": "error", "data": None, "message": f"無法獲取股票 {symbol} 報價資訊"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取股票 {symbol} 報價資訊",
+            }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取商品報價失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取商品報價失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2154,18 +2399,34 @@ def query_symbol_snapshot(args: Dict) -> dict:
         stock_type_enums = to_stock_types(stock_type)
 
         # 批量查詢商品報價
-        snapshot_result = sdk.stock.query_symbol_snapshot(account_obj, market_type_enum, stock_type_enums)
-        if snapshot_result and hasattr(snapshot_result, "is_success") and snapshot_result.is_success:
+        snapshot_result = sdk.stock.query_symbol_snapshot(
+            account_obj, market_type_enum, stock_type_enums
+        )
+        if (
+            snapshot_result
+            and hasattr(snapshot_result, "is_success")
+            and snapshot_result.is_success
+        ):
             return {
                 "status": "success",
-                "data": snapshot_result.data if hasattr(snapshot_result, "data") else snapshot_result,
+                "data": snapshot_result.data
+                if hasattr(snapshot_result, "data")
+                else snapshot_result,
                 "message": f"成功批量獲取股票報價資訊，市場類型: {market_type}，股票類型: {stock_type}",
             }
         else:
-            return {"status": "error", "data": None, "message": f"無法批量獲取股票報價資訊"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法批量獲取股票報價資訊",
+            }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"批量獲取商品報價失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"批量獲取商品報價失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2246,9 +2507,17 @@ def get_intraday_tickers(args: Dict) -> dict:
             api_params["isHalted"] = isHalted
 
         result = reststock.intraday.tickers(**api_params)
-        return {"status": "success", "data": result, "message": f"成功獲取 {market} 市場股票列表"}
+        return {
+            "status": "success",
+            "data": result,
+            "message": f"成功獲取 {market} 市場股票列表",
+        }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取股票列表失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取股票列表失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2327,7 +2596,9 @@ def get_intraday_ticker(args: Dict) -> dict:
         # 如果數據是字典且包含 securityType，進行轉換
         if isinstance(data, dict) and "securityType" in data:
             security_type_code = str(data["securityType"])
-            data["securityTypeName"] = security_type_mapping.get(security_type_code, f"未知代碼({security_type_code})")
+            data["securityTypeName"] = security_type_mapping.get(
+                security_type_code, f"未知代碼({security_type_code})"
+            )
 
         return {
             "status": "success",
@@ -2335,7 +2606,11 @@ def get_intraday_ticker(args: Dict) -> dict:
             "message": f"成功獲取 {symbol} 基本資料",
         }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取基本資料失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取基本資料失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2364,7 +2639,11 @@ def get_intraday_quote(args: Dict) -> dict:
             "message": f"成功獲取 {symbol} 即時報價",
         }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取即時報價失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取即時報價失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2380,9 +2659,17 @@ def get_intraday_candles(args: Dict) -> dict:
         symbol = validated_args.symbol
 
         result = reststock.intraday.candles(symbol=symbol)
-        return {"status": "success", "data": result, "message": f"成功獲取 {symbol} 盤中 K 線"}
+        return {
+            "status": "success",
+            "data": result,
+            "message": f"成功獲取 {symbol} 盤中 K 線",
+        }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取盤中 K 線失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取盤中 K 線失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2413,9 +2700,17 @@ def get_intraday_trades(args: Dict) -> dict:
             api_params["limit"] = limit
 
         result = reststock.intraday.trades(**api_params)
-        return {"status": "success", "data": result, "message": f"成功獲取 {symbol} 成交明細"}
+        return {
+            "status": "success",
+            "data": result,
+            "message": f"成功獲取 {symbol} 成交明細",
+        }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取成交明細失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取成交明細失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2431,9 +2726,17 @@ def get_intraday_volumes(args: Dict) -> dict:
         symbol = validated_args.symbol
 
         result = reststock.intraday.volumes(symbol=symbol)
-        return {"status": "success", "data": result, "message": f"成功獲取 {symbol} 分價量表"}
+        return {
+            "status": "success",
+            "data": result,
+            "message": f"成功獲取 {symbol} 分價量表",
+        }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取分價量表失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取分價量表失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2475,12 +2778,24 @@ def get_snapshot_quotes(args: Dict) -> dict:
                     "message": f"成功獲取 {market} 行情快照 (顯示前 {len(limited_data)} 筆，共 {len(data)} 筆)",
                 }
             else:
-                return {"status": "error", "data": None, "message": "API 返回的 data 欄位不是列表格式"}
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": "API 返回的 data 欄位不是列表格式",
+                }
         else:
             # 如果返回的不是預期的字典格式
-            return {"status": "success", "data": result, "message": f"成功獲取 {market} 行情快照"}
+            return {
+                "status": "success",
+                "data": result,
+                "message": f"成功獲取 {market} 行情快照",
+            }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取行情快照失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取行情快照失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2556,12 +2871,24 @@ def get_snapshot_movers(args: Dict) -> dict:
                     "message": f"成功獲取 {market} 漲跌幅排行 (顯示前 {len(limited_data)} 筆，共 {len(data)} 筆)",
                 }
             else:
-                return {"status": "error", "data": None, "message": "API 返回的 data 欄位不是列表格式"}
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": "API 返回的 data 欄位不是列表格式",
+                }
         else:
             # 如果返回的不是預期的字典格式
-            return {"status": "success", "data": result, "message": f"成功獲取 {market} {direction} {change}排行"}
+            return {
+                "status": "success",
+                "data": result,
+                "message": f"成功獲取 {market} {direction} {change}排行",
+            }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取漲跌幅排行失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取漲跌幅排行失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2639,12 +2966,24 @@ def get_snapshot_actives(args: Dict) -> dict:
                     "message": f"成功獲取 {market} 成交量值排行 (顯示前 {len(limited_data)} 筆，共 {len(data)} 筆)",
                 }
             else:
-                return {"status": "error", "data": None, "message": "API 返回的 data 欄位不是列表格式"}
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": "API 返回的 data 欄位不是列表格式",
+                }
         else:
             # 如果返回的不是預期的字典格式
-            return {"status": "success", "data": result, "message": f"成功獲取 {market} {trade}排行"}
+            return {
+                "status": "success",
+                "data": result,
+                "message": f"成功獲取 {market} {trade}排行",
+            }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取成交量值排行失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取成交量值排行失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2678,12 +3017,811 @@ def get_historical_stats(args: Dict) -> dict:
                 "change_percent": result.get("changePercent"),
                 "date": result.get("date"),
             }
-            return {"status": "success", "data": stats, "message": f"成功獲取 {symbol} 近 52 週統計"}
+            return {
+                "status": "success",
+                "data": stats,
+                "message": f"成功獲取 {symbol} 近 52 週統計",
+            }
         else:
-            return {"status": "error", "data": None, "message": f"API 返回格式錯誤: {result}"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"API 返回格式錯誤: {result}",
+            }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取歷史統計失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取歷史統計失敗: {str(e)}",
+        }
+
+
+@mcp.tool()
+def get_intraday_futopt_products(args: Dict) -> dict:
+    """
+    獲取期貨/選擇權合約列表
+
+    查詢期貨和選擇權合約的基本資訊，可依據類型、交易所、交易時段、合約類型和狀態進行過濾。
+    對應富邦官方 API: intraday/products
+
+    Args:
+        type (str, optional): 商品類型
+            - "FUTURE": 期貨
+            - "OPTION": 選擇權
+            - 預設查詢所有類型
+        exchange (str, optional): 交易所
+            - "TAIFEX": 台灣期貨交易所
+            - 預設查詢所有交易所
+        session (str, optional): 交易時段
+            - "REGULAR": 一般交易時段
+            - "AFTERHOURS": 盤後交易時段
+            - 預設查詢所有時段
+        contract_type (str, optional): 合約類型
+            - "FUTURES": 期貨合約
+            - "CALL": 買權選擇權
+            - "PUT": 賣權選擇權
+            - 預設查詢所有類型
+        status (str, optional): 合約狀態
+            - "ACTIVE": 活躍合約
+            - "INACTIVE": 非活躍合約
+            - 預設查詢所有狀態
+
+    Returns:
+        dict: 成功時返回合約列表，每筆記錄包含：
+            - symbol (str): 合約代碼
+            - name (str): 合約名稱
+            - type (str): 商品類型 (FUTURE/OPTION)
+            - exchange (str): 交易所
+            - session (str): 交易時段
+            - contract_type (str): 合約類型
+            - status (str): 合約狀態
+            - underlying_symbol (str): 標的代碼 (選擇權專用)
+            - strike_price (float): 履約價 (選擇權專用)
+            - expiration_date (str): 到期日
+            - 其他合約相關資訊
+
+    Example:
+        # 查詢所有活躍期貨合約
+        {"type": "FUTURE", "status": "ACTIVE"}
+
+        # 查詢台指選擇權
+        {"type": "OPTION", "contract_type": "CALL", "underlying_symbol": "TX00"}
+
+        # 查詢所有合約 (無過濾條件)
+        {}
+    """
+    try:
+        validated_args = GetIntradayProductsArgs(**args)
+
+        # 準備 API 參數
+        api_params = {}
+
+        # 依據驗證後的參數設置 API 參數
+        if validated_args.type is not None:
+            api_params["type"] = validated_args.type
+        if validated_args.exchange is not None:
+            api_params["exchange"] = validated_args.exchange
+        if validated_args.session is not None:
+            api_params["session"] = validated_args.session
+        if validated_args.contract_type is not None:
+            api_params["contract_type"] = validated_args.contract_type
+        if validated_args.status is not None:
+            api_params["status"] = validated_args.status
+
+        # 調用富邦期貨/選擇權 API
+        global restfutopt  # noqa: F824 - 訪問全局變數
+        result = restfutopt.intraday.products(**api_params)
+
+        # 檢查 API 返回結果
+        if result and isinstance(result, list):
+            # 整理返回數據
+            products = []
+            for product in result:
+                if isinstance(product, dict):
+                    product_info = {
+                        "symbol": product.get("symbol"),
+                        "name": product.get("name"),
+                        "type": product.get("type"),
+                        "exchange": product.get("exchange"),
+                        "session": product.get("session"),
+                        "contract_type": product.get("contract_type"),
+                        "status": product.get("status"),
+                        "underlying_symbol": product.get("underlying_symbol"),
+                        "strike_price": product.get("strike_price"),
+                        "expiration_date": product.get("expiration_date"),
+                        "multiplier": product.get("multiplier"),
+                        "tick_size": product.get("tick_size"),
+                        "tick_value": product.get("tick_value"),
+                        "trading_hours": product.get("trading_hours"),
+                        "settlement_date": product.get("settlement_date"),
+                        "last_trading_date": product.get("last_trading_date"),
+                    }
+                    # 移除 None 值
+                    product_info = {
+                        k: v for k, v in product_info.items() if v is not None
+                    }
+                    products.append(product_info)
+
+            # 統計資訊
+            total_count = len(products)
+            type_counts = {}
+            for product in products:
+                p_type = product.get("type", "UNKNOWN")
+                type_counts[p_type] = type_counts.get(p_type, 0) + 1
+
+            return {
+                "status": "success",
+                "data": products,
+                "total_count": total_count,
+                "type_counts": type_counts,
+                "filters_applied": api_params,
+                "message": f"成功獲取 {total_count} 筆合約資訊",
+            }
+        else:
+            return {"status": "error", "data": None, "message": "API 返回格式錯誤"}
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取合約列表失敗: {str(e)}",
+        }
+
+
+@mcp.tool()
+def get_intraday_futopt_tickers(args: Dict) -> dict:
+    """
+    獲取期貨/選擇權合約代碼列表（依條件查詢）
+
+    查詢期貨和選擇權合約的代碼資訊，可依據類型、交易所、交易時段、產品和契約類型進行過濾。
+    對應富邦官方 API: intraday/tickers
+
+    Args:
+        type (str): 商品類型
+            - "FUTURE": 期貨
+            - "OPTION": 選擇權
+        exchange (str, optional): 交易所
+            - "TAIFEX": 台灣期貨交易所
+            - 預設查詢所有交易所
+        session (str, optional): 交易時段
+            - "REGULAR": 一般交易時段
+            - "AFTERHOURS": 盤後交易時段
+            - 預設查詢所有時段
+        product (str, optional): 產品代碼
+            - 例如: "TX00" (台指期), "MTX00" (小台指期)
+            - 預設查詢所有產品
+        contractType (str, optional): 契約類型
+            - "I": 指數類
+            - "R": 利率類
+            - "B": 債券類
+            - "C": 商品類
+            - "S": 股票類
+            - "E": 匯率類
+            - 預設查詢所有類型
+
+    Returns:
+        dict: 成功時返回合約代碼列表，每筆記錄包含：
+            - symbol (str): 合約代碼
+            - name (str): 合約名稱
+            - type (str): 商品類型 (FUTURE/OPTION)
+            - exchange (str): 交易所
+            - session (str): 交易時段
+            - product (str): 產品代碼
+            - contract_type (str): 契約類型
+            - expiration_date (str): 到期日
+            - strike_price (float): 履約價 (選擇權專用)
+            - option_type (str): 選擇權類型 (CALL/PUT，選擇權專用)
+            - 其他合約相關資訊
+
+    Example:
+        # 查詢所有台指期合約
+        {"type": "FUTURE", "product": "TX00"}
+
+        # 查詢所有台指選擇權
+        {"type": "OPTION", "product": "TX00"}
+
+        # 查詢指數類期貨
+        {"type": "FUTURE", "contractType": "I"}
+    """
+    try:
+        validated_args = GetIntradayFutOptTickersArgs(**args)
+
+        # 準備 API 參數
+        api_params = {}
+
+        # 依據驗證後的參數設置 API 參數
+        if validated_args.type is not None:
+            api_params["type"] = validated_args.type
+        if validated_args.exchange is not None:
+            api_params["exchange"] = validated_args.exchange
+        if validated_args.session is not None:
+            api_params["session"] = validated_args.session
+        if validated_args.product is not None:
+            api_params["product"] = validated_args.product
+        if validated_args.contractType is not None:
+            api_params["contractType"] = validated_args.contractType
+
+        # 調用富邦期貨/選擇權 API
+        global restfutopt  # noqa: F824 - 訪問全局變數
+        result = restfutopt.intraday.tickers(**api_params)
+
+        # 檢查 API 返回結果
+        if result and isinstance(result, list):
+            # 整理返回數據
+            tickers = []
+            for ticker in result:
+                if isinstance(ticker, dict):
+                    ticker_info = {
+                        "symbol": ticker.get("symbol"),
+                        "name": ticker.get("name"),
+                        "type": ticker.get("type"),
+                        "exchange": ticker.get("exchange"),
+                        "session": ticker.get("session"),
+                        "product": ticker.get("product"),
+                        "contract_type": ticker.get("contractType"),
+                        "expiration_date": ticker.get("expirationDate"),
+                        "strike_price": ticker.get("strikePrice"),
+                        "option_type": ticker.get("optionType"),
+                        "underlying_symbol": ticker.get("underlyingSymbol"),
+                        "multiplier": ticker.get("multiplier"),
+                        "tick_size": ticker.get("tickSize"),
+                        "trading_hours": ticker.get("tradingHours"),
+                        "last_trading_date": ticker.get("lastTradingDate"),
+                    }
+                    # 移除 None 值
+                    ticker_info = {
+                        k: v for k, v in ticker_info.items() if v is not None
+                    }
+                    tickers.append(ticker_info)
+
+            # 統計資訊
+            total_count = len(tickers)
+            type_counts = {}
+            for ticker in tickers:
+                t_type = ticker.get("type", "UNKNOWN")
+                type_counts[t_type] = type_counts.get(t_type, 0) + 1
+
+            return {
+                "status": "success",
+                "data": tickers,
+                "total_count": total_count,
+                "type_counts": type_counts,
+                "filters_applied": api_params,
+                "message": f"成功獲取 {total_count} 筆合約代碼資訊",
+            }
+        else:
+            return {"status": "error", "data": None, "message": "API 返回格式錯誤"}
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取合約代碼列表失敗: {str(e)}",
+        }
+
+
+@mcp.tool()
+def get_intraday_futopt_ticker(args: Dict) -> dict:
+    """
+    獲取期貨/選擇權個別合約基本資訊
+
+    查詢指定期貨或選擇權合約代碼的基本資訊，包含合約名稱、參考價、結算日等。
+    對應富邦官方 API: intraday/ticker/
+
+    Args:
+        symbol (str): 合約代碼，例如 "TX00", "MTX00", "TE00C24000" 等
+        session (str, optional): 交易時段，預設為 "regular"
+            - "regular": 一般交易時段
+            - "afterhours": 盤後交易時段
+
+    Returns:
+        dict: 成功時返回合約基本資訊，包含:
+            - date: 資料日期
+            - type: 商品類型 (FUTURE/OPTION)
+            - exchange: 交易所代碼
+            - symbol: 合約代碼
+            - name: 合約名稱
+            - referencePrice: 參考價
+            - settlementDate: 結算日期
+            - startDate: 合約開始日期
+            - endDate: 合約結束日期
+
+    Example:
+        {
+            "symbol": "TX00",
+            "session": "regular"
+        }
+    """
+    try:
+        validated_args = GetIntradayFutOptTickerArgs(**args)
+        symbol = validated_args.symbol
+        session = validated_args.session
+
+        global restfutopt
+        if not restfutopt:
+            return {
+                "status": "error",
+                "data": None,
+                "message": "期貨/選擇權行情服務未初始化",
+            }
+
+        # 調用 API
+        api_params = {"symbol": symbol}
+        if session:
+            api_params["session"] = session
+
+        result = restfutopt.intraday.ticker(**api_params)
+
+        # 檢查 API 返回結果
+        if result and hasattr(result, "is_success") and result.is_success:
+            ticker_data = result.data
+            if ticker_data:
+                return {
+                    "status": "success",
+                    "data": ticker_data,
+                    "message": f"成功獲取合約 {symbol} 基本資訊",
+                }
+            else:
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": f"找不到合約代碼 {symbol}",
+                }
+        else:
+            error_msg = "API 調用失敗"
+            if result and hasattr(result, "message"):
+                error_msg = f"API 調用失敗: {result.message}"
+            return {"status": "error", "data": None, "message": error_msg}
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取合約基本資訊失敗: {str(e)}",
+        }
+
+
+@mcp.tool()
+def get_intraday_futopt_quote(args: Dict) -> dict:
+    """
+    獲取期貨/選擇權即時報價（依合約代碼查詢）
+
+    查詢指定期貨或選擇權合約的即時報價資訊，包含價格、成交量、買賣價量等詳細數據。
+    對應富邦官方 API: intraday/quote/
+
+    Args:
+        symbol (str): 合約代碼，例如 "TX00", "MTX00", "TE00C24000" 等
+        session (str, optional): 交易時段，預設為 "regular"
+            - "regular": 一般交易時段
+            - "afterhours": 盤後交易時段
+
+    Returns:
+        dict: 成功時返回合約即時報價資訊，包含:
+            - date: 資料日期
+            - type: 商品類型 (FUTURE/OPTION)
+            - exchange: 交易所代碼
+            - symbol: 合約代碼
+            - name: 合約名稱
+            - previousClose: 昨日收盤價
+            - openPrice: 開盤價
+            - openTime: 開盤價成交時間
+            - highPrice: 最高價
+            - highTime: 最高價成交時間
+            - lowPrice: 最低價
+            - lowTime: 最低價成交時間
+            - closePrice: 收盤價（最後成交價）
+            - closeTime: 收盤價（最後成交價）成交時間
+            - avgPrice: 當日成交均價
+            - change: 最後成交價漲跌
+            - changePercent: 最後成交價漲跌幅
+            - amplitude: 當日振幅
+            - lastPrice: 最後一筆成交價（含試撮）
+            - lastSize: 最後一筆成交數量（含試撮）
+            - total: 統計資訊
+                - tradeVolume: 累計成交量
+                - totalBidMatch: 委買成筆
+                - totalAskMatch: 委賣成筆
+            - lastTrade: 最後一筆成交資訊
+                - bid: 最後一筆成交買價
+                - ask: 最後一筆成交賣價
+                - price: 最後一筆成交價格
+                - size: 最後一筆成交數量
+                - time: 最後一筆成交時間
+                - serial: 最後一筆成交流水號
+            - serial: 流水號
+            - lastUpdated: 最後異動時間
+
+    Example:
+        {
+            "symbol": "TX00",
+            "session": "regular"
+        }
+    """
+    try:
+        validated_args = GetIntradayFutOptQuoteArgs(**args)
+        symbol = validated_args.symbol
+        session = validated_args.session
+
+        global restfutopt
+        if not restfutopt:
+            return {
+                "status": "error",
+                "data": None,
+                "message": "期貨/選擇權行情服務未初始化",
+            }
+
+        # 調用 API
+        api_params = {"symbol": symbol}
+        if session:
+            api_params["session"] = session
+
+        result = restfutopt.intraday.quote(**api_params)
+
+        # 檢查 API 返回結果
+        if result and hasattr(result, "is_success") and result.is_success:
+            quote_data = result.data
+            if quote_data:
+                return {
+                    "status": "success",
+                    "data": quote_data,
+                    "message": f"成功獲取合約 {symbol} 即時報價",
+                }
+            else:
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": f"找不到合約代碼 {symbol}",
+                }
+        else:
+            error_msg = "API 調用失敗"
+            if result and hasattr(result, "message"):
+                error_msg = f"API 調用失敗: {result.message}"
+            return {"status": "error", "data": None, "message": error_msg}
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取合約即時報價失敗: {str(e)}",
+        }
+
+
+@mcp.tool()
+def get_intraday_futopt_candles(args: Dict) -> dict:
+    """
+    獲取期貨/選擇權 K 線數據（依合約代碼查詢）
+
+    查詢指定期貨或選擇權合約的 K 線（candlestick）數據，包含開高低收成交量等資訊。
+    對應富邦官方 API: intraday/candles/
+
+    Args:
+        symbol (str): 合約代碼，例如 "TX00", "MTX00", "TE00C24000" 等
+        session (str, optional): 交易時段，預設為 "regular"
+            - "regular": 一般交易時段
+            - "afterhours": 盤後交易時段
+        timeframe (str, optional): K 線週期，預設為 "1" (1分鐘)
+            - "1": 1分鐘 K 線
+            - "3": 3分鐘 K 線
+            - "5": 5分鐘 K 線
+            - "15": 15分鐘 K 線
+            - "30": 30分鐘 K 線
+            - "60": 60分鐘 K 線
+
+    Returns:
+        dict: 成功時返回合約 K 線數據，包含:
+            - date: 資料日期
+            - type: 商品類型 (FUTURE/OPTION)
+            - exchange: 交易所代碼
+            - market: 市場代碼
+            - symbol: 合約代碼
+            - timeframe: K 線週期
+            - data: K 線數據陣列，每筆包含:
+                - open: 開盤價
+                - high: 最高價
+                - low: 最低價
+                - close: 收盤價
+                - volume: 成交量
+
+    Example:
+        {
+            "symbol": "TX00",
+            "session": "regular",
+            "timeframe": "1"
+        }
+    """
+    try:
+        validated_args = GetIntradayFutOptCandlesArgs(**args)
+        symbol = validated_args.symbol
+        session = validated_args.session
+        timeframe = validated_args.timeframe
+
+        global restfutopt
+        if not restfutopt:
+            return {
+                "status": "error",
+                "data": None,
+                "message": "期貨/選擇權行情服務未初始化",
+            }
+
+        # 調用 API
+        api_params = {"symbol": symbol}
+        if session:
+            api_params["session"] = session
+        if timeframe:
+            api_params["timeframe"] = timeframe
+
+        result = restfutopt.intraday.candles(**api_params)
+
+        # 檢查 API 返回結果
+        if result and hasattr(result, "is_success") and result.is_success:
+            candles_data = result.data
+            if candles_data:
+                return {
+                    "status": "success",
+                    "data": candles_data,
+                    "message": f"成功獲取合約 {symbol} K 線數據",
+                }
+            else:
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": f"找不到合約代碼 {symbol}",
+                }
+        else:
+            error_msg = "API 調用失敗"
+            if result and hasattr(result, "message"):
+                error_msg = f"API 調用失敗: {result.message}"
+            return {"status": "error", "data": None, "message": error_msg}
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取合約 K 線數據失敗: {str(e)}",
+        }
+
+
+@mcp.tool()
+def get_intraday_futopt_trades(args: Dict) -> dict:
+    """
+    獲取期貨/選擇權成交明細數據（依合約代碼查詢）
+
+    查詢指定期貨或選擇權合約的成交明細數據，包含成交價格、數量、時間等資訊。
+    對應富邦官方 API: intraday/trades/
+
+    Args:
+        symbol (str): 合約代碼，例如 "TX00", "MTX00", "TE00C24000" 等
+        session (str, optional): 交易時段，預設為 "regular"
+            - "regular": 一般交易時段
+            - "afterhours": 盤後交易時段
+        offset (int, optional): 偏移量，預設為 0
+        limit (int, optional): 返回筆數上限，預設為 100
+
+    Returns:
+        dict: 成功時返回合約成交明細數據，包含:
+            - date: 資料日期
+            - type: 商品類型 (FUTURE/OPTION)
+            - exchange: 交易所代碼
+            - market: 市場代碼
+            - symbol: 合約代碼
+            - data: 成交明細數據陣列，每筆包含:
+                - price: 成交價格
+                - size: 成交數量
+                - time: 成交時間
+                - serial: 成交序號
+
+    Example:
+        {
+            "symbol": "TX00",
+            "session": "regular",
+            "offset": 0,
+            "limit": 50
+        }
+    """
+    try:
+        validated_args = GetIntradayFutOptTradesArgs(**args)
+        symbol = validated_args.symbol
+        session = validated_args.session
+        offset = validated_args.offset
+        limit = validated_args.limit
+
+        global restfutopt
+        if not restfutopt:
+            return {
+                "status": "error",
+                "data": None,
+                "message": "期貨/選擇權行情服務未初始化",
+            }
+
+        # 調用 API
+        api_params = {"symbol": symbol}
+        if session:
+            api_params["session"] = session
+        if offset is not None:
+            api_params["offset"] = offset
+        if limit is not None:
+            api_params["limit"] = limit
+
+        result = restfutopt.intraday.trades(**api_params)
+
+        # 檢查 API 返回結果
+        if result and hasattr(result, "is_success") and result.is_success:
+            trades_data = result.data
+            if trades_data:
+                return {
+                    "status": "success",
+                    "data": trades_data,
+                    "message": f"成功獲取合約 {symbol} 成交明細數據",
+                }
+            else:
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": f"找不到合約代碼 {symbol}",
+                }
+        else:
+            error_msg = "API 調用失敗"
+            if result and hasattr(result, "message"):
+                error_msg = f"API 調用失敗: {result.message}"
+            return {"status": "error", "data": None, "message": error_msg}
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取合約成交明細數據失敗: {str(e)}",
+        }
+
+
+@mcp.tool()
+def get_intraday_futopt_volumes(args: Dict) -> dict:
+    """
+    獲取期貨/選擇權合約成交量數據
+
+    查詢指定期貨/選擇權合約代碼的成交量數據，對應官方 SDK `restfutopt.intraday.volumes(symbol, session)`。
+
+    Args:
+        symbol (str): 合約代碼，例如 "TXFA4" 或 "2330"
+        session (str, optional): 交易時段，預設為 "0" (一般交易時段)
+
+    Returns:
+        dict: 成功時返回成交量數據，包含以下結構：
+            - date (str): 資料日期
+            - type (str): 商品類型
+            - exchange (str): 交易所
+            - market (str): 市場別
+            - symbol (str): 合約代碼
+            - data (list): 成交量數據陣列，每筆包含：
+                - price (float): 成交價格
+                - volume (int): 成交量
+
+    Example:
+        {
+            "symbol": "TXFA4",
+            "session": "0"
+        }
+    """
+    try:
+        validated_args = GetIntradayFutOptVolumesArgs(**args)
+        symbol = validated_args.symbol
+        session = validated_args.session
+
+        # 準備 API 參數
+        api_params = {"symbol": symbol}
+        if session is not None:
+            api_params["session"] = session
+
+        result = restfutopt.intraday.volumes(**api_params)
+
+        # 檢查 API 返回結果
+        if result and hasattr(result, "is_success") and result.is_success:
+            volumes_data = result.data
+            if volumes_data:
+                return {
+                    "status": "success",
+                    "data": volumes_data,
+                    "message": f"成功獲取合約 {symbol} 成交量數據",
+                }
+            else:
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": f"找不到合約代碼 {symbol}",
+                }
+        else:
+            error_msg = "API 調用失敗"
+            if result and hasattr(result, "message"):
+                error_msg = f"API 調用失敗: {result.message}"
+            return {"status": "error", "data": None, "message": error_msg}
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取合約成交量數據失敗: {str(e)}",
+        }
+
+
+@mcp.tool()
+def get_intraday_futopt_trades(args: Dict) -> dict:
+    """
+    獲取期貨/選擇權合約成交明細數據
+
+    查詢指定期貨/選擇權合約代碼的成交明細數據，對應官方 SDK `restfutopt.intraday.trades(symbol, session, offset, limit)`。
+
+    Args:
+        symbol (str): 合約代碼，例如 "TXFA4" 或 "2330"
+        session (str, optional): 交易時段，預設為 "0" (一般交易時段)
+        offset (int, optional): 偏移量，用於分頁，預設為 0
+        limit (int, optional): 返回的最大記錄數，預設為 100
+
+    Returns:
+        dict: 成功時返回成交明細數據，包含以下結構：
+            - date (str): 資料日期
+            - type (str): 商品類型
+            - exchange (str): 交易所
+            - market (str): 市場別
+            - symbol (str): 合約代碼
+            - data (list): 成交明細數據陣列，每筆包含：
+                - time (str): 成交時間
+                - price (float): 成交價格
+                - volume (int): 成交量
+                - tick_type (str): 成交類型
+
+    Example:
+        {
+            "symbol": "TXFA4",
+            "session": "0",
+            "offset": 0,
+            "limit": 50
+        }
+    """
+    try:
+        validated_args = GetIntradayFutOptTradesArgs(**args)
+        symbol = validated_args.symbol
+        session = validated_args.session
+        offset = validated_args.offset
+        limit = validated_args.limit
+
+        # 準備 API 參數
+        api_params = {"symbol": symbol}
+        if session is not None:
+            api_params["session"] = session
+        if offset is not None:
+            api_params["offset"] = offset
+        if limit is not None:
+            api_params["limit"] = limit
+
+        result = restfutopt.intraday.trades(**api_params)
+
+        # 檢查 API 返回結果
+        if result and hasattr(result, "is_success") and result.is_success:
+            trades_data = result.data
+            if trades_data:
+                return {
+                    "status": "success",
+                    "data": trades_data,
+                    "message": f"成功獲取合約 {symbol} 成交明細數據",
+                }
+            else:
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": f"找不到合約代碼 {symbol}",
+                }
+        else:
+            error_msg = "API 調用失敗"
+            if result and hasattr(result, "message"):
+                error_msg = f"API 調用失敗: {result.message}"
+            return {"status": "error", "data": None, "message": error_msg}
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取合約成交明細數據失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2708,7 +3846,11 @@ def get_order_reports(args: Dict) -> dict:
             "message": f"成功獲取最新的 {len(reports)} 筆委託回報",
         }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取委託回報失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取委託回報失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2724,7 +3866,11 @@ def get_order_changed_reports(args: Dict) -> dict:
         limit = validated_args.limit
 
         global latest_order_changed_reports  # noqa: F824 - 訪問 SDK 回調存儲的全局變數
-        reports = latest_order_changed_reports[-limit:] if latest_order_changed_reports else []
+        reports = (
+            latest_order_changed_reports[-limit:]
+            if latest_order_changed_reports
+            else []
+        )
 
         return {
             "status": "success",
@@ -2733,7 +3879,11 @@ def get_order_changed_reports(args: Dict) -> dict:
             "message": f"成功獲取最新的 {len(reports)} 筆改價/改量/刪單回報",
         }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取改價/改量/刪單回報失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取改價/改量/刪單回報失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2758,7 +3908,11 @@ def get_filled_reports(args: Dict) -> dict:
             "message": f"成功獲取最新的 {len(reports)} 筆成交回報",
         }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取成交回報失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取成交回報失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2783,7 +3937,11 @@ def get_event_reports(args: Dict) -> dict:
             "message": f"成功獲取最新的 {len(reports)} 筆事件通知",
         }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取事件通知失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取事件通知失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2801,10 +3959,18 @@ def get_all_reports(args: Dict) -> dict:
         global latest_order_reports, latest_order_changed_reports, latest_filled_reports, latest_event_reports  # noqa: F824 - 訪問 SDK 回調存儲的全局變數
 
         all_reports = {
-            "order_reports": latest_order_reports[-limit:] if latest_order_reports else [],
-            "order_changed_reports": latest_order_changed_reports[-limit:] if latest_order_changed_reports else [],
-            "filled_reports": latest_filled_reports[-limit:] if latest_filled_reports else [],
-            "event_reports": latest_event_reports[-limit:] if latest_event_reports else [],
+            "order_reports": latest_order_reports[-limit:]
+            if latest_order_reports
+            else [],
+            "order_changed_reports": latest_order_changed_reports[-limit:]
+            if latest_order_changed_reports
+            else [],
+            "filled_reports": latest_filled_reports[-limit:]
+            if latest_filled_reports
+            else [],
+            "event_reports": latest_event_reports[-limit:]
+            if latest_event_reports
+            else [],
         }
 
         total_count = sum(len(reports) for reports in all_reports.values())
@@ -2816,7 +3982,11 @@ def get_all_reports(args: Dict) -> dict:
             "message": f"成功獲取所有類型的主動回報，共 {total_count} 筆記錄",
         }
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取所有回報失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取所有回報失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -2878,13 +4048,25 @@ def cancel_order(args: Dict) -> dict:
 
         # 獲取委託結果
         order_results = sdk.stock.get_order_results(account_obj)
-        if not (order_results and hasattr(order_results, "is_success") and order_results.is_success):
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 委託結果"}
+        if not (
+            order_results
+            and hasattr(order_results, "is_success")
+            and order_results.is_success
+        ):
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取帳戶 {account} 委託結果",
+            }
 
         # 找到對應的委託單
         target_order = _find_target_order(order_results, order_no)
         if not target_order:
-            return {"status": "error", "data": None, "message": f"找不到委託單號 {order_no}"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"找不到委託單號 {order_no}",
+            }
 
         # 取消委託
         result = sdk.stock.cancel_order(account_obj, target_order)
@@ -2895,7 +4077,11 @@ def cancel_order(args: Dict) -> dict:
                 "message": f"成功取消委託 {order_no}",
             }
         else:
-            return {"status": "error", "data": None, "message": f"取消委託 {order_no} 失敗"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"取消委託 {order_no} 失敗",
+            }
 
     except Exception as e:
         return {"status": "error", "data": None, "message": f"取消委託失敗: {str(e)}"}
@@ -2958,7 +4144,12 @@ def _place_single_order(account_obj, order_data):
 
         # 檢查 API 返回結果
         if result and hasattr(result, "is_success") and result.is_success:
-            return {"order_data": order_data, "result": result, "success": True, "error": None}
+            return {
+                "order_data": order_data,
+                "result": result,
+                "success": True,
+                "error": None,
+            }
         else:
             # 提取錯誤訊息
             error_msg = "下單失敗"
@@ -2967,9 +4158,19 @@ def _place_single_order(account_obj, order_data):
             elif result:
                 error_msg = f"下單失敗: {str(result)}"
 
-            return {"order_data": order_data, "result": result, "success": False, "error": error_msg}
+            return {
+                "order_data": order_data,
+                "result": result,
+                "success": False,
+                "error": error_msg,
+            }
     except Exception as e:
-        return {"order_data": order_data, "result": None, "success": False, "error": str(e)}
+        return {
+            "order_data": order_data,
+            "result": None,
+            "success": False,
+            "error": str(e),
+        }
 
 
 def _execute_batch_orders(account_obj, orders, max_workers):
@@ -2978,7 +4179,10 @@ def _execute_batch_orders(account_obj, orders, max_workers):
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         # 提交所有任務
-        future_to_order = {executor.submit(_place_single_order, account_obj, order_data): order_data for order_data in orders}
+        future_to_order = {
+            executor.submit(_place_single_order, account_obj, order_data): order_data
+            for order_data in orders
+        }
 
         # 等待所有任務完成
         for future in concurrent.futures.as_completed(future_to_order):
@@ -3205,7 +4409,9 @@ def place_condition_order(args: Dict) -> dict:
                     order_type=to_condition_order_type(tp_data.order_type),
                     target_price=tp_data.target_price,
                     price=tp_data.price,
-                    trigger=to_trigger_content(tp_data.trigger) if tp_data.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(tp_data.trigger)
+                    if tp_data.trigger
+                    else TriggerContent.MatchedPrice,
                 )
 
             # 建立停損單（如果有）
@@ -3218,7 +4424,9 @@ def place_condition_order(args: Dict) -> dict:
                     order_type=to_condition_order_type(sl_data.order_type),
                     target_price=sl_data.target_price,
                     price=sl_data.price,
-                    trigger=to_trigger_content(sl_data.trigger) if sl_data.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(sl_data.trigger)
+                    if sl_data.trigger
+                    else TriggerContent.MatchedPrice,
                 )
 
             # 建立停損停利包裝器
@@ -3243,7 +4451,9 @@ def place_condition_order(args: Dict) -> dict:
 
         # 檢查結果
         if result and hasattr(result, "is_success") and result.is_success:
-            guid = getattr(result.data, "guid", None) if hasattr(result, "data") else None
+            guid = (
+                getattr(result.data, "guid", None) if hasattr(result, "data") else None
+            )
             response_data = {
                 "guid": guid,
                 "condition_no": guid,  # 條件單號
@@ -3275,7 +4485,9 @@ def place_condition_order(args: Dict) -> dict:
                 "message": message,
             }
         else:
-            error_msg = getattr(result, "message", "未知錯誤") if result else "API 調用失敗"
+            error_msg = (
+                getattr(result, "message", "未知錯誤") if result else "API 調用失敗"
+            )
             return {"status": "error", "message": f"條件單建立失敗: {error_msg}"}
 
     except Exception as e:
@@ -3469,7 +4681,9 @@ def place_multi_condition_order(args: Dict) -> dict:
                     order_type=to_condition_order_type(tp_data.order_type),
                     target_price=tp_data.target_price,
                     price=tp_data.price,
-                    trigger=to_trigger_content(tp_data.trigger) if tp_data.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(tp_data.trigger)
+                    if tp_data.trigger
+                    else TriggerContent.MatchedPrice,
                 )
 
             # 建立停損單（如果有）
@@ -3482,7 +4696,9 @@ def place_multi_condition_order(args: Dict) -> dict:
                     order_type=to_condition_order_type(sl_data.order_type),
                     target_price=sl_data.target_price,
                     price=sl_data.price,
-                    trigger=to_trigger_content(sl_data.trigger) if sl_data.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(sl_data.trigger)
+                    if sl_data.trigger
+                    else TriggerContent.MatchedPrice,
                 )
 
             # 建立停損停利包裝器
@@ -3507,7 +4723,9 @@ def place_multi_condition_order(args: Dict) -> dict:
 
         # 檢查結果
         if result and hasattr(result, "is_success") and result.is_success:
-            guid = getattr(result.data, "guid", None) if hasattr(result, "data") else None
+            guid = (
+                getattr(result.data, "guid", None) if hasattr(result, "data") else None
+            )
 
             # 整理條件資訊
             conditions_info = []
@@ -3542,7 +4760,9 @@ def place_multi_condition_order(args: Dict) -> dict:
             else:
                 response_data["has_tpsl"] = False
 
-            message = f"多條件單已成功建立 - {order_data.symbol} ({len(conditions)} 個條件)"
+            message = (
+                f"多條件單已成功建立 - {order_data.symbol} ({len(conditions)} 個條件)"
+            )
             if response_data.get("has_tpsl"):
                 message += " (含停損停利)"
 
@@ -3552,7 +4772,9 @@ def place_multi_condition_order(args: Dict) -> dict:
                 "message": message,
             }
         else:
-            error_msg = getattr(result, "message", "未知錯誤") if result else "API 調用失敗"
+            error_msg = (
+                getattr(result, "message", "未知錯誤") if result else "API 調用失敗"
+            )
             return {"status": "error", "message": f"多條件單建立失敗: {error_msg}"}
 
     except Exception as e:
@@ -3681,7 +4903,9 @@ def place_daytrade_condition_order(args: Dict) -> dict:
                     order_type=to_condition_order_type(tp_args.order_type),
                     target_price=tp_args.target_price,
                     price=tp_args.price,
-                    trigger=to_trigger_content(tp_args.trigger) if tp_args.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(tp_args.trigger)
+                    if tp_args.trigger
+                    else TriggerContent.MatchedPrice,
                 )
 
             sl = None
@@ -3693,7 +4917,9 @@ def place_daytrade_condition_order(args: Dict) -> dict:
                     order_type=to_condition_order_type(sl_args.order_type),
                     target_price=sl_args.target_price,
                     price=sl_args.price,
-                    trigger=to_trigger_content(sl_args.trigger) if sl_args.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(sl_args.trigger)
+                    if sl_args.trigger
+                    else TriggerContent.MatchedPrice,
                 )
 
             tpsl = TPSLWrapper(
@@ -3717,7 +4943,9 @@ def place_daytrade_condition_order(args: Dict) -> dict:
         )
 
         if result and hasattr(result, "is_success") and result.is_success:
-            guid = getattr(result.data, "guid", None) if hasattr(result, "data") else None
+            guid = (
+                getattr(result.data, "guid", None) if hasattr(result, "data") else None
+            )
 
             resp = {
                 "guid": guid,
@@ -3790,7 +5018,9 @@ def get_daytrade_condition_by_id(args: Dict) -> dict:
                 return {k: to_dict(v) for k, v in obj.items()}
             # 嘗試用 __dict__ 轉換
             try:
-                return {k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")}
+                return {
+                    k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")
+                }
             except Exception:
                 return str(obj)
 
@@ -3888,7 +5118,9 @@ def place_daytrade_multi_condition_order(args: Dict) -> dict:
                     order_type=to_condition_order_type(tpa.order_type),
                     target_price=tpa.target_price,
                     price=tpa.price,
-                    trigger=to_trigger_content(tpa.trigger) if tpa.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(tpa.trigger)
+                    if tpa.trigger
+                    else TriggerContent.MatchedPrice,
                 )
             sl = None
             if wrap.sl:
@@ -3899,7 +5131,9 @@ def place_daytrade_multi_condition_order(args: Dict) -> dict:
                     order_type=to_condition_order_type(sla.order_type),
                     target_price=sla.target_price,
                     price=sla.price,
-                    trigger=to_trigger_content(sla.trigger) if sla.trigger else TriggerContent.MatchedPrice,
+                    trigger=to_trigger_content(sla.trigger)
+                    if sla.trigger
+                    else TriggerContent.MatchedPrice,
                 )
             tpsl = TPSLWrapper(
                 stop_sign=to_stop_sign(wrap.stop_sign),
@@ -3922,8 +5156,12 @@ def place_daytrade_multi_condition_order(args: Dict) -> dict:
         )
 
         if result and hasattr(result, "is_success") and result.is_success:
-            guid = getattr(result.data, "guid", None) if hasattr(result, "data") else None
-            msg = f"當沖多條件單已成功建立 - {ord_args.symbol} ({len(conditions)} 個條件)"
+            guid = (
+                getattr(result.data, "guid", None) if hasattr(result, "data") else None
+            )
+            msg = (
+                f"當沖多條件單已成功建立 - {ord_args.symbol} ({len(conditions)} 個條件)"
+            )
             if validated.tpsl:
                 msg += " (含停損停利)"
 
@@ -4033,7 +5271,9 @@ def place_trail_profit(args: Dict) -> dict:
         )
 
         if result and hasattr(result, "is_success") and result.is_success:
-            guid = getattr(result.data, "guid", None) if hasattr(result, "data") else None
+            guid = (
+                getattr(result.data, "guid", None) if hasattr(result, "data") else None
+            )
             return {
                 "status": "success",
                 "data": {
@@ -4090,7 +5330,9 @@ def get_trail_order(args: Dict) -> dict:
             if isinstance(obj, dict):
                 return {k: to_dict(v) for k, v in obj.items()}
             try:
-                return {k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")}
+                return {
+                    k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")
+                }
             except Exception:
                 return str(obj)
 
@@ -4130,7 +5372,9 @@ def get_trail_history(args: Dict) -> dict:
             return {"status": "error", "message": error}
 
         # 呼叫 SDK
-        result = sdk.stock.get_trail_history(account_obj, validated.start_date, validated.end_date)
+        result = sdk.stock.get_trail_history(
+            account_obj, validated.start_date, validated.end_date
+        )
 
         # 序列化工具
         def to_dict(obj):
@@ -4143,7 +5387,9 @@ def get_trail_history(args: Dict) -> dict:
             if isinstance(obj, dict):
                 return {k: to_dict(v) for k, v in obj.items()}
             try:
-                return {k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")}
+                return {
+                    k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")
+                }
             except Exception:
                 return str(obj)
 
@@ -4390,7 +5636,9 @@ def get_time_slice_order(args: Dict) -> dict:
             if isinstance(obj, dict):
                 return {k: to_dict(v) for k, v in obj.items()}
             try:
-                return {k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")}
+                return {
+                    k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")
+                }
             except Exception:
                 return str(obj)
 
@@ -4458,13 +5706,17 @@ def cancel_condition_order(args: Dict) -> dict:
             if isinstance(obj, dict):
                 return {k: to_dict(v) for k, v in obj.items()}
             try:
-                return {k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")}
+                return {
+                    k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")
+                }
             except Exception:
                 return str(obj)
 
         if result and hasattr(result, "is_success") and result.is_success:
             data_dict = to_dict(getattr(result, "data", None)) or {}
-            advisory_text = data_dict.get("advisory") if isinstance(data_dict, dict) else None
+            advisory_text = (
+                data_dict.get("advisory") if isinstance(data_dict, dict) else None
+            )
             msg = advisory_text or f"取消成功（guid={validated.guid}）"
             return {"status": "success", "data": data_dict, "message": msg}
 
@@ -4502,7 +5754,10 @@ def get_condition_order(args: Dict) -> dict:
             try:
                 status_enum = to_condition_status(validated.condition_status)
             except ValueError:
-                return {"status": "error", "message": f"不支援的條件單狀態: {validated.condition_status}"}
+                return {
+                    "status": "error",
+                    "message": f"不支援的條件單狀態: {validated.condition_status}",
+                }
             result = sdk.stock.get_condition_order(account_obj, status_enum)
         else:
             result = sdk.stock.get_condition_order(account_obj)
@@ -4518,7 +5773,9 @@ def get_condition_order(args: Dict) -> dict:
             if isinstance(obj, dict):
                 return {k: to_dict(v) for k, v in obj.items()}
             try:
-                return {k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")}
+                return {
+                    k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")
+                }
             except Exception:
                 return str(obj)
 
@@ -4526,7 +5783,11 @@ def get_condition_order(args: Dict) -> dict:
             data = getattr(result, "data", []) or []
             data_list = to_dict(data) or []
             count = len(data_list) if isinstance(data_list, list) else 0
-            suffix = f", 狀態={validated.condition_status}" if validated.condition_status else ""
+            suffix = (
+                f", 狀態={validated.condition_status}"
+                if validated.condition_status
+                else ""
+            )
             return {
                 "status": "success",
                 "data": data_list,
@@ -4574,7 +5835,9 @@ def get_condition_order_by_id(args: Dict) -> dict:
             if isinstance(obj, dict):
                 return {k: to_dict(v) for k, v in obj.items()}
             try:
-                return {k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")}
+                return {
+                    k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")
+                }
             except Exception:
                 return str(obj)
 
@@ -4619,10 +5882,17 @@ def get_condition_history(args: Dict) -> dict:
             try:
                 hist_enum = to_history_status(validated.condition_history_status)
             except ValueError:
-                return {"status": "error", "message": f"不支援的歷史條件單狀態: {validated.condition_history_status}"}
-            result = sdk.stock.get_condition_history(account_obj, validated.start_date, validated.end_date, hist_enum)
+                return {
+                    "status": "error",
+                    "message": f"不支援的歷史條件單狀態: {validated.condition_history_status}",
+                }
+            result = sdk.stock.get_condition_history(
+                account_obj, validated.start_date, validated.end_date, hist_enum
+            )
         else:
-            result = sdk.stock.get_condition_history(account_obj, validated.start_date, validated.end_date)
+            result = sdk.stock.get_condition_history(
+                account_obj, validated.start_date, validated.end_date
+            )
 
         # 序列化
         def to_dict(obj):
@@ -4635,7 +5905,9 @@ def get_condition_history(args: Dict) -> dict:
             if isinstance(obj, dict):
                 return {k: to_dict(v) for k, v in obj.items()}
             try:
-                return {k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")}
+                return {
+                    k: to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")
+                }
             except Exception:
                 return str(obj)
 
@@ -4643,7 +5915,11 @@ def get_condition_history(args: Dict) -> dict:
             data = getattr(result, "data", []) or []
             data_list = to_dict(data) or []
             count = len(data_list) if isinstance(data_list, list) else 0
-            suffix = f", 狀態={validated.condition_history_status}" if validated.condition_history_status else ""
+            suffix = (
+                f", 狀態={validated.condition_history_status}"
+                if validated.condition_history_status
+                else ""
+            )
             return {
                 "status": "success",
                 "data": data_list,
@@ -4708,7 +5984,11 @@ def get_realized_pnl(args: Dict) -> dict:
 
         # 獲取已實現損益
         realized_pnl = sdk.accounting.realized_gains_and_loses(account_obj)
-        if realized_pnl and hasattr(realized_pnl, "is_success") and realized_pnl.is_success:
+        if (
+            realized_pnl
+            and hasattr(realized_pnl, "is_success")
+            and realized_pnl.is_success
+        ):
             # 處理數據，將枚舉轉為字串
             processed_data = []
             if hasattr(realized_pnl, "data") and realized_pnl.data:
@@ -4718,10 +5998,14 @@ def get_realized_pnl(args: Dict) -> dict:
                         "branch_no": getattr(item, "branch_no", ""),
                         "account": getattr(item, "account", ""),
                         "stock_no": getattr(item, "stock_no", ""),
-                        "buy_sell": str(getattr(item, "buy_sell", "")).split(".")[-1],  # 轉為字串
+                        "buy_sell": str(getattr(item, "buy_sell", "")).split(".")[
+                            -1
+                        ],  # 轉為字串
                         "filled_qty": getattr(item, "filled_qty", 0),
                         "filled_price": getattr(item, "filled_price", 0.0),
-                        "order_type": str(getattr(item, "order_type", "")).split(".")[-1],  # 轉為字串
+                        "order_type": str(getattr(item, "order_type", "")).split(".")[
+                            -1
+                        ],  # 轉為字串
                         "realized_profit": getattr(item, "realized_profit", 0),
                         "realized_loss": getattr(item, "realized_loss", 0),
                     }
@@ -4733,10 +6017,18 @@ def get_realized_pnl(args: Dict) -> dict:
                 "message": f"成功獲取帳戶 {account} 已實現損益，共 {len(processed_data)} 筆記錄",
             }
         else:
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 已實現損益"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取帳戶 {account} 已實現損益",
+            }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取已實現損益失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取已實現損益失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -4788,8 +6080,14 @@ def get_realized_pnl_summary(args: Dict) -> dict:
             return {"status": "error", "data": None, "message": error}
 
         # 獲取已實現損益彙總
-        realized_pnl_summary = sdk.accounting.realized_gains_and_loses_summary(account_obj)
-        if realized_pnl_summary and hasattr(realized_pnl_summary, "is_success") and realized_pnl_summary.is_success:
+        realized_pnl_summary = sdk.accounting.realized_gains_and_loses_summary(
+            account_obj
+        )
+        if (
+            realized_pnl_summary
+            and hasattr(realized_pnl_summary, "is_success")
+            and realized_pnl_summary.is_success
+        ):
             # 處理數據，將枚舉轉為字串
             processed_data = []
             if hasattr(realized_pnl_summary, "data") and realized_pnl_summary.data:
@@ -4800,11 +6098,17 @@ def get_realized_pnl_summary(args: Dict) -> dict:
                         "branch_no": getattr(item, "branch_no", ""),
                         "account": getattr(item, "account", ""),
                         "stock_no": getattr(item, "stock_no", ""),
-                        "buy_sell": str(getattr(item, "buy_sell", "")).split(".")[-1],  # 轉為字串
-                        "order_type": str(getattr(item, "order_type", "")).split(".")[-1],  # 轉為字串
+                        "buy_sell": str(getattr(item, "buy_sell", "")).split(".")[
+                            -1
+                        ],  # 轉為字串
+                        "order_type": str(getattr(item, "order_type", "")).split(".")[
+                            -1
+                        ],  # 轉為字串
                         "filled_qty": getattr(item, "filled_qty", 0),
                         "filled_avg_price": getattr(item, "filled_avg_price", 0.0),
-                        "realized_profit_and_loss": getattr(item, "realized_profit_and_loss", 0),
+                        "realized_profit_and_loss": getattr(
+                            item, "realized_profit_and_loss", 0
+                        ),
                     }
                     processed_data.append(processed_item)
 
@@ -4814,10 +6118,18 @@ def get_realized_pnl_summary(args: Dict) -> dict:
                 "message": f"成功獲取帳戶 {account} 已實現損益彙總，共 {len(processed_data)} 筆記錄",
             }
         else:
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 已實現損益彙總"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取帳戶 {account} 已實現損益彙總",
+            }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取已實現損益彙總失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取已實現損益彙總失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -4880,7 +6192,11 @@ def get_unrealized_pnl(args: Dict) -> dict:
 
         # 獲取未實現損益
         unrealized_pnl = sdk.accounting.unrealized_gains_and_loses(account_obj)
-        if unrealized_pnl and hasattr(unrealized_pnl, "is_success") and unrealized_pnl.is_success:
+        if (
+            unrealized_pnl
+            and hasattr(unrealized_pnl, "is_success")
+            and unrealized_pnl.is_success
+        ):
             # 處理數據，將枚舉轉為字串
             processed_data = []
             if hasattr(unrealized_pnl, "data") and unrealized_pnl.data:
@@ -4889,8 +6205,12 @@ def get_unrealized_pnl(args: Dict) -> dict:
                         "date": getattr(item, "date", ""),
                         "branch_no": getattr(item, "branch_no", ""),
                         "stock_no": getattr(item, "stock_no", ""),
-                        "buy_sell": str(getattr(item, "buy_sell", "")).split(".")[-1],  # 轉為字串
-                        "order_type": str(getattr(item, "order_type", "")).split(".")[-1],  # 轉為字串
+                        "buy_sell": str(getattr(item, "buy_sell", "")).split(".")[
+                            -1
+                        ],  # 轉為字串
+                        "order_type": str(getattr(item, "order_type", "")).split(".")[
+                            -1
+                        ],  # 轉為字串
                         "cost_price": getattr(item, "cost_price", 0.0),
                         "tradable_qty": getattr(item, "tradable_qty", 0),
                         "today_qty": getattr(item, "today_qty", 0),
@@ -4905,10 +6225,18 @@ def get_unrealized_pnl(args: Dict) -> dict:
                 "message": f"成功獲取帳戶 {account} 未實現損益，共 {len(processed_data)} 筆記錄",
             }
         else:
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 未實現損益"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取帳戶 {account} 未實現損益",
+            }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取未實現損益失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取未實現損益失敗: {str(e)}",
+        }
 
 
 @mcp.tool()
@@ -4966,7 +6294,11 @@ def get_maintenance(args: Dict) -> dict:
 
         # 獲取維護保證金資訊
         maintenance = sdk.accounting.get_maintenance(account_obj)
-        if maintenance and hasattr(maintenance, "is_success") and maintenance.is_success:
+        if (
+            maintenance
+            and hasattr(maintenance, "is_success")
+            and maintenance.is_success
+        ):
             # 處理數據
             processed_data = {}
             if hasattr(maintenance, "data") and maintenance.data:
@@ -4976,11 +6308,19 @@ def get_maintenance(args: Dict) -> dict:
                 summary_data = getattr(data, "summary", None)
                 if summary_data:
                     processed_summary = {
-                        "total_market_value": getattr(summary_data, "total_market_value", 0.0),
-                        "total_maintenance_margin": getattr(summary_data, "total_maintenance_margin", 0.0),
+                        "total_market_value": getattr(
+                            summary_data, "total_market_value", 0.0
+                        ),
+                        "total_maintenance_margin": getattr(
+                            summary_data, "total_maintenance_margin", 0.0
+                        ),
                         "total_equity": getattr(summary_data, "total_equity", 0.0),
-                        "total_margin_balance": getattr(summary_data, "total_margin_balance", 0.0),
-                        "total_short_balance": getattr(summary_data, "total_short_balance", 0.0),
+                        "total_margin_balance": getattr(
+                            summary_data, "total_margin_balance", 0.0
+                        ),
+                        "total_short_balance": getattr(
+                            summary_data, "total_short_balance", 0.0
+                        ),
                     }
                 else:
                     processed_summary = {
@@ -5001,7 +6341,9 @@ def get_maintenance(args: Dict) -> dict:
                             "quantity": getattr(item, "quantity", 0),
                             "market_price": getattr(item, "market_price", 0.0),
                             "market_value": getattr(item, "market_value", 0.0),
-                            "maintenance_margin": getattr(item, "maintenance_margin", 0.0),
+                            "maintenance_margin": getattr(
+                                item, "maintenance_margin", 0.0
+                            ),
                             "equity": getattr(item, "equity", 0.0),
                             "margin_balance": getattr(item, "margin_balance", 0.0),
                             "short_balance": getattr(item, "short_balance", 0.0),
@@ -5020,10 +6362,18 @@ def get_maintenance(args: Dict) -> dict:
                 "message": f"成功獲取帳戶 {account} 維護保證金資訊，共 {len(processed_data.get('details', []))} 筆明細",
             }
         else:
-            return {"status": "error", "data": None, "message": f"無法獲取帳戶 {account} 維護保證金資訊"}
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"無法獲取帳戶 {account} 維護保證金資訊",
+            }
 
     except Exception as e:
-        return {"status": "error", "data": None, "message": f"獲取維護保證金資訊失敗: {str(e)}"}
+        return {
+            "status": "error",
+            "data": None,
+            "message": f"獲取維護保證金資訊失敗: {str(e)}",
+        }
 
 
 def main():
@@ -5054,7 +6404,9 @@ def main():
     try:
         # 檢查必要的環境變數
         if not all([username, password, pfx_path]):
-            raise ValueError("FUBON_USERNAME, FUBON_PASSWORD, and FUBON_PFX_PATH environment variables are required")
+            raise ValueError(
+                "FUBON_USERNAME, FUBON_PASSWORD, and FUBON_PFX_PATH environment variables are required"
+            )
 
         print("正在初始化富邦證券SDK...", file=sys.stderr)
 
@@ -5063,9 +6415,14 @@ def main():
         accounts = sdk.login(username, password, pfx_path, pfx_password or "")
         sdk.init_realtime()
         reststock = sdk.marketdata.rest_client.stock
+        restfutopt = sdk.marketdata.rest_client.futopt
 
         # 驗證登入是否成功
-        if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
+        if (
+            not accounts
+            or not hasattr(accounts, "is_success")
+            or not accounts.is_success
+        ):
             raise ValueError("登入失敗，請檢查憑證是否正確")
 
         # 設定主動回報事件回調函數
