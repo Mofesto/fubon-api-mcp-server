@@ -12,11 +12,11 @@
 - 批量並行下單功能
 
 使用方式:
-    from fubon_mcp import main
+    from fubon_api_mcp_server.server import main, mcp
     main()  # 啟動 MCP 服務器
 
 或通過命令行:
-    python -m fubon_mcp.server
+    python -m fubon_api_mcp_server.server
 
 環境變數:
 - FUBON_USERNAME: 富邦證券帳號
@@ -31,11 +31,3 @@
 
 __version__ = "1.6.0"
 __author__ = "Fubon MCP Team"
-
-from . import config
-
-# 匯入主要組件
-from .server import main, mcp
-
-# 定義包的公開介面
-__all__ = ["mcp", "main", "config"]
