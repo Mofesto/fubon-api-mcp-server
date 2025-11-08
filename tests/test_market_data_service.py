@@ -274,8 +274,8 @@ class TestGetIntradayFutOptProducts:
                     "marketCloseGroup": "FUTURES",
                     "endSession": "REGULAR",
                     "underlyingSymbol": "MTX",
-                }
-            ]
+                },
+            ],
         }
         mock_restfutopt.intraday.products.return_value = mock_response
 
@@ -296,14 +296,7 @@ class TestGetIntradayFutOptProducts:
 
     def test_get_intraday_futopt_products_empty_data(self, mock_server_globals_futopt, mock_restfutopt):
         """Test get_intraday_futopt_products with empty data."""
-        mock_response = {
-            "type": None,
-            "exchange": None,
-            "session": None,
-            "contractType": None,
-            "status": None,
-            "data": []
-        }
+        mock_response = {"type": None, "exchange": None, "session": None, "contractType": None, "status": None, "data": []}
         mock_restfutopt.intraday.products.return_value = mock_response
 
         result = get_intraday_futopt_products({})
@@ -376,8 +369,8 @@ class TestGetIntradayFutOptTickers:
                     "tickSize": 0.5,
                     "tradingHours": "08:45-15:00",
                     "lastTradingDate": "20241220",
-                }
-            ]
+                },
+            ],
         }
         mock_restfutopt.intraday.tickers.return_value = mock_response
 
@@ -400,13 +393,7 @@ class TestGetIntradayFutOptTickers:
 
     def test_get_intraday_futopt_tickers_empty_data(self, mock_server_globals_futopt, mock_restfutopt):
         """Test get_intraday_futopt_tickers with empty data."""
-        mock_response = {
-            "type": "FUTURE",
-            "exchange": "TAIFEX",
-            "session": "REGULAR",
-            "contractType": "I",
-            "data": []
-        }
+        mock_response = {"type": "FUTURE", "exchange": "TAIFEX", "session": "REGULAR", "contractType": "I", "data": []}
         mock_restfutopt.intraday.tickers.return_value = mock_response
 
         result = get_intraday_futopt_tickers({"type": "FUTURE"})
@@ -442,7 +429,7 @@ class TestGetIntradayFutOptTickers:
                     "tradingHours": "08:45-15:00",
                     "lastTradingDate": "20241220",
                 }
-            ]
+            ],
         }
         mock_restfutopt.intraday.tickers.return_value = mock_response
 
@@ -940,12 +927,7 @@ class TestGetIntradayFutOptTrades:
         mock_response.data = {"symbol": "TX00", "data": []}
         mock_restfutopt.intraday.trades.return_value = mock_response
 
-        result = get_intraday_futopt_trades({
-            "symbol": "TX00",
-            "session": "regular",
-            "offset": 10,
-            "limit": 50
-        })
+        result = get_intraday_futopt_trades({"symbol": "TX00", "session": "regular", "offset": 10, "limit": 50})
 
         assert result["status"] == "success"
         mock_restfutopt.intraday.trades.assert_called_once_with(symbol="TX00", session="regular", offset=10, limit=50)
