@@ -56,12 +56,25 @@ class TestGetBankBalance:
 
     def test_get_bank_balance_success(self, mock_accounts, mock_sdk, mock_server_globals):
         """Test get_bank_balance success."""
-        mock_sdk.accounting.bank_remain.return_value = Mock(is_success=True, data="balance_data")
+        # Mock BankRemain object
+        mock_bank_obj = Mock()
+        mock_bank_obj.branch_no = "001"
+        mock_bank_obj.account = "123456"
+        mock_bank_obj.currency = "TWD"
+        mock_bank_obj.balance = 100000
+        mock_bank_obj.available_balance = 100000
+        
+        mock_sdk.accounting.bank_remain.return_value = Mock(is_success=True, data=mock_bank_obj)
 
         result = get_bank_balance({"account": "123456"})
 
         assert result["status"] == "success"
-        assert result["data"] == "balance_data"
+        assert isinstance(result["data"], dict)
+        assert result["data"]["branch_no"] == "001"
+        assert result["data"]["account"] == "123456"
+        assert result["data"]["currency"] == "TWD"
+        assert result["data"]["balance"] == 100000
+        assert result["data"]["available_balance"] == 100000
         assert "成功獲取帳戶 123456 銀行水位資訊" in result["message"]
 
     def test_get_bank_balance_api_failed(self, mock_accounts, mock_sdk, mock_server_globals):
@@ -79,12 +92,46 @@ class TestGetInventory:
 
     def test_get_inventory_success(self, mock_accounts, mock_sdk, mock_server_globals):
         """Test get_inventory success."""
-        mock_sdk.accounting.inventories.return_value = Mock(is_success=True, data="inventory_data")
+        # Mock Inventory object
+        mock_inventory_obj = Mock()
+        mock_inventory_obj.date = "2024-01-01"
+        mock_inventory_obj.account = "123456"
+        mock_inventory_obj.branch_no = "001"
+        mock_inventory_obj.stock_no = "2330"
+        mock_inventory_obj.order_type = "Stock"
+        mock_inventory_obj.lastday_qty = 1000
+        mock_inventory_obj.buy_qty = 0
+        mock_inventory_obj.buy_filled_qty = 0
+        mock_inventory_obj.buy_value = 0
+        mock_inventory_obj.today_qty = 1000
+        mock_inventory_obj.tradable_qty = 1000
+        mock_inventory_obj.sell_qty = 0
+        mock_inventory_obj.sell_filled_qty = 0
+        mock_inventory_obj.sell_value = 0
+        
+        # Mock odd object
+        mock_odd = Mock()
+        mock_odd.lastday_qty = 0
+        mock_odd.buy_qty = 0
+        mock_odd.buy_filled_qty = 0
+        mock_odd.buy_value = 0
+        mock_odd.today_qty = 0
+        mock_odd.tradable_qty = 0
+        mock_odd.sell_qty = 0
+        mock_odd.sell_filled_qty = 0
+        mock_odd.sell_value = 0
+        mock_inventory_obj.odd = mock_odd
+        
+        mock_sdk.accounting.inventories.return_value = Mock(is_success=True, data=[mock_inventory_obj])
 
         result = get_inventory({"account": "123456"})
 
         assert result["status"] == "success"
-        assert result["data"] == "inventory_data"
+        assert isinstance(result["data"], list)
+        assert len(result["data"]) == 1
+        assert isinstance(result["data"][0], dict)
+        assert result["data"][0]["stock_no"] == "2330"
+        assert result["data"][0]["tradable_qty"] == 1000
         assert "成功獲取帳戶 123456 庫存資訊" in result["message"]
 
     def test_get_inventory_api_failed(self, mock_accounts, mock_sdk, mock_server_globals):

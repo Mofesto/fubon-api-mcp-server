@@ -601,25 +601,46 @@ class TestPnLAndMaintenanceFunctions:
         mock_validate.return_value = (mock_account, None)
 
         mock_summary = Mock()
-        mock_summary.total_market_value = 1000000.0
-        mock_summary.total_equity = 800000.0
+        mock_summary.margin_value = 3135000
+        mock_summary.shortsell_value = 0
+        mock_summary.shortsell_margin = 0
+        mock_summary.collateral = 0
+        mock_summary.margin_loan_amt = 1494000
+        mock_summary.maintenance_ratio = 209.83
 
         mock_detail = Mock()
-        mock_detail.stock_no = "2330"
-        mock_detail.market_value = 500000.0
+        mock_detail.stock_no = "2603"
+        mock_detail.order_no = "x4580"
+        mock_detail.order_type = "Stock"
+        mock_detail.quantity = 10000
+        mock_detail.price = 152.5
+        mock_detail.cost_price = 119.0
+        mock_detail.shortsell_margin = 0
+        mock_detail.collateral = 0
+        mock_detail.margin_loan_amt = 0
+        mock_detail.maintenance_ratio = 213.58
+        mock_detail.collateral_interest = 0.0
+        mock_detail.margin_interest = 20818.0
+        mock_detail.shortsell_interest = 0.0
 
         mock_data = Mock()
-        mock_data.maintenance_ratio = 1.5
-        mock_data.summary = mock_summary
-        mock_data.details = [mock_detail]
+        mock_data.date = "2024/02/27"
+        mock_data.branch_no = "6460"
+        mock_data.account = "26"
+        mock_data.maintenance_summary = mock_summary
+        mock_data.maintenance_detail = [mock_detail]
 
         mock_result = Mock()
         mock_result.is_success = True
         mock_result.data = mock_data
-        mock_sdk.accounting.get_maintenance.return_value = mock_result
+        mock_sdk.accounting.maintenance.return_value = mock_result
 
         result = get_maintenance({"account": "123456"})
 
         assert result["status"] == "success"
-        assert result["data"]["maintenance_ratio"] == 1.5
-        assert len(result["data"]["details"]) == 1
+        assert result["data"]["date"] == "2024/02/27"
+        assert result["data"]["branch_no"] == "6460"
+        assert result["data"]["account"] == "26"
+        assert result["data"]["maintenance_summary"]["maintenance_ratio"] == 209.83
+        assert len(result["data"]["maintenance_detail"]) == 1
+        assert result["data"]["maintenance_detail"][0]["stock_no"] == "2603"

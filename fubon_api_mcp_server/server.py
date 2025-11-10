@@ -941,7 +941,7 @@ class CancelOrderArgs(BaseModel):
 
 
 class GetAccountInfoArgs(BaseModel):
-    account: str
+    account: Optional[str] = None
 
 
 class GetInventoryArgs(BaseModel):
@@ -990,14 +990,14 @@ class QuerySymbolSnapshotArgs(BaseModel):
 class GetIntradayTickersArgs(BaseModel):
     market: str  # 市場別，可選 TSE 上市；OTC 上櫃；ESB 興櫃一般板；TIB 臺灣創新板；PSB 興櫃戰略新板
     type: Optional[str] = (
-        None  # 類型，可選 ALLBUT099 包含一般股票、特別股及ETF ； COMMONSTOCK 為一般股票
+        None  # 類型，可選 EQUITY 股票；INDEX 指數；WARRANT 權證；ODDLOT 盤中零股
     )
-    exchange: Optional[str] = None  # 交易所，可選 TSE 或 OTC
-    industry: Optional[str] = None  # 行業別
-    isNormal: Optional[bool] = None  # 是否為普通股
-    isAttention: Optional[bool] = None  # 是否為注意股
-    isDisposition: Optional[bool] = None  # 是否為處置股
-    isHalted: Optional[bool] = None  # 是否為停止交易股
+    exchange: Optional[str] = None  # 交易所，可選 TWSE 臺灣證券交易所；TPEx 證券櫃檯買賣中心
+    industry: Optional[str] = None  # 產業別
+    isNormal: Optional[bool] = None  # 查詢正常股票
+    isAttention: Optional[bool] = None  # 查詢注意股票
+    isDisposition: Optional[bool] = None  # 查詢處置股票
+    isHalted: Optional[bool] = None  # 查詢暫停交易股票
 
 
 class GetIntradayTickerArgs(BaseModel):
@@ -1503,12 +1503,6 @@ def get_trading_signals(args: Dict) -> dict:
             df = df[df["date"] >= pd.to_datetime(params.from_date)]
         if params.to_date:
             df = df[df["date"] <= pd.to_datetime(params.to_date)]
-        if len(df) < 50:
-            return {
-                "status": "error",
-                "data": None,
-                "message": "資料不足，需至少 50 日",
-            }
 
         close = df["close"]
         high = df["high"] if "high" in df.columns else close
@@ -2539,11 +2533,58 @@ def get_inventory(args: Dict) -> dict:
         # 獲取庫存資訊
         inventory = sdk.accounting.inventories(account_obj)
         if inventory and hasattr(inventory, "is_success") and inventory.is_success:
-            return {
-                "status": "success",
-                "data": inventory.data if hasattr(inventory, "data") else inventory,
-                "message": f"成功獲取帳戶 {account} 庫存資訊",
-            }
+            # 正規化數據：將Inventory物件轉換為dict
+            inventory_data = inventory.data if hasattr(inventory, "data") else inventory
+            if isinstance(inventory_data, list):
+                normalized_data = []
+                for item in inventory_data:
+                    if hasattr(item, '__dict__'):
+                        # 將物件屬性轉換為dict
+                        item_dict = {
+                            'date': getattr(item, 'date', None),
+                            'account': getattr(item, 'account', None),
+                            'branch_no': getattr(item, 'branch_no', None),
+                            'stock_no': getattr(item, 'stock_no', None),
+                            'order_type': getattr(item, 'order_type', None),
+                            'lastday_qty': getattr(item, 'lastday_qty', None),
+                            'buy_qty': getattr(item, 'buy_qty', None),
+                            'buy_filled_qty': getattr(item, 'buy_filled_qty', None),
+                            'buy_value': getattr(item, 'buy_value', None),
+                            'today_qty': getattr(item, 'today_qty', None),
+                            'tradable_qty': getattr(item, 'tradable_qty', None),
+                            'sell_qty': getattr(item, 'sell_qty', None),
+                            'sell_filled_qty': getattr(item, 'sell_filled_qty', None),
+                            'sell_value': getattr(item, 'sell_value', None),
+                            'odd': {
+                                'lastday_qty': getattr(getattr(item, 'odd', None), 'lastday_qty', None),
+                                'buy_qty': getattr(getattr(item, 'odd', None), 'buy_qty', None),
+                                'buy_filled_qty': getattr(getattr(item, 'odd', None), 'buy_filled_qty', None),
+                                'buy_value': getattr(getattr(item, 'odd', None), 'buy_value', None),
+                                'today_qty': getattr(getattr(item, 'odd', None), 'today_qty', None),
+                                'tradable_qty': getattr(getattr(item, 'odd', None), 'tradable_qty', None),
+                                'sell_qty': getattr(getattr(item, 'odd', None), 'sell_qty', None),
+                                'sell_filled_qty': getattr(getattr(item, 'odd', None), 'sell_filled_qty', None),
+                                'sell_value': getattr(getattr(item, 'odd', None), 'sell_value', None),
+                            } if hasattr(item, 'odd') else None
+                        }
+                        # 移除None值
+                        item_dict = {k: v for k, v in item_dict.items() if v is not None}
+                        if item_dict.get('odd'):
+                            item_dict['odd'] = {k: v for k, v in item_dict['odd'].items() if v is not None}
+                        normalized_data.append(item_dict)
+                    else:
+                        normalized_data.append(item)
+                return {
+                    "status": "success",
+                    "data": normalized_data,
+                    "message": f"成功獲取帳戶 {account} 庫存資訊",
+                }
+            else:
+                return {
+                    "status": "success",
+                    "data": inventory_data,
+                    "message": f"成功獲取帳戶 {account} 庫存資訊",
+                }
         else:
             return {
                 "status": "error",
@@ -2627,13 +2668,29 @@ def get_bank_balance(args: Dict) -> dict:
             and hasattr(bank_balance, "is_success")
             and bank_balance.is_success
         ):
-            return {
-                "status": "success",
-                "data": bank_balance.data
-                if hasattr(bank_balance, "data")
-                else bank_balance,
-                "message": f"成功獲取帳戶 {account} 銀行水位資訊",
-            }
+            # 正規化數據：將BankRemain物件轉換為dict
+            bank_data = bank_balance.data if hasattr(bank_balance, "data") else bank_balance
+            if hasattr(bank_data, '__dict__'):
+                normalized_data = {
+                    'branch_no': getattr(bank_data, 'branch_no', None),
+                    'account': getattr(bank_data, 'account', None),
+                    'currency': getattr(bank_data, 'currency', None),
+                    'balance': getattr(bank_data, 'balance', None),
+                    'available_balance': getattr(bank_data, 'available_balance', None),
+                }
+                # 移除None值
+                normalized_data = {k: v for k, v in normalized_data.items() if v is not None}
+                return {
+                    "status": "success",
+                    "data": normalized_data,
+                    "message": f"成功獲取帳戶 {account} 銀行水位資訊",
+                }
+            else:
+                return {
+                    "status": "success",
+                    "data": bank_data,
+                    "message": f"成功獲取帳戶 {account} 銀行水位資訊",
+                }
         else:
             return {
                 "status": "error",
@@ -2660,6 +2717,14 @@ def get_realtime_quotes(args: Dict) -> dict:
     try:
         validated_args = GetRealtimeQuotesArgs(**args)
         symbol = validated_args.symbol
+
+        # 檢查 reststock 是否已初始化
+        if reststock is None:
+            return {
+                "status": "error",
+                "data": None,
+                "message": "股票行情服務未初始化，請先登入系統",
+            }
 
         # 使用 intraday API 獲取即時行情
         from fubon_neo.fugle_marketdata.rest.base_rest import FugleAPIError
@@ -3326,13 +3391,13 @@ def get_intraday_tickers(args: Dict) -> dict:
 
     Args:
         market (str): 市場別，可選 TSE 上市；OTC 上櫃；ESB 興櫃一般板；TIB 臺灣創新板；PSB 興櫃戰略新板
-        type (str, optional): 類型，可選 ALLBUT099 包含一般股票、特別股及ETF；COMMONSTOCK 為一般股票
-        exchange (str, optional): 交易所，可選 TSE 或 OTC
-        industry (str, optional): 行業別
-        isNormal (bool, optional): 是否為普通股
-        isAttention (bool, optional): 是否為注意股
-        isDisposition (bool, optional): 是否為處置股
-        isHalted (bool, optional): 是否為停止交易股
+        type (str, optional): 類型，可選 EQUITY 股票；INDEX 指數；WARRANT 權證；ODDLOT 盤中零股
+        exchange (str, optional): 交易所，可選 TWSE 臺灣證券交易所；TPEx 證券櫃檯買賣中心
+        industry (str, optional): 產業別
+        isNormal (bool, optional): 查詢正常股票
+        isAttention (bool, optional): 查詢注意股票
+        isDisposition (bool, optional): 查詢處置股票
+        isHalted (bool, optional): 查詢暫停交易股票
 
     Returns:
         dict: 成功時返回包含以下字段的字典：
@@ -3362,7 +3427,7 @@ def get_intraday_tickers(args: Dict) -> dict:
     Example:
         {
             "market": "TSE",
-            "type": "COMMONSTOCK",
+            "type": "EQUITY",
             "isNormal": true
         }
     """
@@ -3885,6 +3950,14 @@ def get_historical_stats(args: Dict) -> dict:
     try:
         validated_args = GetHistoricalStatsArgs(**args)
         symbol = validated_args.symbol
+
+        # 檢查 reststock 是否已初始化
+        if reststock is None:
+            return {
+                "status": "error",
+                "data": None,
+                "message": "歷史數據服務未初始化，請先登入系統",
+            }
 
         # 使用正確的 historical.stats API
         result = reststock.historical.stats(symbol=symbol)
@@ -7088,7 +7161,7 @@ def get_maintenance(args: Dict) -> dict:
     """
     獲取帳戶維護保證金資訊
 
-    查詢帳戶的維護保證金相關資訊，對應官方 SDK `accounting.get_maintenance(account)`。
+    查詢帳戶的維護保證金相關資訊，對應官方 SDK `accounting.maintenance(account)`。
 
     ⚠️ 重要用途：
     - 查詢帳戶的維護保證金比率
@@ -7100,32 +7173,40 @@ def get_maintenance(args: Dict) -> dict:
 
     Returns:
         dict: 成功時返回維護保證金資訊，包含以下關鍵字段：
-            - maintenance_ratio (float): 維護保證金比率
-            - summary (dict): 總計資訊
-                - total_market_value (float): 總市值
-                - total_maintenance_margin (float): 總維護保證金
-                - total_equity (float): 總權益
-                - total_margin_balance (float): 總融資餘額
-                - total_short_balance (float): 總融券餘額
-            - details (list): 明細列表，每筆包含：
-                - stock_no (str): 股票代碼
+            - date (str): 查詢日期
+            - branch_no (str): 分公司代號
+            - account (str): 帳戶號碼
+            - maintenance_summary (dict): 整戶維持率概況
+                - margin_value (int): 整戶融資市值
+                - shortsell_value (int): 整戶融券市值
+                - shortsell_margin (int): 整戶融券保證金額
+                - collateral (int): 擔保品
+                - margin_loan_amt (int): 整戶融資金額
+                - maintenance_ratio (float): 整戶維持率
+            - maintenance_detail (list): 個股維持率明細列表，每筆包含：
+                - stock_no (str): 股票代號
+                - order_no (str): 委託書號
+                - order_type (str): 委託單類型
                 - quantity (int): 持有股數
-                - market_price (float): 市場價格
-                - market_value (float): 市值
-                - maintenance_margin (float): 維護保證金
-                - equity (float): 權益
-                - margin_balance (float): 融資餘額
-                - short_balance (float): 融券餘額
+                - price (float): 計算價
+                - cost_price (float): 成本價
+                - shortsell_margin (int): 融券保證金
+                - collateral (int): 擔保品
+                - margin_loan_amt (int): 融資金
+                - maintenance_ratio (float): 維持率
+                - collateral_interest (float): 擔保品利息
+                - margin_interest (float): 融資金利息
+                - shortsell_interest (float): 融券保證金利息
 
     Note:
-        **維護保證金說明**:
+        **維持率說明**:
         - maintenance_ratio: 帳戶需要維持的最低保證金比率
-        - 當帳戶權益低於維護保證金要求時，可能會收到追繳保證金通知
+        - 當維持率低於一定水平時，可能會收到追繳保證金通知
 
         **融資融券相關**:
-        - margin_balance: 融資餘額（向券商借錢買股票）
-        - short_balance: 融券餘額（向券商借股票賣出）
-        - equity: 帳戶權益 = 市值 - 融資餘額 + 融券餘額
+        - margin_loan_amt: 融資餘額（向券商借錢買股票）
+        - shortsell_margin: 融券保證金（借股票賣出的保證金）
+        - collateral: 擔保品價值
     """
     try:
         validated_args = GetMaintenanceArgs(**args)
@@ -7136,8 +7217,16 @@ def get_maintenance(args: Dict) -> dict:
         if error:
             return {"status": "error", "data": None, "message": error}
 
+        # 檢查 SDK 是否有 maintenance 方法
+        if not hasattr(sdk.accounting, 'maintenance'):
+            return {
+                "status": "error",
+                "data": None,
+                "message": "維護保證金功能暫時不可用。SDK 版本可能不支援此功能。",
+            }
+
         # 獲取維護保證金資訊
-        maintenance = sdk.accounting.get_maintenance(account_obj)
+        maintenance = sdk.accounting.maintenance(account_obj)
         if (
             maintenance
             and hasattr(maintenance, "is_success")
@@ -7148,62 +7237,61 @@ def get_maintenance(args: Dict) -> dict:
             if hasattr(maintenance, "data") and maintenance.data:
                 data = maintenance.data
 
-                # 處理總計資訊
-                summary_data = getattr(data, "summary", None)
+                # 處理總計資訊 (maintenance_summary)
+                summary_data = getattr(data, "maintenance_summary", None)
                 if summary_data:
                     processed_summary = {
-                        "total_market_value": getattr(
-                            summary_data, "total_market_value", 0.0
-                        ),
-                        "total_maintenance_margin": getattr(
-                            summary_data, "total_maintenance_margin", 0.0
-                        ),
-                        "total_equity": getattr(summary_data, "total_equity", 0.0),
-                        "total_margin_balance": getattr(
-                            summary_data, "total_margin_balance", 0.0
-                        ),
-                        "total_short_balance": getattr(
-                            summary_data, "total_short_balance", 0.0
-                        ),
+                        "margin_value": getattr(summary_data, "margin_value", 0),
+                        "shortsell_value": getattr(summary_data, "shortsell_value", 0),
+                        "shortsell_margin": getattr(summary_data, "shortsell_margin", 0),
+                        "collateral": getattr(summary_data, "collateral", 0),
+                        "margin_loan_amt": getattr(summary_data, "margin_loan_amt", 0),
+                        "maintenance_ratio": getattr(summary_data, "maintenance_ratio", 0.0),
                     }
                 else:
                     processed_summary = {
-                        "total_market_value": 0.0,
-                        "total_maintenance_margin": 0.0,
-                        "total_equity": 0.0,
-                        "total_margin_balance": 0.0,
-                        "total_short_balance": 0.0,
+                        "margin_value": 0,
+                        "shortsell_value": 0,
+                        "shortsell_margin": 0,
+                        "collateral": 0,
+                        "margin_loan_amt": 0,
+                        "maintenance_ratio": 0.0,
                     }
 
-                # 處理明細列表
-                details_data = getattr(data, "details", [])
+                # 處理明細列表 (maintenance_detail)
+                details_data = getattr(data, "maintenance_detail", [])
                 processed_details = []
                 if details_data:
                     for item in details_data:
                         processed_item = {
                             "stock_no": getattr(item, "stock_no", ""),
+                            "order_no": getattr(item, "order_no", ""),
+                            "order_type": str(getattr(item, "order_type", "")),
                             "quantity": getattr(item, "quantity", 0),
-                            "market_price": getattr(item, "market_price", 0.0),
-                            "market_value": getattr(item, "market_value", 0.0),
-                            "maintenance_margin": getattr(
-                                item, "maintenance_margin", 0.0
-                            ),
-                            "equity": getattr(item, "equity", 0.0),
-                            "margin_balance": getattr(item, "margin_balance", 0.0),
-                            "short_balance": getattr(item, "short_balance", 0.0),
+                            "price": getattr(item, "price", 0.0),
+                            "cost_price": getattr(item, "cost_price", 0.0),
+                            "shortsell_margin": getattr(item, "shortsell_margin", 0),
+                            "collateral": getattr(item, "collateral", 0),
+                            "margin_loan_amt": getattr(item, "margin_loan_amt", 0),
+                            "maintenance_ratio": getattr(item, "maintenance_ratio", 0.0),
+                            "collateral_interest": getattr(item, "collateral_interest", 0.0),
+                            "margin_interest": getattr(item, "margin_interest", 0.0),
+                            "shortsell_interest": getattr(item, "shortsell_interest", 0.0),
                         }
                         processed_details.append(processed_item)
 
                 processed_data = {
-                    "maintenance_ratio": getattr(data, "maintenance_ratio", 0.0),
-                    "summary": processed_summary,
-                    "details": processed_details,
+                    "date": getattr(data, "date", ""),
+                    "branch_no": getattr(data, "branch_no", ""),
+                    "account": getattr(data, "account", ""),
+                    "maintenance_summary": processed_summary,
+                    "maintenance_detail": processed_details,
                 }
 
             return {
                 "status": "success",
                 "data": processed_data,
-                "message": f"成功獲取帳戶 {account} 維護保證金資訊，共 {len(processed_data.get('details', []))} 筆明細",
+                "message": f"成功獲取帳戶 {account} 維護保證金資訊，共 {len(processed_data.get('maintenance_detail', []))} 筆明細",
             }
         else:
             return {
@@ -7212,6 +7300,19 @@ def get_maintenance(args: Dict) -> dict:
                 "message": f"無法獲取帳戶 {account} 維護保證金資訊",
             }
 
+    except AttributeError as ae:
+        if "maintenance" in str(ae):
+            return {
+                "status": "error",
+                "data": None,
+                "message": "維護保證金功能暫時不可用。SDK 版本可能不支援此功能。",
+            }
+        else:
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"獲取維護保證金資訊失敗: {str(ae)}",
+            }
     except Exception as e:
         return {
             "status": "error",
@@ -9437,7 +9538,7 @@ class GenerateMarketSentimentIndexArgs(BaseModel):
 
 
 @mcp.tool()
-def calculate_portfolio_var(args: CalculatePortfolioVaRArgs) -> dict:
+def calculate_portfolio_var(args: Dict) -> dict:
     """
     計算投資組合風險價值 (VaR)
 
@@ -9520,9 +9621,8 @@ def calculate_portfolio_var(args: CalculatePortfolioVaRArgs) -> dict:
             "message": f"計算投資組合VaR失敗: {str(e)}",
         }
 
-
 @mcp.tool()
-def run_portfolio_stress_test(args: RunPortfolioStressTestArgs) -> dict:
+def run_portfolio_stress_test(args: Dict) -> dict:
     """
     執行投資組合壓力測試
 
@@ -9628,7 +9728,7 @@ def run_portfolio_stress_test(args: RunPortfolioStressTestArgs) -> dict:
 
 
 @mcp.tool()
-def optimize_portfolio_allocation(args: OptimizePortfolioAllocationArgs) -> dict:
+def optimize_portfolio_allocation(args: Dict) -> dict:
     """
     投資組合資產配置優化
 
@@ -9648,6 +9748,7 @@ def optimize_portfolio_allocation(args: OptimizePortfolioAllocationArgs) -> dict
         {
             "account": "12345678",
             "target_return": 0.12,
+            "max_volatility": 0.2,
             "optimization_method": "max_sharpe"
         }
     """
@@ -9659,34 +9760,171 @@ def optimize_portfolio_allocation(args: OptimizePortfolioAllocationArgs) -> dict
         optimization_method = validated_args.optimization_method
 
         # 驗證帳戶
-        account_obj, error = server_state.validate_account(account)
+        account_obj, error = validate_and_get_account(account)
         if error:
             return {"status": "error", "data": None, "message": error}
 
         # 獲取投資組合數據
         portfolio_data = server_state.get_cached_resource(f"portfolio_{account}")
         if not portfolio_data:
-            return {
-                "status": "error",
-                "data": None,
-                "message": "無法獲取投資組合數據，請先獲取投資組合摘要"
+            # 如果沒有快取數據，直接獲取投資組合摘要
+            # 獲取庫存資訊
+            inventory_result = sdk.accounting.inventories(account_obj)
+            if (
+                not inventory_result
+                or not hasattr(inventory_result, "is_success")
+                or not inventory_result.is_success
+            ):
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": f"無法獲取帳戶 {account} 庫存資訊",
+                }
+
+            # 獲取未實現損益
+            pnl_result = sdk.accounting.unrealized_gains_and_loses(account_obj)
+            unrealized_data = []
+            if (
+                pnl_result
+                and hasattr(pnl_result, "is_success")
+                and pnl_result.is_success
+                and hasattr(pnl_result, "data")
+            ):
+                unrealized_data = pnl_result.data
+
+            # 處理投資組合數據
+            portfolio_data = {
+                "account": account,
+                "total_positions": len(inventory_result.data)
+                if hasattr(inventory_result, "data")
+                else 0,
+                "positions": [],
+                "summary": {
+                    "total_market_value": 0,
+                    "total_cost": 0,
+                    "total_unrealized_pnl": 0,
+                    "total_realized_pnl": 0,
+                },
             }
 
-        positions = portfolio_data.get("inventory", [])
+            # 整合庫存和損益數據
+            inventory_dict = {}
+            if hasattr(inventory_result, "data"):
+                for item in inventory_result.data:
+                    symbol = getattr(item, "stock_no", "")
+                    inventory_dict[symbol] = {
+                        "quantity": getattr(item, "today_qty", 0),  # 使用 today_qty 作為持有數量
+                        "cost_price": getattr(item, "cost_price", 0),
+                        "market_price": getattr(item, "market_price", 0),
+                        "market_value": getattr(item, "market_value", 0),
+                    }
+
+            for pnl_item in unrealized_data:
+                symbol = getattr(pnl_item, "stock_no", "")
+                if symbol in inventory_dict:
+                    inventory_dict[symbol]["unrealized_pnl"] = getattr(
+                        pnl_item, "unrealized_profit", 0
+                    ) + getattr(pnl_item, "unrealized_loss", 0)
+
+            # 計算總計
+            for symbol, data in inventory_dict.items():
+                # 如果庫存沒有市場價格，嘗試獲取即時報價
+                if data["market_price"] == 0 or data["market_value"] == 0:
+                    try:
+                        if reststock is None:
+                            # 如果行情服務未初始化，跳過
+                            pass
+                        else:
+                            quote_result = reststock.intraday.quote(symbol=symbol)
+                            if hasattr(quote_result, "dict"):
+                                quote_data = quote_result.dict()
+                            else:
+                                quote_data = quote_result
+                            
+                            # 嘗試從 dict 或 object 中獲取價格
+                            current_price = 0
+                            if isinstance(quote_data, dict):
+                                for price_field in ["price", "closePrice", "lastPrice"]:
+                                    price_val = quote_data.get(price_field)
+                                    if price_val is not None:
+                                        try:
+                                            current_price = float(price_val)
+                                            if current_price > 0:
+                                                break
+                                        except (ValueError, TypeError):
+                                            continue
+                            else:
+                                # 如果是 object，嘗試 getattr
+                                for price_field in ["price", "closePrice", "lastPrice"]:
+                                    price_val = getattr(quote_data, price_field, None)
+                                    if price_val is not None:
+                                        try:
+                                            current_price = float(price_val)
+                                            if current_price > 0:
+                                                break
+                                        except (ValueError, TypeError):
+                                            continue
+                            
+                            if current_price > 0:
+                                data["market_price"] = current_price
+                                data["market_value"] = current_price * data["quantity"]
+                    except Exception:
+                        # 如果獲取報價失敗，保持原值
+                        pass
+
+                position = {
+                    "symbol": symbol,
+                    "quantity": data["quantity"],
+                    "cost_price": data["cost_price"],
+                    "market_price": data["market_price"],
+                    "market_value": data["market_value"],
+                    "unrealized_pnl": data.get("unrealized_pnl", 0),
+                    "pnl_percent": (
+                        data.get("unrealized_pnl", 0)
+                        / (data["cost_price"] * data["quantity"])
+                    )
+                    * 100
+                    if data["cost_price"] * data["quantity"] > 0
+                    else 0,
+                }
+                portfolio_data["positions"].append(position)
+
+                portfolio_data["summary"]["total_market_value"] += data["market_value"]
+                portfolio_data["summary"]["total_cost"] += (
+                    data["cost_price"] * data["quantity"]
+                )
+                portfolio_data["summary"]["total_unrealized_pnl"] += data.get(
+                    "unrealized_pnl", 0
+                )
+
+        positions = portfolio_data.get("positions", [])
 
         # 模擬投資組合優化（實際實現會使用更複雜的數學模型）
         current_weights = {}
         total_value = 0
 
         for pos in positions:
-            stock_no = pos.get("stock_no", "")
+            stock_no = pos.get("symbol", "")
             market_value = pos.get("market_value", 0)
             current_weights[stock_no] = market_value
             total_value += market_value
 
-        # 正規化權重
-        for stock in current_weights:
-            current_weights[stock] /= total_value
+        # 如果總市值為0，使用等權重
+        if total_value == 0:
+            num_positions = len(current_weights)
+            if num_positions > 0:
+                equal_weight = 1.0 / num_positions
+                current_weights = {stock: equal_weight for stock in current_weights.keys()}
+            else:
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": "投資組合沒有有效持倉，無法進行優化"
+                }
+        else:
+            # 正規化權重
+            for stock in current_weights:
+                current_weights[stock] /= total_value
 
         # 模擬優化結果（實際應用中會使用二次規劃等方法）
         optimized_weights = {}
@@ -9743,7 +9981,7 @@ def optimize_portfolio_allocation(args: OptimizePortfolioAllocationArgs) -> dict
 
 
 @mcp.tool()
-def calculate_performance_attribution(args: CalculatePerformanceAttributionArgs) -> dict:
+def calculate_performance_attribution(args: Dict) -> dict:
     """
     計算績效歸因分析
 
@@ -9826,7 +10064,7 @@ def calculate_performance_attribution(args: CalculatePerformanceAttributionArgs)
 
 
 @mcp.tool()
-def detect_arbitrage_opportunities(args: DetectArbitrageOpportunitiesArgs) -> dict:
+def detect_arbitrage_opportunities(args: Dict) -> dict:
     """
     偵測套利機會
 
@@ -9917,7 +10155,7 @@ def detect_arbitrage_opportunities(args: DetectArbitrageOpportunitiesArgs) -> di
 
 
 @mcp.tool()
-def generate_market_sentiment_index(args: GenerateMarketSentimentIndexArgs) -> dict:
+def generate_market_sentiment_index(args: Dict) -> dict:
     """
     生成市場情緒指數
 
@@ -10068,6 +10306,13 @@ def main():
         )
         if not success:
             raise ValueError("登入失敗，請檢查憑證是否正確")
+
+        # 設置全局變數以保持向後兼容性
+        global sdk, accounts, reststock, restfutopt
+        sdk = server_state.sdk
+        accounts = server_state.accounts
+        reststock = server_state.reststock
+        restfutopt = server_state.restfutopt
 
         print("富邦證券MCP server運行中...", file=sys.stderr)
         mcp.run()

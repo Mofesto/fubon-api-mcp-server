@@ -224,6 +224,14 @@ class TestGetSnapshotActives:
         assert result["status"] == "error"
         assert "獲取歷史統計失敗" in result["message"]
 
+    def test_get_historical_stats_service_not_initialized(self, mock_server_globals):
+        """Test get_historical_stats when service not initialized."""
+        with patch("fubon_api_mcp_server.server.reststock", None):
+            result = get_historical_stats({"symbol": "2330"})
+
+        assert result["status"] == "error"
+        assert "歷史數據服務未初始化" in result["message"]
+
 
 class TestGetIntradayFutOptProducts:
     """Test get_intraday_futopt_products function."""
