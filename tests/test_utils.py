@@ -44,7 +44,7 @@ class TestValidateAndGetAccount:
         with patch("fubon_api_mcp_server.server.accounts", None):
             account_obj, error = validate_and_get_account("123456")
             assert account_obj is None
-            assert "帳戶認證失敗" in error
+            assert "帳戶資訊未初始化" in error
 
 
 class TestGetOrderByNo:

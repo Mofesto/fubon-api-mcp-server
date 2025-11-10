@@ -190,6 +190,28 @@ if res["status"] == "success":
 - ✅ **錯誤處理**：完善的異常處理機制
 - ✅ **參數驗證**：輸入驗證與錯誤訊息
 
+### 🤖 Phase 3: 高級分析與量化交易
+- ✅ **8項高級MCP提示**：投資組合績效分析、進階風險管理、投資組合優化、市場情緒分析、算法策略建構、期權策略優化、期貨價差分析、波動率交易顧問
+- ✅ **6項量化交易工具**：投資組合VaR計算、投資組合壓力測試、投資組合配置優化、績效歸因分析、套利機會偵測、市場情緒指數生成
+
+#### 高級分析提示（Advanced Analysis Prompts）
+- ✅ **performance_analytics**：全面投資組合績效分析，包含Sharpe比率、Sortino比率、最大回撤等指標
+- ✅ **advanced_risk_management**：多因子風險評估，包含市場風險、信用風險、流動性風險分析
+- ✅ **portfolio_optimization**：現代投資組合理論（MPT）基礎的資產配置優化
+- ✅ **market_sentiment_analysis**：多維度市場情緒分析，整合新聞、社交媒體、技術指標
+- ✅ **algorithmic_strategy_builder**：量化策略開發，支援均值回歸、動量策略、統計套利
+- ✅ **options_strategy_optimizer**：期權Greeks分析，包含Delta、Gamma、Theta、Vega、Rho計算
+- ✅ **futures_spread_analyzer**：期貨價差分析，包含跨期價差、跨商品價差、統計套利機會
+- ✅ **volatility_trading_advisor**：波動率基礎策略，包含VIX指數分析、隱含波動率、實現波動率
+
+#### 量化交易工具（Quantitative Trading Tools）
+- ✅ **calculate_portfolio_var**：投資組合風險價值（VaR）計算，多種方法（歷史模擬、參數法、蒙特卡洛）
+- ✅ **run_portfolio_stress_test**：投資組合壓力測試，模擬極端市場狀況下的表現
+- ✅ **optimize_portfolio_allocation**：投資組合配置優化，使用MPT和Black-Litterman模型
+- ✅ **calculate_performance_attribution**：績效歸因分析，分解收益來源（股票選擇、資產配置、時機選擇）
+- ✅ **detect_arbitrage_opportunities**：套利機會偵測，包含統計套利、期貨現貨套利、期權套利
+- ✅ **generate_market_sentiment_index**：市場情緒指數生成，整合多種情緒指標的綜合指數
+
 ## � 與富邦證券官方 API 的關係
 
 本專案是基於 [**富邦證券官方 Trade API**](https://www.fbs.com.tw/TradeAPI/docs/welcome/) 開發的 MCP (Model Context Protocol) 服務器包裝器：
@@ -874,6 +896,15 @@ fubon-api-mcp-server/
 - 🔒 **網路安全**: 確保網路連線的安全性
 
 ## 📝 更新日誌
+### v2.1.0 (2025-11-10)
+- 🤖 **Phase 3 高級分析**: 新增8項高級MCP提示與6項量化交易工具
+- 📊 **投資組合分析**: 績效分析、風險管理、投資組合優化
+- 🎯 **市場情緒分析**: 多維度情緒分析與指數生成
+- ⚡ **算法策略**: 量化策略建構與期權策略優化
+- 📈 **期貨分析**: 期貨價差分析與波動率交易顧問
+- 🔬 **量化工具**: VaR計算、壓力測試、績效歸因、套利偵測
+- 📚 **文檔更新**: 完整記錄Phase 3新功能與使用說明
+
 ### v2.0.6 (2025-11-05)
 - 🐛 **CI 修復**: 修復 GitHub Actions 中 ModuleNotFoundError，通過添加可編輯安裝解決測試時模組找不到的問題
 - 📚 **文檔清理**: 移除不必要的舊版 release notes 和重複的安裝指南，簡化專案結構
@@ -993,14 +1024,14 @@ flake8 .
 
 ### PyPI Package
 - **套件名稱**: `fubon-api-mcp-server`
-- **最新版本**: 2.0.6
+- **最新版本**: 2.1.0
 - **安裝**: `pip install fubon-api-mcp-server`
 - **PyPI**: https://pypi.org/project/fubon-api-mcp-server/
 
 ### VS Code Extension
 - **Extension ID**: `mofesto.fubon-api-mcp-server`
 - **Publisher**: mofesto
-- **版本**: 2.0.6
+- **版本**: 2.1.0
 - **Marketplace**: https://marketplace.visualstudio.com/items?itemName=mofesto.fubon-api-mcp-server
 - **安裝方式**: 在 VS Code 中搜尋 "Fubon API MCP Server"
 

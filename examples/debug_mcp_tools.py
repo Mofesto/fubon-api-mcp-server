@@ -1,7 +1,7 @@
 """Test script to verify MCP tools registration."""
 
 import asyncio
-from fubon_api_mcp_server.config import mcp
+from fubon_api_mcp_server.server import mcp
 
 
 async def check_tools():
@@ -10,7 +10,7 @@ async def check_tools():
     import fubon_api_mcp_server.server  # noqa: F401
 
     print("Getting tools...")
-    tools = await mcp.get_tools()
+    tools = await mcp.list_tools()
 
     print(f"\n總共註冊了 {len(tools)} 個工具")
     print("\n已註冊的工具列表:")
