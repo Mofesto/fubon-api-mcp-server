@@ -119,46 +119,75 @@ class TestWebSocketStreaming:
 class TestMCPServerStateStreaming:
     """Test MCPServerState streaming methods."""
 
-    def test_start_websocket_stream(self):
-        """Test starting WebSocket stream in server state."""
-        # Mock SDK
+    def test_subscribe_market_data_quote(self):
+        """Test subscribing to market data (quote) in server state."""
+        # Mock SDK with WebSocket client
         mock_sdk = MagicMock()
-        mock_result = MagicMock()
-        mock_result.is_success = True
-        mock_sdk.marketdata.subscribe_quote.return_value = mock_result
+        mock_ws_client = MagicMock()
+        mock_ws_client.subscribe.return_value = True
+        mock_ws_client.connect.return_value = None
+        mock_sdk.marketdata.websocket_client.stock = mock_ws_client
 
         server_state.sdk = mock_sdk
+        server_state.accounts = MagicMock()  # Mock accounts for login check
 
-        stream_id = server_state.start_websocket_stream('2330', 'quote', '1m')
+        stream_id = server_state.subscribe_market_data('2330', 'quote')
 
         assert stream_id is not None
-        assert stream_id.startswith('ws_')
+        assert stream_id.startswith('stream_')
         assert stream_id in server_state._active_streams
         assert server_state._active_streams[stream_id]['symbol'] == '2330'
+        assert server_state._active_streams[stream_id]['data_type'] == 'quote'
 
-    def test_stop_websocket_stream(self):
-        """Test stopping WebSocket stream in server state."""
+        # Verify WebSocket client was called correctly
+        mock_ws_client.on.assert_called()
+        mock_ws_client.connect.assert_called()
+        mock_ws_client.subscribe.assert_called_with({'channel': 'quotes', 'symbol': '2330'})
+
+    def test_subscribe_market_data_candles(self):
+        """Test subscribing to market data (candles) in server state."""
+        # Mock SDK with WebSocket client
+        mock_sdk = MagicMock()
+        mock_ws_client = MagicMock()
+        mock_ws_client.subscribe.return_value = True
+        mock_ws_client.connect.return_value = None
+        mock_sdk.marketdata.websocket_client.stock = mock_ws_client
+
+        server_state.sdk = mock_sdk
+        server_state.accounts = MagicMock()  # Mock accounts for login check
+
+        stream_id = server_state.subscribe_market_data('2330', 'candles')
+
+        assert stream_id is not None
+        mock_ws_client.subscribe.assert_called_with({'channel': 'candles', 'symbol': '2330'})
+
+    def test_unsubscribe_market_data(self):
+        """Test unsubscribing from market data in server state."""
         # Setup active stream
         stream_id = 'test_stream_123'
         server_state._active_streams[stream_id] = {
             'subscription_key': '2330_quote',
             'symbol': '2330',
             'data_type': 'quote',
+            'websocket_client': 'quote',
             'status': 'active'
         }
 
-        # Mock SDK
-        mock_sdk = MagicMock()
-        mock_result = MagicMock()
-        mock_result.is_success = True
-        mock_sdk.marketdata.unsubscribe_quote.return_value = mock_result
+        # Setup WebSocket client
+        mock_ws_client = MagicMock()
+        mock_ws_client.unsubscribe.return_value = True
+        server_state._websocket_clients['quote'] = {
+            'client': mock_ws_client,
+            'channel': 'quotes',
+            'subscribed_symbols': {'2330'},
+            'connected_at': MagicMock()
+        }
 
-        server_state.sdk = mock_sdk
-
-        result = server_state.stop_websocket_stream(stream_id)
+        result = server_state.unsubscribe_market_data(stream_id)
 
         assert result is True
         assert stream_id not in server_state._active_streams
+        mock_ws_client.unsubscribe.assert_called_with({'channel': 'quotes', 'symbol': '2330'})
 
     def test_get_stream_status(self):
         """Test getting stream status."""

@@ -189,6 +189,7 @@ addopts = [
     "--cov=fubon_api_mcp_server",
     "--cov-report=term-missing",
     "--cov-report=xml",
+    "--asyncio-mode=auto",
 ]
 markers = [
     "slow: 標記慢速測試",

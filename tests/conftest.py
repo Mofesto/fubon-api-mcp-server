@@ -26,6 +26,8 @@ def mock_sdk():
     mock_sdk.marketdata = Mock()
     mock_sdk.marketdata.rest_client = Mock()
     mock_sdk.marketdata.rest_client.stock = Mock()
+    mock_sdk.marketdata.websocket_client = Mock()
+    mock_sdk.marketdata.websocket_client.stock = Mock()
     mock_sdk.accounting = Mock()
     mock_sdk.stock = Mock()
     return mock_sdk

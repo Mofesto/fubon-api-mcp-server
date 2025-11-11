@@ -3962,7 +3962,7 @@ def get_historical_stats(args: Dict) -> dict:
 
         # 使用正確的 historical.stats API
         result = reststock.historical.stats(symbol=symbol)
-
+    
         # 檢查返回格式
         if (
             isinstance(result, dict)
@@ -8138,12 +8138,13 @@ class MCPServerState:
             self._cache_ttl = 300  # 5分鐘預設TTL
             self._last_cache_cleanup = datetime.now()
 
-            # Phase 2: 訂閱管理
+    # Phase 2: 訂閱管理
             self._market_subscriptions = {}  # symbol -> subscription_info
             self._active_streams = {}  # stream_id -> stream_info
             self._event_listeners = {}  # event_type -> listeners
             self._realtime_data_buffer = {}  # symbol -> latest_data
             self._stream_callbacks = {}  # stream_id -> callback_function
+            self._websocket_clients = {}  # data_type -> websocket_client
 
             MCPServerState._initialized = True
 
@@ -8248,31 +8249,86 @@ class MCPServerState:
     ) -> str:
         """訂閱市場數據"""
         if not self.sdk:
+            print("SDK 未初始化", file=sys.stderr)
+            return None
+
+        # 檢查登入狀態
+        if not self.accounts:
+            print("尚未登入，請先登入", file=sys.stderr)
             return None
 
         subscription_key = f"{symbol}_{data_type}"
         stream_id = f"stream_{subscription_key}_{int(datetime.now().timestamp())}"
 
         try:
-            # 根據數據類型進行訂閱
-            if data_type == "quote":
-                # 使用SDK的即時報價訂閱
-                result = self.sdk.marketdata.subscribe_quote(symbol)
-            elif data_type == "candles":
-                # K線數據訂閱
-                result = self.sdk.marketdata.subscribe_candles(symbol)
-            elif data_type == "volume":
-                # 成交量數據訂閱
-                result = self.sdk.marketdata.subscribe_volume(symbol)
-            else:
-                return None
+            # 使用 WebSocket 客戶端進行訂閱
+            if data_type not in self._websocket_clients:
+                # 初始化 WebSocket 客戶端
+                if data_type == "quote":
+                    ws_client = self.sdk.marketdata.websocket_client.stock
+                    channel = "quotes"
+                elif data_type == "candles":
+                    ws_client = self.sdk.marketdata.websocket_client.stock
+                    channel = "candles"
+                elif data_type == "volume":
+                    ws_client = self.sdk.marketdata.websocket_client.stock
+                    channel = "volumes"
+                else:
+                    print(f"不支持的數據類型: {data_type}", file=sys.stderr)
+                    return None
 
-            if result and hasattr(result, "is_success") and result.is_success:
+                # 設置消息處理器
+                def handle_message(message):
+                    try:
+                        # 解析消息並更新即時數據緩衝區
+                        if isinstance(message, dict) and message.get("event") == "data":
+                            data = message.get("data", {})
+                            symbol_from_msg = data.get("symbol")
+                            if symbol_from_msg:
+                                self.update_realtime_data(symbol_from_msg, data)
+                                # 通知訂閱者
+                                self.notify_event_listeners(f"realtime_{data_type}", {
+                                    "symbol": symbol_from_msg,
+                                    "data": data,
+                                    "timestamp": datetime.now().isoformat()
+                                })
+                    except Exception as e:
+                        print(f"處理 WebSocket 消息失敗: {str(e)}", file=sys.stderr)
+
+                ws_client.on('message', handle_message)
+
+                # 連接到 WebSocket
+                ws_client.connect()
+
+                self._websocket_clients[data_type] = {
+                    "client": ws_client,
+                    "channel": channel,
+                    "subscribed_symbols": set(),
+                    "connected_at": datetime.now()
+                }
+
+            ws_info = self._websocket_clients[data_type]
+            ws_client = ws_info["client"]
+            channel = ws_info["channel"]
+
+            # 訂閱頻道
+            subscribe_data = {
+                'channel': channel,
+                'symbol': symbol
+            }
+
+            result = ws_client.subscribe(subscribe_data)
+
+            if result:  # WebSocket 訂閱通常是異步的，返回值可能為 None 或訂閱 ID
+                # 記錄已訂閱的 symbol
+                ws_info["subscribed_symbols"].add(symbol)
+
                 # 儲存訂閱資訊
                 self._market_subscriptions[subscription_key] = {
                     "stream_id": stream_id,
                     "symbol": symbol,
                     "data_type": data_type,
+                    "websocket_client": data_type,
                     "subscribed_at": datetime.now(),
                     "callback": callback,
                 }
@@ -8281,12 +8337,16 @@ class MCPServerState:
                     "subscription_key": subscription_key,
                     "symbol": symbol,
                     "data_type": data_type,
+                    "websocket_client": data_type,
                     "status": "active",
                 }
 
                 return stream_id
+            else:
+                print(f"WebSocket 訂閱 {symbol} {data_type} 數據失敗", file=sys.stderr)
+
         except Exception as e:
-            print(f"訂閱市場數據失敗: {str(e)}", file=sys.stderr)
+            print(f"訂閱市場數據異常: {str(e)}", file=sys.stderr)
 
         return None
 
@@ -8297,30 +8357,46 @@ class MCPServerState:
 
         stream_info = self._active_streams[stream_id]
         subscription_key = stream_info["subscription_key"]
+        symbol = stream_info["symbol"]
+        data_type = stream_info["data_type"]
+        ws_client_key = stream_info.get("websocket_client")
 
         try:
-            symbol = stream_info["symbol"]
-            data_type = stream_info["data_type"]
+            if ws_client_key and ws_client_key in self._websocket_clients:
+                ws_info = self._websocket_clients[ws_client_key]
+                ws_client = ws_info["client"]
+                channel = ws_info["channel"]
 
-            # 根據數據類型取消訂閱
-            if data_type == "quote":
-                result = self.sdk.marketdata.unsubscribe_quote(symbol)
-            elif data_type == "candles":
-                result = self.sdk.marketdata.unsubscribe_candles(symbol)
-            elif data_type == "volume":
-                result = self.sdk.marketdata.unsubscribe_volume(symbol)
-            else:
-                return False
+                # 取消訂閱頻道
+                unsubscribe_data = {
+                    'channel': channel,
+                    'symbol': symbol
+                }
 
-            if result and hasattr(result, "is_success") and result.is_success:
-                # 清理訂閱資訊
-                self._active_streams.pop(stream_id, None)
-                self._market_subscriptions.pop(subscription_key, None)
-                return True
+                result = ws_client.unsubscribe(unsubscribe_data)
+
+                # 從已訂閱列表中移除
+                ws_info["subscribed_symbols"].discard(symbol)
+
+                # 如果沒有其他訂閱，關閉 WebSocket 連線
+                if not ws_info["subscribed_symbols"]:
+                    try:
+                        ws_client.disconnect()
+                    except Exception:
+                        pass  # 忽略斷開連線的錯誤
+                    del self._websocket_clients[ws_client_key]
+
+            # 清理訂閱資訊
+            self._active_streams.pop(stream_id, None)
+            self._market_subscriptions.pop(subscription_key, None)
+            return True
+
         except Exception as e:
             print(f"取消訂閱市場數據失敗: {str(e)}", file=sys.stderr)
-
-        return False
+            # 即使取消訂閱失敗，也清理本地狀態
+            self._active_streams.pop(stream_id, None)
+            self._market_subscriptions.pop(subscription_key, None)
+            return True
 
     def get_active_subscriptions(self) -> dict:
         """獲取所有活躍的訂閱"""
@@ -8519,7 +8595,15 @@ class MCPServerState:
             self.restfutopt = None
             self.clear_cache()
 
-            # Phase 2: 清理訂閱
+            # Phase 2: 清理訂閱和 WebSocket 連線
+            # 斷開所有 WebSocket 連線
+            for ws_key, ws_info in self._websocket_clients.items():
+                try:
+                    ws_info["client"].disconnect()
+                except Exception:
+                    pass  # 忽略斷開連線的錯誤
+            self._websocket_clients.clear()
+
             self._market_subscriptions.clear()
             self._active_streams.clear()
             self._event_listeners.clear()

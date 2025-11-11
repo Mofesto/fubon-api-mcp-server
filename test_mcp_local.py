@@ -4,10 +4,11 @@
 用於驗證本地MCP服務器是否正常工作
 """
 
-import asyncio
 import json
 import sys
 from pathlib import Path
+
+import pytest
 
 # 添加項目根目錄到Python路徑
 project_root = Path(__file__).parent
@@ -15,6 +16,7 @@ sys.path.insert(0, str(project_root))
 
 from fubon_api_mcp_server.server import mcp
 
+@pytest.mark.asyncio
 async def test_mcp_server():
     """測試MCP服務器基本功能"""
     print("🔍 測試MCP服務器...")
@@ -42,11 +44,4 @@ async def test_mcp_server():
 
     except Exception as e:
         print(f"❌ MCP服務器測試失敗: {e}")
-        return False
-
-    return True
-
-if __name__ == "__main__":
-    print("🚀 啟動MCP服務器測試...")
-    success = asyncio.run(test_mcp_server())
-    sys.exit(0 if success else 1)
+        pytest.fail(f"MCP服務器測試失敗: {e}")
