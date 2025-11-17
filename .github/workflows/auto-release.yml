@@ -166,7 +166,7 @@ jobs:
         fetch-depth: 0
 
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v6
       with:
         node-version: '20'
 
@@ -235,13 +235,13 @@ jobs:
         echo "$CHANGELOG" > /tmp/changelog.txt
 
     - name: Download VSIX artifact
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v6
       with:
         name: vscode-extension-${{ needs.version.outputs.version }}
         path: ./artifacts
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ needs.version.outputs.tag }}
         name: Release ${{ needs.version.outputs.tag }}
