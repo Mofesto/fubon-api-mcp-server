@@ -5,27 +5,39 @@ Configuration module for fubon_api_mcp_server.
 import os
 import sys
 from pathlib import Path
+from typing import Any, Optional
 
 
 class Config:
     """Configuration class for fubon_api_mcp_server."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Load environment variables
-        self.username = os.getenv("FUBON_USERNAME")
-        self.password = os.getenv("FUBON_PASSWORD")
-        self.pfx_path = os.getenv("FUBON_PFX_PATH")
-        self.pfx_password = os.getenv("FUBON_PFX_PASSWORD")
+        self.username: Optional[str] = os.getenv("FUBON_USERNAME")
+        self.password: Optional[str] = os.getenv("FUBON_PASSWORD")
+        self.pfx_path: Optional[str] = os.getenv("FUBON_PFX_PATH")
+        self.pfx_password: Optional[str] = os.getenv("FUBON_PFX_PASSWORD")
 
         # Data directory configuration - platform-specific defaults
         if sys.platform == "win32":
-            self.DEFAULT_DATA_DIR = Path.home() / "AppData" / "Local" / "fubon-mcp" / "data"
+            self.DEFAULT_DATA_DIR: Path = (
+                Path.home() / "AppData" / "Local" / "fubon-mcp" / "data"
+            )
         elif sys.platform == "darwin":
-            self.DEFAULT_DATA_DIR = Path.home() / "Library" / "Application Support" / "fubon-mcp" / "data"
+            self.DEFAULT_DATA_DIR: Path = (
+                Path.home() / "Library" / "Application Support" / "fubon-mcp" / "data"
+            )
         else:  # Linux and other Unix-like systems
-            self.DEFAULT_DATA_DIR = Path.home() / ".local" / "share" / "fubon-mcp" / "data"
+            self.DEFAULT_DATA_DIR: Path = (
+                Path.home() / ".local" / "share" / "fubon-mcp" / "data"
+            )
 
-        self.BASE_DATA_DIR = Path(os.getenv("FUBON_DATA_DIR", self.DEFAULT_DATA_DIR))
+        self.BASE_DATA_DIR: Path = Path(
+            os.getenv("FUBON_DATA_DIR", self.DEFAULT_DATA_DIR)
+        )
+
+        # SQLite database path
+        self.DATABASE_PATH: Path = self.BASE_DATA_DIR / "stock_data.db"
 
         # Ensure data directory exists
         self.BASE_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -36,3 +48,11 @@ class Config:
 
 # Create global config instance
 config = Config()
+
+# Global variables for SDK and accounts (set by utils.validate_and_get_account)
+sdk: Optional[Any] = None  # FubonSDK instance
+accounts: Optional[Any] = None  # List of accounts
+
+# REST API clients (set in server.py main())
+reststock: Optional[Any] = None  # Stock REST client
+restfutopt: Optional[Any] = None  # Futures/options REST client

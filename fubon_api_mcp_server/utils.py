@@ -8,7 +8,7 @@ services, including account validation, error handling, and API calls.
 import functools
 import sys
 import traceback
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, Optional, Tuple, Union, List
 
 from . import config as config_module
 
@@ -71,8 +71,6 @@ def validate_and_get_account(account: str) -> Tuple[Optional[Any], Optional[str]
         tuple: (account_obj, error_message) - If successful, account_obj is the account object, error_message is None
                If failed, account_obj is None, error_message is the error message
     """
-    # Always try to initialize SDK and login for MCP tool calls
-    # since MCP tools run in separate contexts
     try:
         import os
         from pathlib import Path
@@ -85,26 +83,32 @@ def validate_and_get_account(account: str) -> Tuple[Optional[Any], Optional[str]
         env_path = project_root / ".env"
         load_dotenv(env_path)
 
-        sdk = FubonSDK()
+        # Check if SDK is already initialized
+        if config_module.sdk is None:
+            print("Initializing SDK and logging in for account validation...", file=sys.stderr)
+            # Get credentials from environment
+            username = os.getenv("FUBON_USERNAME")
+            password = os.getenv("FUBON_PASSWORD")
+            pfx_path = os.getenv("FUBON_PFX_PATH")
+            pfx_password = os.getenv("FUBON_PFX_PASSWORD", "")
 
-        # Get credentials from environment
-        username = os.getenv("FUBON_USERNAME")
-        password = os.getenv("FUBON_PASSWORD")
-        pfx_path = os.getenv("FUBON_PFX_PATH")
-        pfx_password = os.getenv("FUBON_PFX_PASSWORD", "")
+            if not username or not password or not pfx_path:
+                return None, "Account authentication failed, please check if credentials have expired"
 
-        if not username or not password or not pfx_path:
-            return None, "Account authentication failed, please check if credentials have expired"
+            sdk = FubonSDK()
+            # Login and get accounts
+            accounts = sdk.login(username, password, pfx_path, pfx_password)
 
-        # Login and get accounts
-        accounts = sdk.login(username, password, pfx_path, pfx_password)
+            if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
+                return None, "Account authentication failed, please check if credentials have expired"
 
-        if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
-            return None, "Account authentication failed, please check if credentials have expired"
+            # Store in config_module for reuse
+            config_module.sdk = sdk
+            config_module.accounts = accounts
+        else:
+            print("Reusing existing SDK for account validation...", file=sys.stderr)
+            accounts = config_module.accounts
 
-        # Store in config_module for potential reuse
-        config_module.sdk = sdk
-        config_module.accounts = accounts
         # Note: reststock is initialized only when needed for market data operations
 
     except Exception as e:
@@ -112,8 +116,8 @@ def validate_and_get_account(account: str) -> Tuple[Optional[Any], Optional[str]
 
     # Find the corresponding account object
     account_obj = None
-    if hasattr(config_module.accounts, "data") and config_module.accounts.data:
-        for acc in config_module.accounts.data:
+    if hasattr(accounts, "data") and accounts.data:
+        for acc in accounts.data:
             if getattr(acc, "account", None) == account:
                 account_obj = acc
                 break
@@ -184,3 +188,38 @@ def _safe_api_call(api_func: Callable[[], Any], error_prefix: str) -> Union[Any,
             return None
     except Exception as e:
         return f"{error_prefix}: {str(e)}"
+
+
+def normalize_item(item: Any, keys: List[str]) -> dict:
+    """
+    Normalize an SDK object or a dict into a plain dict with requested keys.
+
+    Args:
+        item: SDK object or dict
+        keys: list of attribute names to extract
+
+    Returns:
+        dict: key -> value (defaults: numeric-like fields -> 0, others -> empty string)
+
+    Numeric-like detection uses substrings: price, quantity, value, cost, profit, loss, amount
+    """
+    result = {}
+
+    def _default_for(k: str):
+        if any(x in k for x in ("price", "quantity", "value", "cost", "profit", "loss", "amount")):
+            return 0
+        return ""
+
+    if isinstance(item, dict):
+        for k in keys:
+            v = item.get(k, None)
+            # Treat explicit None as missing
+            result[k] = v if v is not None else _default_for(k)
+        return result
+
+    # SDK object: use getattr
+    for k in keys:
+        v = getattr(item, k, None)
+        result[k] = v if v is not None else _default_for(k)
+
+    return result

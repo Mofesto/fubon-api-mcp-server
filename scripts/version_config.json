@@ -29,5 +29,5 @@
     "documentation": "https://github.com/mofesto/fubon-api-mcp-server#readme",
     "fubon_api": "https://www.fbs.com.tw/TradeAPI/docs/"
   },
-  "license": "MIT"
+  "license": "Apache-2.0"
 }

@@ -1,238 +1,256 @@
+#!/usr/bin/env python3
 """
-Test account service functions from server.py.
-"""
+富邦 API MCP Server - Account Service 單元測試
 
-from unittest.mock import MagicMock, Mock, patch
+此測試檔案使用 pytest 框架測試 account_service 的所有功能。
+測試分為兩類：
+1. 模擬測試：使用 mock 物件測試邏輯
+2. 整合測試：使用真實 API 測試（需要環境變數）
+
+使用方法：
+# 運行所有測試
+pytest tests/test_account_service.py -v
+
+# 只運行模擬測試
+pytest tests/test_account_service.py::TestAccountServiceMock -v
+
+# 只運行整合測試（需要真實憑證）
+pytest tests/test_account_service.py::TestAccountServiceIntegration -v
+"""
 
 import pytest
+from unittest.mock import Mock, patch, MagicMock
+from mcp.server.fastmcp import FastMCP
 
-from fubon_api_mcp_server.server import (
-    _get_account_financial_info,
-    _get_all_accounts_basic_info,
-    _get_basic_account_info,
-    get_account_info,
-    get_bank_balance,
-    get_inventory,
-    get_settlement_info,
-    get_unrealized_pnl,
-)
+from fubon_api_mcp_server.account_service import AccountService
 
 
-class TestGetAccountInfo:
-    """Test get_account_info function."""
+class TestAccountServiceMock:
+    """模擬測試 - 不依賴真實 API"""
 
-    def test_get_account_info_basic_only(self, mock_accounts, mock_server_globals):
-        """Test get_account_info with basic info only."""
-        result = get_account_info({"account": ""})
+    @pytest.fixture
+    def mock_mcp(self):
+        """模擬 MCP 實例"""
+        return Mock(spec=FastMCP)
 
-        assert result["status"] == "success"
-        assert "data" in result
-        assert "message" in result
+    @pytest.fixture
+    def mock_sdk(self):
+        """模擬 SDK 實例"""
+        sdk = Mock()
+        # 模擬帳戶物件
+        mock_account = Mock()
+        mock_account.account = "1234567"
+        mock_account.name = "測試用戶"
+        mock_account.branch_no = "20203"
+        mock_account.account_type = "stock"
 
-    def test_get_account_info_detailed_success(self, mock_accounts, mock_sdk, mock_server_globals):
-        """Test get_account_info with detailed info success."""
-        # Mock SDK responses
-        mock_sdk.accounting.bank_remain.return_value = Mock(is_success=True, data="bank_data")
-        mock_sdk.accounting.unrealized_gains_and_loses.return_value = Mock(is_success=True, data="pnl_data")
-        mock_sdk.accounting.query_settlement.return_value = Mock(is_success=True, data="settlement_data")
+        # 模擬帳戶列表
+        mock_accounts = Mock()
+        mock_accounts.data = [mock_account]
 
-        result = get_account_info({"account": "123456"})
+        sdk.accounting = Mock()
+        return sdk, mock_accounts
 
-        assert result["status"] == "success"
-        assert "basic_info" in result["data"]
-        assert "bank_balance" in result["data"]
-        assert result["message"] == "成功獲取帳戶 123456 詳細資訊"
+    @pytest.fixture
+    def account_service(self, mock_mcp, mock_sdk):
+        """建立 AccountService 實例"""
+        sdk, accounts = mock_sdk
+        return AccountService(mock_mcp, sdk, accounts.data)
 
-    def test_get_account_info_validation_failed(self, mock_server_globals):
-        """Test get_account_info with validation failure."""
-        result = get_account_info({"account": "999999"})
+    def test_initialization(self, account_service):
+        """測試 AccountService 初始化"""
+        assert account_service.mcp is not None
+        assert account_service.sdk is not None
+        assert account_service.accounts is not None
 
-        assert result["status"] == "error"
-        assert result["message"] == "找不到帳戶 999999"
+    @patch('fubon_api_mcp_server.account_service.validate_and_get_account')
+    def test_get_account_info_with_account(self, mock_validate, account_service):
+        """測試獲取指定帳戶資訊"""
+        # 模擬 validate_and_get_account 返回值
+        mock_account_obj = Mock()
+        mock_account_obj.account = "1234567"
+        mock_account_obj.account_name = "測試用戶"
+        mock_account_obj.branch_no = "20203"
+        mock_account_obj.account_type = "stock"
+        mock_account_obj.id_no = "A123456789"
+        mock_account_obj.status = "active"
+        mock_validate.return_value = (mock_account_obj, None)
 
-
-class TestGetBankBalance:
-    """Test get_bank_balance function."""
-
-    def test_get_bank_balance_success(self, mock_accounts, mock_sdk, mock_server_globals):
-        """Test get_bank_balance success."""
-        # Mock BankRemain object
-        mock_bank_obj = Mock()
-        mock_bank_obj.branch_no = "001"
-        mock_bank_obj.account = "123456"
-        mock_bank_obj.currency = "TWD"
-        mock_bank_obj.balance = 100000
-        mock_bank_obj.available_balance = 100000
-        
-        mock_sdk.accounting.bank_remain.return_value = Mock(is_success=True, data=mock_bank_obj)
-
-        result = get_bank_balance({"account": "123456"})
+        result = account_service.get_account_info({"account": "1234567"})
 
         assert result["status"] == "success"
-        assert isinstance(result["data"], dict)
-        assert result["data"]["branch_no"] == "001"
-        assert result["data"]["account"] == "123456"
-        assert result["data"]["currency"] == "TWD"
-        assert result["data"]["balance"] == 100000
-        assert result["data"]["available_balance"] == 100000
-        assert "成功獲取帳戶 123456 銀行水位資訊" in result["message"]
+        assert result["data"]["account"] == "1234567"
+        assert result["data"]["account_name"] == "測試用戶"
+        assert "成功獲取帳戶" in result["message"]
 
-    def test_get_bank_balance_api_failed(self, mock_accounts, mock_sdk, mock_server_globals):
-        """Test get_bank_balance with API failure."""
-        mock_sdk.accounting.bank_remain.return_value = Mock(is_success=False)
+    @patch('fubon_api_mcp_server.account_service.validate_and_get_account')
+    def test_get_account_info_without_account(self, mock_validate, account_service):
+        """測試獲取所有帳戶資訊"""
+        # 模擬初始化 SDK 來獲取帳戶列表
+        mock_validate.return_value = (None, None)  # 初始化成功但沒有指定帳戶
 
-        result = get_bank_balance({"account": "123456"})
-
-        assert result["status"] == "error"
-        assert "無法獲取帳戶 123456 銀行水位資訊" in result["message"]
-
-
-class TestGetInventory:
-    """Test get_inventory function."""
-
-    def test_get_inventory_success(self, mock_accounts, mock_sdk, mock_server_globals):
-        """Test get_inventory success."""
-        # Mock Inventory object
-        mock_inventory_obj = Mock()
-        mock_inventory_obj.date = "2024-01-01"
-        mock_inventory_obj.account = "123456"
-        mock_inventory_obj.branch_no = "001"
-        mock_inventory_obj.stock_no = "2330"
-        mock_inventory_obj.order_type = "Stock"
-        mock_inventory_obj.lastday_qty = 1000
-        mock_inventory_obj.buy_qty = 0
-        mock_inventory_obj.buy_filled_qty = 0
-        mock_inventory_obj.buy_value = 0
-        mock_inventory_obj.today_qty = 1000
-        mock_inventory_obj.tradable_qty = 1000
-        mock_inventory_obj.sell_qty = 0
-        mock_inventory_obj.sell_filled_qty = 0
-        mock_inventory_obj.sell_value = 0
-        
-        # Mock odd object
-        mock_odd = Mock()
-        mock_odd.lastday_qty = 0
-        mock_odd.buy_qty = 0
-        mock_odd.buy_filled_qty = 0
-        mock_odd.buy_value = 0
-        mock_odd.today_qty = 0
-        mock_odd.tradable_qty = 0
-        mock_odd.sell_qty = 0
-        mock_odd.sell_filled_qty = 0
-        mock_odd.sell_value = 0
-        mock_inventory_obj.odd = mock_odd
-        
-        mock_sdk.accounting.inventories.return_value = Mock(is_success=True, data=[mock_inventory_obj])
-
-        result = get_inventory({"account": "123456"})
+        # 模擬 config.accounts
+        with patch('fubon_api_mcp_server.config.accounts') as mock_accounts:
+            mock_accounts.data = account_service.accounts
+            result = account_service.get_account_info({})
 
         assert result["status"] == "success"
         assert isinstance(result["data"], list)
         assert len(result["data"]) == 1
-        assert isinstance(result["data"][0], dict)
-        assert result["data"][0]["stock_no"] == "2330"
-        assert result["data"][0]["tradable_qty"] == 1000
-        assert "成功獲取帳戶 123456 庫存資訊" in result["message"]
+        assert "成功獲取所有帳戶" in result["message"]
 
-    def test_get_inventory_api_failed(self, mock_accounts, mock_sdk, mock_server_globals):
-        """Test get_inventory with API failure."""
-        mock_sdk.accounting.inventories.return_value = Mock(is_success=False)
+    @patch('fubon_api_mcp_server.account_service.validate_and_get_account')
+    def test_get_inventory_success(self, mock_validate, account_service):
+        """測試獲取庫存成功"""
+        mock_account_obj = Mock()
+        mock_validate.return_value = (mock_account_obj, None)
 
-        result = get_inventory({"account": "123456"})
-
-        assert result["status"] == "error"
-        assert "無法獲取帳戶 123456 庫存資訊" in result["message"]
-
-
-class TestGetUnrealizedPnL:
-    """Test get_unrealized_pnl function."""
-
-    def test_get_unrealized_pnl_success(self, mock_accounts, mock_sdk, mock_server_globals):
-        """Test get_unrealized_pnl success."""
-        # Mock the API response with data that will be processed
-        mock_item = Mock()
-        mock_item.date = "2024-01-01"
-        mock_item.branch_no = "001"
-        mock_item.stock_no = "2330"
-        mock_item.buy_sell = Mock()
-        mock_item.buy_sell.__str__ = Mock(return_value="BSAction.Buy")
-        mock_item.order_type = Mock()
-        mock_item.order_type.__str__ = Mock(return_value="OrderType.Stock")
-        mock_item.cost_price = 500.0
-        mock_item.tradable_qty = 1000
-        mock_item.today_qty = 100
-        mock_item.unrealized_profit = 5000
-        mock_item.unrealized_loss = 0
-
+        # 模擬 SDK 返回
         mock_result = Mock()
         mock_result.is_success = True
-        mock_result.data = [mock_item]
-        mock_sdk.accounting.unrealized_gains_and_loses.return_value = mock_result
+        mock_result.data = [
+            Mock(stock_no="0050", quantity=1000, cost_price=50.0, market_price=55.0)
+        ]
+        account_service.sdk.accounting.inventories.return_value = mock_result
 
-        result = get_unrealized_pnl({"account": "123456"})
+        result = account_service.get_inventory({"account": "1234567"})
+
+        assert result["status"] == "success"
+        assert len(result["data"]) == 1
+        assert result["data"][0]["stock_no"] == "0050"
+        assert "成功獲取帳戶" in result["message"]
+
+    @patch('fubon_api_mcp_server.account_service.validate_and_get_account')
+    def test_get_inventory_failure(self, mock_validate, account_service):
+        """測試獲取庫存失敗"""
+        mock_account_obj = Mock()
+        mock_validate.return_value = (mock_account_obj, None)
+
+        # 模擬 SDK 返回失敗
+        mock_result = Mock()
+        mock_result.is_success = False
+        mock_result.message = "API 錯誤"
+        account_service.sdk.accounting.inventories.return_value = mock_result
+
+        result = account_service.get_inventory({"account": "1234567"})
+
+        assert result["status"] == "error"
+        assert "獲取庫存明細失敗" in result["message"]
+
+    @patch('fubon_api_mcp_server.account_service.validate_and_get_account')
+    def test_get_bank_balance_success(self, mock_validate, account_service):
+        """測試獲取銀行餘額成功"""
+        mock_account_obj = Mock()
+        mock_validate.return_value = (mock_account_obj, None)
+
+        # 模擬 SDK 返回
+        mock_result = Mock()
+        mock_result.is_success = True
+        mock_result.data = {"balance": 100000, "available_balance": 100000}
+        account_service.sdk.accounting.bank_remain.return_value = mock_result
+
+        result = account_service.get_bank_balance({"account": "1234567"})
+
+        assert result["status"] == "success"
+        assert result["data"]["balance"] == 100000
+        assert "成功獲取帳戶" in result["message"]
+
+    @patch('fubon_api_mcp_server.account_service.validate_and_get_account')
+    def test_get_maintenance_success(self, mock_validate, account_service):
+        """測試獲取維持率成功"""
+        mock_account_obj = Mock()
+        mock_validate.return_value = (mock_account_obj, None)
+
+        # 模擬 SDK 返回
+        mock_result = Mock()
+        mock_result.is_success = True
+        mock_result.data = {
+            "maintenance_ratio": 0.0,
+            "maintenance_summary": {"margin_value": 0, "shortsell_value": 0},
+            "maintenance_detail": []
+        }
+        account_service.sdk.accounting.maintenance.return_value = mock_result
+
+        result = account_service.get_maintenance({"account": "1234567"})
+
+        assert result["status"] == "success"
+        assert result["data"]["maintenance_ratio"] == 0.0
+        assert "成功獲取帳戶" in result["message"]
+
+    @patch('fubon_api_mcp_server.account_service.validate_and_get_account')
+    def test_get_settlement_info_success(self, mock_validate, account_service):
+        """測試獲取結算資訊成功"""
+        mock_account_obj = Mock()
+        mock_validate.return_value = (mock_account_obj, None)
+
+        # 模擬 SDK 返回
+        mock_result = Mock()
+        mock_result.is_success = True
+        mock_result.data = []
+        account_service.sdk.accounting.query_settlement.return_value = mock_result
+
+        result = account_service.get_settlement_info({"account": "1234567"})
 
         assert result["status"] == "success"
         assert isinstance(result["data"], list)
-        assert len(result["data"]) == 1
-        assert result["data"][0]["stock_no"] == "2330"
-        assert result["data"][0]["buy_sell"] == "Buy"
-        assert result["data"][0]["order_type"] == "Stock"
-        assert "成功獲取帳戶 123456 未實現損益" in result["message"]
+        assert "成功獲取帳戶" in result["message"]
 
+   
 
-class TestGetSettlementInfo:
-    """Test get_settlement_info function."""
+    @patch('fubon_api_mcp_server.account_service.validate_and_get_account')
+    def test_get_realized_pnl_success(self, mock_validate, account_service):
+        """測試獲取已實現損益成功"""
+        mock_account_obj = Mock()
+        mock_validate.return_value = (mock_account_obj, None)
 
-    def test_get_settlement_info_success(self, mock_accounts, mock_sdk, mock_server_globals):
-        """Test get_settlement_info success."""
-        mock_sdk.accounting.query_settlement.return_value = Mock(is_success=True, data="settlement_data")
+        # 模擬 SDK 返回
+        mock_result = Mock()
+        mock_result.is_success = True
+        mock_result.data = []
+        account_service.sdk.accounting.realized_gains_and_loses.return_value = mock_result
 
-        result = get_settlement_info({"account": "123456", "days": "0d"})
-
-        assert result["status"] == "success"
-        assert result["data"] == "settlement_data"
-        assert "成功獲取帳戶 123456 0d 交割資訊" in result["message"]
-
-    def test_get_settlement_info_api_failed(self, mock_accounts, mock_sdk, mock_server_globals):
-        """Test get_settlement_info with API failure."""
-        mock_sdk.accounting.query_settlement.return_value = Mock(is_success=False)
-
-        result = get_settlement_info({"account": "123456", "days": "0d"})
-
-        assert result["status"] == "error"
-        assert "無法獲取帳戶 123456 交割資訊" in result["message"]
-
-
-class TestPrivateAccountFunctions:
-    """Test private account helper functions."""
-
-    def test_get_all_accounts_basic_info(self, mock_accounts, mock_server_globals):
-        """Test _get_all_accounts_basic_info function."""
-        result = _get_all_accounts_basic_info()
+        result = account_service.get_realized_pnl({"account": "1234567"})
 
         assert result["status"] == "success"
-        assert "data" in result
-        assert len(result["data"]) == 2  # Two mock accounts
+        assert isinstance(result["data"], list)
+        assert "成功獲取已實現損益" in result["message"]
 
-    def test_get_basic_account_info(self, mock_accounts):
-        """Test _get_basic_account_info function."""
-        account_obj = mock_accounts.data[0]
-        result = _get_basic_account_info(account_obj)
+    @patch('fubon_api_mcp_server.account_service.validate_and_get_account')
+    def test_get_realized_pnl_summary_success(self, mock_validate, account_service):
+        """測試獲取已實現損益摘要成功"""
+        mock_account_obj = Mock()
+        mock_validate.return_value = (mock_account_obj, None)
 
-        assert "basic_info" in result
-        assert result["basic_info"]["account"] == "123456"
+        # 模擬 SDK 返回
+        mock_result = Mock()
+        mock_result.is_success = True
+        mock_result.data = []
+        account_service.sdk.accounting.realized_gains_and_loses_summary.return_value = mock_result
 
-    def test_get_account_financial_info(self, mock_accounts, mock_sdk, mock_server_globals):
-        """Test _get_account_financial_info function."""
-        account_obj = mock_accounts.data[0]
+        result = account_service.get_realized_pnl_summary({"account": "1234567"})
 
-        # Mock successful API calls
-        mock_sdk.accounting.bank_remain.return_value = Mock(is_success=True, data="bank_data")
-        mock_sdk.accounting.unrealized_gains_and_loses.return_value = Mock(is_success=True, data="pnl_data")
-        mock_sdk.accounting.query_settlement.return_value = Mock(is_success=True, data="settlement_data")
+        assert result["status"] == "success"
+        assert isinstance(result["data"], list)
+        assert "成功獲取已實現損益摘要" in result["message"]
 
-        result = _get_account_financial_info(account_obj)
+    @patch('fubon_api_mcp_server.account_service.validate_and_get_account')
+    def test_get_unrealized_pnl_success(self, mock_validate, account_service):
+        """測試獲取未實現損益成功"""
+        mock_account_obj = Mock()
+        mock_validate.return_value = (mock_account_obj, None)
 
-        assert "bank_balance" in result
-        assert "unrealized_pnl" in result
-        assert "settlement_today" in result
+        # 模擬 SDK 返回
+        mock_result = Mock()
+        mock_result.is_success = True
+        mock_result.data = []
+        account_service.sdk.accounting.unrealized_gains_and_loses.return_value = mock_result
+
+        result = account_service.get_unrealized_pnl({"account": "1234567"})
+
+        assert result["status"] == "success"
+        assert isinstance(result["data"], list)
+        assert "成功獲取未實現損益" in result["message"]
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

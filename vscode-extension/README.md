@@ -167,7 +167,7 @@ Extension 使用系統預設的 `python` 命令。如需指定 Python 路徑：
 
 ## 📄 授權
 
-MIT License
+Apache-2.0 License
 
 ## ⚠️ 免責聲明
 

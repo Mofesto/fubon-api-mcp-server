@@ -31,7 +31,7 @@
     "url": "https://github.com/Mofesto/fubon-api-mcp-server/issues"
   },
   "homepage": "https://github.com/Mofesto/fubon-api-mcp-server#readme",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": {
     "name": "Mofesto",
     "email": "mofesto.cui@gmail.com"
