@@ -14,31 +14,13 @@
 - API 調用封裝
 """
 
-import os
 import pandas as pd
-import sqlite3
-import sys
+import numpy as np
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import logging
 
-from fubon_neo.constant import (
-    ConditionMarketType,
-    ConditionOrderType,
-    ConditionPriceType,
-    ConditionStatus,
-    Direction,
-    HistoryStatus,
-    Operator,
-    SplitDescription,
-    StopSign,
-    TimeSliceOrderType,
-    TPSLOrder,
-    TPSLWrapper,
-    TradingType,
-    TrailOrder,
-    TriggerContent,
-)
-from fubon_neo.sdk import Condition, ConditionDayTrade, ConditionOrder, FubonSDK
+ 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
@@ -50,7 +32,7 @@ from .utils import validate_and_get_account
 class QuerySymbolSnapshotArgs(BaseModel):
     account: str
     market_type: str = "Common"
-    stock_type: List[str] = ["Stock"]
+    stock_type: List[str] = Field(default_factory=lambda: ["Stock"])
 
 
 class MarketDataService:
@@ -62,11 +44,18 @@ class MarketDataService:
         self.reststock = reststock
         self.restfutopt = restfutopt
         self.sdk = sdk
-        
+        self.logger = logging.getLogger(__name__)
+        # 確保 base_data_dir 存在
+        try:
+            self.base_data_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            # 若目錄建立失敗，記錄並繼續，_create_tables 會在連線時暴露錯誤
+            self.logger.debug("無法建立 base_data_dir: %s", self.base_data_dir, exc_info=True)
+
         # 初始化數據庫連接
         self.db_path = base_data_dir / "stock_data.db"
         self._create_tables()
-        
+
         self._register_tools()
 
     def _create_tables(self):
@@ -101,11 +90,177 @@ class MarketDataService:
                 ''')
                 
                 conn.commit()
-                print(f"數據庫表創建成功: {self.db_path}", file=sys.stderr)
+                self.logger.info("數據庫表創建成功: %s", self.db_path)
                 
-        except Exception as e:
-            print(f"創建數據庫表時發生錯誤: {str(e)}", file=sys.stderr)
+        except Exception:
+            self.logger.exception("創建數據庫表時發生錯誤")
             raise
+
+    def _normalize_result(self, obj) -> dict:
+        """
+        Normalize SDK return objects (dict, SDK object, or string) into a plain dict.
+        This handles the common SDK pattern of returning an object with .data
+        or nested attributes, and also attempts to parse simple string reprs.
+        """
+        try:
+            import dataclasses
+            import re
+
+            def to_snake_case(s: str) -> str:
+                # Convert camelCase or PascalCase to snake_case
+                s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', s)
+                s2 = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1)
+                return s2.replace('-', '_').lower()
+
+            def normalize_value(v):
+                # Primitive types
+                if v is None or isinstance(v, (bool, int, float, str)):
+                    return v
+                # Mapping
+                if isinstance(v, dict):
+                    return normalize_dict(v)
+                # Iterable
+                if isinstance(v, (list, tuple, set)):
+                    return [normalize_value(x) for x in v]
+                # Dataclass
+                if dataclasses.is_dataclass(v):
+                    return normalize_dict(dataclasses.asdict(v))
+                # Namedtuple or object with _asdict
+                if hasattr(v, '_asdict') and callable(v._asdict):
+                    return normalize_dict(v._asdict())
+                # Object with dict() or to_dict()
+                if hasattr(v, 'dict') and callable(getattr(v, 'dict')):
+                    try:
+                        return normalize_value(v.dict())
+                    except Exception:
+                        pass
+                if hasattr(v, 'to_dict') and callable(getattr(v, 'to_dict')):
+                    try:
+                        return normalize_value(v.to_dict())
+                    except Exception:
+                        pass
+                # Object with __dict__
+                if hasattr(v, '__dict__'):
+                    try:
+                        return normalize_dict({k: getattr(v, k) for k in v.__dict__ if not k.startswith('_')})
+                    except Exception:
+                        pass
+                # Fallback: try to parse simple dict-like string
+                if isinstance(v, str):
+                    pairs = re.findall(r"(\w+):\s*(?:\"([^\"]*)\"|(None)|(-?\d+(?:\.\d+)?))", v)
+                    if pairs:
+                        result = {}
+                        for key, quoted, none_val, num_val in pairs:
+                            if quoted:
+                                result[key] = quoted
+                            elif none_val:
+                                result[key] = None
+                            elif num_val:
+                                result[key] = float(num_val) if '.' in num_val else int(num_val)
+                        return result
+                # final fallback: string repr
+                try:
+                    return str(v)
+                except Exception:
+                    return repr(v)
+
+            def normalize_dict(d: dict) -> dict:
+                out = {}
+                for k, v in d.items():
+                    if k is None:
+                        continue
+                    nk = to_snake_case(str(k))
+                    out[nk] = normalize_value(v)
+                return out
+
+            # start of main function
+            if obj is None:
+                return {}
+            # dict
+            if isinstance(obj, dict):
+                return normalize_dict(obj)
+            # list-like
+            if isinstance(obj, (list, tuple, set)):
+                return [self._normalize_result(x) for x in obj]
+            import unittest
+            import types as _types
+            import unittest.mock as _unittest_mock
+
+            # Dataclass, namedtuple, or object with _asdict
+            if dataclasses.is_dataclass(obj):
+                return normalize_dict(dataclasses.asdict(obj))
+            if hasattr(obj, '_asdict') and callable(getattr(obj, '_asdict')):
+                return normalize_dict(obj._asdict())
+            # SDK-provided dict or to_dict or dict methods
+            if hasattr(obj, 'dict') and callable(getattr(obj, 'dict')) and not isinstance(obj, _unittest_mock.Mock):
+                try:
+                    return normalize_value(obj.dict())
+                except Exception:
+                    pass
+            if hasattr(obj, 'to_dict') and callable(getattr(obj, 'to_dict')) and not isinstance(obj, _unittest_mock.Mock):
+                try:
+                    return normalize_value(obj.to_dict())
+                except Exception:
+                    pass
+            # If object has 'data' attribute, unpack and normalize
+            if hasattr(obj, 'data') and not isinstance(obj, _unittest_mock.Mock):
+                return normalize_value(getattr(obj, 'data'))
+            # If object has __dict__ (usual case for objects with attributes)
+            if hasattr(obj, '__dict__') and not isinstance(obj, _unittest_mock.Mock):
+                try:
+                    return normalize_dict({k: getattr(obj, k) for k in obj.__dict__ if not k.startswith('_')})
+                except Exception:
+                    pass
+            # As a last effort, inspect public non-callable attributes (works for Mock and other objects)
+            try:
+                import types
+
+                attrs = {}
+                for attr in dir(obj):
+                    if attr.startswith('_'):
+                        continue
+                    try:
+                        val = getattr(obj, attr)
+                    except Exception:
+                        continue
+                    if callable(val) or isinstance(val, types.MethodType):
+                        continue
+                    attrs[attr] = val
+                if attrs:
+                    return normalize_dict(attrs)
+            except Exception:
+                pass
+            # If it is a string repr like 'MarginShortQuota {\n    stock_no: "2330",\n    ...}',
+            # try to extract simple key: value pairs
+            if isinstance(obj, str):
+                pairs = re.findall(r"(\w+):\s*(?:\"([^\"]*)\"|(None)|(-?\d+(?:\.\d+)?))", obj)
+                result = {}
+                for key, quoted, none_val, num_val in pairs:
+                    if quoted:
+                        result[key] = quoted
+                    elif none_val:
+                        result[key] = None
+                    elif num_val:
+                        if '.' in num_val:
+                            result[key] = float(num_val)
+                        else:
+                            try:
+                                result[key] = int(num_val)
+                            except Exception:
+                                result[key] = float(num_val)
+                if result:
+                    return normalize_dict(result)
+        except Exception:
+            # Fallback: return raw repr
+            try:
+                return {"raw": str(obj)}
+            except Exception:
+                return {"raw": "<unserializable>"}
+        # Final fallback
+        try:
+            return {"raw": str(obj)}
+        except Exception:
+            return {"raw": "<unserializable>"}
 
     def _register_tools(self):
         """註冊所有市場數據相關的工具"""
@@ -126,7 +281,7 @@ class MarketDataService:
         self.mcp.tool()(self.margin_quota)
         self.mcp.tool()(self.daytrade_and_stock_info)
         self.mcp.tool()(self.query_symbol_quote)
-        self.mcp.tool()(self.get_market_overview)
+        self.mcp.tool()(self.get_market_overview) #ERROR 無法獲取台股指數行情
 
         # 期貨/選擇權市場數據工具
         self.mcp.tool()(self.get_intraday_futopt_products)
@@ -167,7 +322,8 @@ class MarketDataService:
                 # 處理並保存數據
                 df = pd.DataFrame(api_data)
                 df = self._process_historical_data(df)
-                self._save_to_local_csv(symbol, api_data)
+                # 儲存至本地 SQLite 快取 (不再使用 CSV)
+                self._save_to_local_db(symbol, df.to_dict("records"))
                 return {
                     "status": "success",
                     "data": df.to_dict("records"),
@@ -195,9 +351,14 @@ class MarketDataService:
         if local_data is None:
             return None
 
-        df = local_data
-        mask = (df["date"] >= from_date) & (df["date"] <= to_date)
-        df = df[mask]
+        df = local_data.copy()
+        # 確保 date 欄為 datetime
+        df["date"] = pd.to_datetime(df["date"]) if df["date"].dtype != "datetime64[ns]" else df["date"]
+        # 將查詢日期轉為 datetime 再比較
+        from_dt = pd.to_datetime(from_date)
+        to_dt = pd.to_datetime(to_date)
+        mask = (df["date"] >= from_dt) & (df["date"] <= to_dt)
+        df = df.loc[mask]
 
         if df.empty:
             return None
@@ -253,24 +414,35 @@ class MarketDataService:
         """
         try:
             params = {"symbol": symbol, "from": from_date, "to": to_date}
-            print(
-                f"正在獲取 {symbol} 從 {params['from']} 到 {params['to']} 的數據...",
-                file=sys.stderr,
-            )
+            self.logger.debug("正在獲取 %s 從 %s 到 %s 的數據...", symbol, params["from"], params["to"])
             response = self.reststock.historical.candles(**params)
-            print(f"API 回應內容: {response}", file=sys.stderr)
+            self.logger.debug("API 回應內容: %s", response)
 
-            if isinstance(response, dict):
+            # 支援 SDK 物件回傳 (is_success/.data) 與 dict 形式回傳
+            if hasattr(response, "is_success"):
+                if response.is_success:
+                    data = response.data if hasattr(response, "data") else getattr(response, "result", None)
+                    if data:
+                        segment_data = data
+                        self.logger.info("成功獲取 %d 筆資料", len(segment_data))
+                        return segment_data
+                    else:
+                        self.logger.warning("API 回應無資料 (object): %s", response)
+                else:
+                    # 嘗試從 message 獲取錯誤資訊
+                    msg = getattr(response, "message", None)
+                    self.logger.warning("API 回應失敗 (object): %s", msg)
+            elif isinstance(response, dict):
                 if "data" in response and response["data"]:
                     segment_data = response["data"]
-                    print(f"成功獲取 {len(segment_data)} 筆資料", file=sys.stderr)
+                    self.logger.info("成功獲取 %d 筆資料", len(segment_data))
                     return segment_data
                 else:
-                    print(f"API 回應無資料: {response}", file=sys.stderr)
+                    self.logger.warning("API 回應無資料 (dict): %s", response)
             else:
-                print(f"API 回應格式錯誤: {response}", file=sys.stderr)
+                self.logger.warning("API 回應格式錯誤: %s", response)
         except Exception as segment_error:
-            print(f"獲取分段資料時發生錯誤: {str(segment_error)}", file=sys.stderr)
+            self.logger.exception("獲取分段資料時發生錯誤: %s", segment_error)
 
         return []
 
@@ -288,7 +460,12 @@ class MarketDataService:
         # 添加更多資訊欄位
         df["vol_value"] = df["close"] * df["volume"]  # 成交值
         df["price_change"] = df["close"] - df["open"]  # 漲跌
-        df["change_ratio"] = (df["close"] - df["open"]) / df["open"] * 100  # 漲跌幅
+        # 安全計算漲跌幅，避免 open 為 0 導致除以零
+        df["change_ratio"] = np.where(
+            df["open"] == 0,
+            0.0,
+            (df["price_change"] / df["open"]) * 100,
+        )
         return df
 
     def _read_local_stock_data(self, stock_code):
@@ -319,23 +496,23 @@ class MarketDataService:
                 
                 if df.empty:
                     return None
-                
+
                 # 將date列轉換為datetime
                 df["date"] = pd.to_datetime(df["date"])
-                
+
                 return df
-                
-        except Exception as e:
-            print(f"讀取SQLite數據時發生錯誤: {str(e)}", file=sys.stderr)
+
+        except Exception:
+            self.logger.exception("讀取SQLite數據時發生錯誤")
             return None
 
-    def _save_to_local_csv(self, symbol: str, new_data: list):
+    def _save_to_local_db(self, symbol: str, new_data: list):
         """
-        將新的股票數據保存到SQLite數據庫，避免重複數據。
+        將新的股票數據保存到本地 SQLite 數據庫(stock_historical_data)，避免重複數據。
 
         參數:
             symbol (str): 股票代碼
-            new_data (list): 新的股票數據列表
+            new_data (list): 新的股票數據列表 (dict 序列)
         """
         try:
             import sqlite3
@@ -369,10 +546,10 @@ class MarketDataService:
                     ))
                 
                 conn.commit()
-                print(f"成功保存數據到SQLite: {symbol}, {len(new_data)} 筆記錄", file=sys.stderr)
+                self.logger.info("成功保存數據到SQLite: %s, %d 筆記錄", symbol, len(new_data))
                 
-        except Exception as e:
-            print(f"保存SQLite數據時發生錯誤: {str(e)}", file=sys.stderr)
+        except Exception:
+            self.logger.exception("保存SQLite數據時發生錯誤")
 
     def get_intraday_tickers(self, args: Dict) -> dict:
         """
@@ -778,7 +955,7 @@ class MarketDataService:
             api_params.update(filter_params)
 
             # 調試輸出
-            print(f"API params: {api_params}", file=sys.stderr)
+            self.logger.debug("API params: %s", api_params)
 
             result = self.reststock.snapshot.movers(**api_params)
 
@@ -1308,7 +1485,7 @@ class MarketDataService:
         對應富邦官方 API: intraday/ticker/
 
         Args:
-            symbol (str): 合約代碼，例如 "TX00", "MTX00", "TE00C24000" 等
+            symbol (str): 合約代碼，例如 "XAFF6" 等
             session (str, optional): 交易時段，預設為 "regular"
                 - "regular": 一般交易時段
                 - "afterhours": 盤後交易時段
@@ -1873,9 +2050,10 @@ class MarketDataService:
             )
 
             if result and hasattr(result, "is_success") and result.is_success:
+                data = self._normalize_result(result.data if hasattr(result, "data") else result)
                 return {
                     "status": "success",
-                    "data": result.data,
+                    "data": data,
                     "message": f"成功查詢快照報價，市場類型: {market_type}，股票類型: {stock_type}",
                 }
             else:
@@ -1996,11 +2174,12 @@ class MarketDataService:
                 and hasattr(quote_result, "is_success")
                 and quote_result.is_success
             ):
+                data = self._normalize_result(
+                    quote_result.data if hasattr(quote_result, "data") else quote_result
+                )
                 return {
                     "status": "success",
-                    "data": quote_result.data
-                    if hasattr(quote_result, "data")
-                    else quote_result,
+                    "data": data,
                     "message": f"成功獲取股票 {symbol} 報價資訊",
                 }
             else:
@@ -2102,11 +2281,12 @@ class MarketDataService:
                 and hasattr(margin_quota_result, "is_success")
                 and margin_quota_result.is_success
             ):
+                data = self._normalize_result(
+                    margin_quota_result.data if hasattr(margin_quota_result, "data") else margin_quota_result
+                )
                 return {
                     "status": "success",
-                    "data": margin_quota_result.data
-                    if hasattr(margin_quota_result, "data")
-                    else margin_quota_result,
+                    "data": data,
                     "message": f"成功獲取帳戶 {account} 股票 {stock_no} 資券配額",
                 }
             elif isinstance(margin_quota_result, dict) and margin_quota_result:
@@ -2225,11 +2405,12 @@ class MarketDataService:
                 and hasattr(daytrade_info, "is_success")
                 and daytrade_info.is_success
             ):
+                data = self._normalize_result(
+                    daytrade_info.data if hasattr(daytrade_info, "data") else daytrade_info
+                )
                 return {
                     "status": "success",
-                    "data": daytrade_info.data
-                    if hasattr(daytrade_info, "data")
-                    else daytrade_info,
+                    "data": data,
                     "message": f"成功獲取帳戶 {account} 股票 {stock_no} 現沖券配額資訊",
                 }
             else:
@@ -2259,11 +2440,20 @@ class MarketDataService:
         """
         try:
             # 獲取台股指數行情
-            tse_result = self.reststock.intraday.quote(symbol="IX0001")  # 台股指數
+            # 嘗試使用 intraday.quote 查詢指數，如果失败則退回到 ticker
+            tse_result = None
+            try:
+                tse_result = self.reststock.intraday.quote(symbol="IX0001")
+            except Exception:
+                try:
+                    tse_result = self.reststock.intraday.ticker(symbol="IX0001")
+                except Exception:
+                    tse_result = None
+
             if (
                 not tse_result
-                or not hasattr(tse_result, "is_success")
-                or not tse_result.is_success
+                or (hasattr(tse_result, "is_success") and not tse_result.is_success)
+                or (isinstance(tse_result, dict) and not tse_result)
             ):
                 return {
                     "status": "error",
@@ -2273,7 +2463,7 @@ class MarketDataService:
 
             # 獲取市場統計數據
             try:
-                movers_result = self.reststock.snapshots.movers(
+                movers_result = self.reststock.snapshot.movers(
                     market="TSE", direction="up", change="value", gt=0, type="COMMONSTOCK"
                 )
                 up_count = (
@@ -2281,11 +2471,11 @@ class MarketDataService:
                     if movers_result and hasattr(movers_result, "data")
                     else 0
                 )
-            except:
+            except Exception:
                 up_count = 0
 
             try:
-                movers_result = self.reststock.snapshots.movers(
+                movers_result = self.reststock.snapshot.movers(
                     market="TSE", direction="down", change="value", lt=0, type="COMMONSTOCK"
                 )
                 down_count = (
@@ -2293,45 +2483,56 @@ class MarketDataService:
                     if movers_result and hasattr(movers_result, "data")
                     else 0
                 )
-            except:
+            except Exception:
                 down_count = 0
 
             # 獲取成交量統計
             try:
-                actives_result = self.reststock.snapshots.actives(
+                actives_result = self.reststock.snapshot.actives(
                     market="TSE", trade="volume", type="COMMONSTOCK"
                 )
+                # 嘗試從返回的 data 取得 trade volume，字段名稱可能為 trade_volume 或 tradeVolume
+                def _get_trade_volume(item):
+                    if isinstance(item, dict):
+                        return item.get("trade_volume") or item.get("tradeVolume") or item.get("trade_volume") or 0
+                    else:
+                        return getattr(item, "trade_volume", None) or getattr(item, "tradeVolume", None) or 0
+
                 total_volume = (
-                    sum(
-                        getattr(item, "trade_volume", 0)
-                        for item in actives_result.data[:10]
-                    )
+                    sum(_get_trade_volume(item) for item in (actives_result.data[:10] if hasattr(actives_result, "data") else []))
                     if actives_result and hasattr(actives_result, "data")
                     else 0
                 )
-            except:
+            except Exception:
                 total_volume = 0
+
+            index_data = self._normalize_result(tse_result.data if hasattr(tse_result, "data") else tse_result)
+            price = index_data.get("price") or index_data.get("close") or 0
+            change = index_data.get("change") or index_data.get("chg") or 0
+            change_percent = index_data.get("change_percent") or index_data.get("chg_percent") or index_data.get("changePercent") or 0
+            volume_val = 0
+            # 有時 total 會是一個 dict
+            if isinstance(index_data.get("total"), dict):
+                volume_val = index_data.get("total", {}).get("trade_volume", 0)
+            else:
+                volume_val = index_data.get("trade_volume") or index_data.get("tradeVolume") or 0
 
             market_data = {
                 "index": {
-                    "name": "台股指數",
-                    "symbol": "IX0001",
-                    "price": float(getattr(tse_result.data, "price", 0)),
-                    "change": float(getattr(tse_result.data, "change", 0)),
-                    "change_percent": float(getattr(tse_result.data, "change_percent", 0)),
-                    "volume": int(
-                        getattr(tse_result.data, "total", {}).get("trade_volume", 0)
-                    ),
-                    "last_updated": getattr(tse_result.data, "at", None),
+                    "name": index_data.get("name", "台股指數"),
+                    "symbol": index_data.get("symbol", "IX0001"),
+                    "price": float(price),
+                    "change": float(change),
+                    "change_percent": float(change_percent),
+                    "volume": int(volume_val),
+                    "last_updated": index_data.get("at") or index_data.get("updated_at"),
                 },
                 "statistics": {
                     "up_count": up_count,
                     "down_count": down_count,
                     "unchanged_count": max(0, 1000 - up_count - down_count),  # 估計值
                     "total_volume": total_volume,
-                    "market_status": "open"
-                    if hasattr(tse_result.data, "price") and tse_result.data.price > 0
-                    else "closed",
+                    "market_status": "open" if float(price) > 0 else "closed",
                 },
             }
 

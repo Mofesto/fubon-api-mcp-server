@@ -16,7 +16,7 @@
 - 事件監聽器系統
 """
 
-import sys
+import logging
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -31,6 +31,7 @@ class StreamingService:
         self.mcp = mcp
         self.server_state = server_state
         self._register_tools()
+        self.logger = logging.getLogger(__name__)
 
     def _register_tools(self):
         """註冊所有串流相關的工具"""
@@ -244,7 +245,7 @@ class StreamingService:
 
             # 創建一個簡單的回調函數（實際應用中可能需要更複雜的邏輯）
             def event_callback(event_data):
-                print(f"收到事件 {event_type}: {event_data}", file=sys.stderr)
+                self.logger.info(f"收到事件 {event_type}: {event_data}")
 
             self.server_state.register_event_listener(event_type, listener_id, event_callback)
 

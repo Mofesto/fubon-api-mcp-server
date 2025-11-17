@@ -47,6 +47,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import pandas as pd
+import logging
 from dotenv import load_dotenv
 from fubon_neo.sdk import Condition, ConditionDayTrade, ConditionOrder, FubonSDK
 from mcp.server.fastmcp import FastMCP
@@ -101,7 +102,8 @@ BASE_DATA_DIR = Path(os.getenv("FUBON_DATA_DIR", DEFAULT_DATA_DIR))
 
 # 確保數據目錄存在
 BASE_DATA_DIR.mkdir(parents=True, exist_ok=True)
-print(f"使用數據目錄: {BASE_DATA_DIR}", file=sys.stderr)
+logger = logging.getLogger(__name__)
+logger.info(f"使用數據目錄: {BASE_DATA_DIR}")
 
 
 # =============================================================================
@@ -191,7 +193,7 @@ def handle_exceptions(func):
             )  # Include traceback from the function name
 
             error_text = f"{func.__name__} exception: {exp}\nTraceback (most recent call last):\n{relevant_tb}"
-            print(error_text, file=sys.stderr)
+            logger.exception(error_text)
 
             # 若要程式完全跳出，可加入下行 (P.S. jupyter 環境不適用)
             # os._exit(-1)
@@ -224,9 +226,9 @@ def on_order(order_data):
         if len(server_state.latest_order_reports) > 10:
             server_state.latest_order_reports.pop(0)
 
-        print(f"收到委託回報: {order_data}", file=sys.stderr)
+        logger.info(f"收到委託回報: {order_data}")
     except Exception as e:
-        print(f"處理委託回報時發生錯誤: {str(e)}", file=sys.stderr)
+        logger.exception(f"處理委託回報時發生錯誤: {str(e)}")
 
 
 def on_order_changed(order_changed_data):
@@ -252,9 +254,9 @@ def on_order_changed(order_changed_data):
         if len(server_state.latest_order_changed_reports) > 10:
             server_state.latest_order_changed_reports.pop(0)
 
-        print(f"收到改價/改量/刪單回報: {order_changed_data}", file=sys.stderr)
+        logger.info(f"收到改價/改量/刪單回報: {order_changed_data}")
     except Exception as e:
-        print(f"處理改價/改量/刪單回報時發生錯誤: {str(e)}", file=sys.stderr)
+        logger.exception(f"處理改價/改量/刪單回報時發生錯誤: {str(e)}")
 
 
 def on_filled(filled_data):
@@ -280,9 +282,9 @@ def on_filled(filled_data):
         if len(server_state.latest_filled_reports) > 10:
             server_state.latest_filled_reports.pop(0)
 
-        print(f"收到成交回報: {filled_data}", file=sys.stderr)
+        logger.info(f"收到成交回報: {filled_data}")
     except Exception as e:
-        print(f"處理成交回報時發生錯誤: {str(e)}", file=sys.stderr)
+        logger.exception(f"處理成交回報時發生錯誤: {str(e)}")
 
 
 def on_event(event_data):
@@ -305,9 +307,9 @@ def on_event(event_data):
         if len(server_state.latest_event_reports) > 10:
             server_state.latest_event_reports.pop(0)
 
-        print(f"收到事件通知: {event_data}", file=sys.stderr)
+        logger.info(f"收到事件通知: {event_data}")
     except Exception as e:
-        print(f"處理事件通知時發生錯誤: {str(e)}", file=sys.stderr)
+        logger.exception(f"處理事件通知時發生錯誤: {str(e)}")
 
 
 def read_local_stock_data(stock_code):
@@ -333,7 +335,7 @@ def read_local_stock_data(stock_code):
         df = df.sort_values(by="date", ascending=False)
         return df
     except Exception as e:
-        print(f"讀取CSV檔案時發生錯誤: {str(e)}", file=sys.stderr)
+        logger.exception(f"讀取CSV檔案時發生錯誤: {str(e)}")
         return None
 
 
@@ -379,7 +381,7 @@ def save_to_local_csv(symbol: str, new_data: list):
 
                 # 原子性地替換原檔案
                 shutil.move(str(temp_path), str(file_path))
-                print(f"成功保存數據到 {file_path}", file=sys.stderr)
+                logger.info(f"成功保存數據到 {file_path}")
 
             except Exception as e:
                 # 確保清理臨時檔案
@@ -388,7 +390,7 @@ def save_to_local_csv(symbol: str, new_data: list):
                 raise e
 
     except Exception as e:
-        print(f"保存CSV檔案時發生錯誤: {str(e)}", file=sys.stderr)
+        logger.exception(f"保存CSV檔案時發生錯誤: {str(e)}")
 
 
 @mcp.resource("twstock://{symbol}/historical")
@@ -1926,7 +1928,7 @@ class MCPServerState:
     ):
         """初始化SDK"""
         try:
-            print("正在初始化富邦證券SDK...", file=sys.stderr)
+            logger.info("正在初始化富邦證券SDK...")
             self.sdk = FubonSDK()
             self.accounts = self.sdk.login(username, password, pfx_path, pfx_password)
             self.sdk.init_realtime()
@@ -1946,10 +1948,10 @@ class MCPServerState:
             self.sdk.set_on_filled(on_filled)
             self.sdk.set_on_event(on_event)
 
-            print("富邦證券SDK初始化成功", file=sys.stderr)
+            logger.info("富邦證券SDK初始化成功")
             return True
         except Exception as e:
-            print(f"SDK初始化失敗: {str(e)}", file=sys.stderr)
+            logger.exception(f"SDK初始化失敗: {str(e)}")
             return False
 
     def get_account_object(self, account: str):
@@ -2022,12 +2024,12 @@ class MCPServerState:
     ) -> str:
         """訂閱市場數據"""
         if not self.sdk:
-            print("SDK 未初始化", file=sys.stderr)
+            logger.warning("SDK 未初始化")
             return None
 
         # 檢查登入狀態
         if not self.accounts:
-            print("尚未登入，請先登入", file=sys.stderr)
+            logger.warning("尚未登入，請先登入")
             return None
 
         subscription_key = f"{symbol}_{data_type}"
@@ -2047,7 +2049,7 @@ class MCPServerState:
                     ws_client = self.sdk.marketdata.websocket_client.stock
                     channel = "volumes"
                 else:
-                    print(f"不支持的數據類型: {data_type}", file=sys.stderr)
+                    logger.error(f"不支持的數據類型: {data_type}")
                     return None
 
                 # 設置消息處理器
@@ -2069,7 +2071,7 @@ class MCPServerState:
                                     },
                                 )
                     except Exception as e:
-                        print(f"處理 WebSocket 消息失敗: {str(e)}", file=sys.stderr)
+                        logger.exception(f"處理 WebSocket 消息失敗: {str(e)}")
 
                 ws_client.on("message", handle_message)
 
@@ -2116,10 +2118,10 @@ class MCPServerState:
 
                 return stream_id
             else:
-                print(f"WebSocket 訂閱 {symbol} {data_type} 數據失敗", file=sys.stderr)
+                logger.error(f"WebSocket 訂閱 {symbol} {data_type} 數據失敗")
 
         except Exception as e:
-            print(f"訂閱市場數據異常: {str(e)}", file=sys.stderr)
+            logger.exception(f"訂閱市場數據異常: {str(e)}")
 
         return None
 
@@ -2162,7 +2164,7 @@ class MCPServerState:
             return True
 
         except Exception as e:
-            print(f"取消訂閱市場數據失敗: {str(e)}", file=sys.stderr)
+            logger.exception(f"取消訂閱市場數據失敗: {str(e)}")
             # 即使取消訂閱失敗，也清理本地狀態
             self._active_streams.pop(stream_id, None)
             self._market_subscriptions.pop(subscription_key, None)
@@ -2209,7 +2211,7 @@ class MCPServerState:
                     callback = listener_info["callback"]
                     callback(event_data)
                 except Exception as e:
-                    print(f"事件監聽器回調失敗: {str(e)}", file=sys.stderr)
+                    logger.exception(f"事件監聽器回調失敗: {str(e)}")
 
     def notify_event_listeners(self, event_type: str, event_data: dict):
         """通知事件監聽器"""
@@ -2219,7 +2221,7 @@ class MCPServerState:
                     callback = listener_info["callback"]
                     callback(event_data)
                 except Exception as e:
-                    print(f"事件監聽器回調失敗: {str(e)}", file=sys.stderr)
+                    logger.exception(f"事件監聽器回調失敗: {str(e)}")
 
     # Phase 2: WebSocket 串流管理
     def start_websocket_stream(
@@ -2253,7 +2255,7 @@ class MCPServerState:
             return stream_id
 
         except Exception as e:
-            print(f"啟動 WebSocket 串流失敗: {str(e)}", file=sys.stderr)
+            logger.exception(f"啟動 WebSocket 串流失敗: {str(e)}")
             return None
 
     def stop_websocket_stream(self, stream_id: str) -> bool:
@@ -2273,7 +2275,7 @@ class MCPServerState:
             return True
 
         except Exception as e:
-            print(f"停止 WebSocket 串流失敗: {str(e)}", file=sys.stderr)
+            logger.exception(f"停止 WebSocket 串流失敗: {str(e)}")
             return False
 
     def get_stream_status(self, stream_id: str) -> dict:
@@ -2311,7 +2313,7 @@ class MCPServerState:
             self.notify_event_listeners(f"symbol_{symbol}", event_data)
 
         except Exception as e:
-            print(f"推送即時更新失敗: {str(e)}", file=sys.stderr)
+            logger.exception(f"推送即時更新失敗: {str(e)}")
 
     def register_stream_callback(self, stream_id: str, callback):
         """註冊串流回調函數"""
@@ -2344,7 +2346,7 @@ class MCPServerState:
                     self.push_realtime_update(symbol, message, data_type)
 
         except Exception as e:
-            print(f"處理串流訊息失敗: {str(e)}", file=sys.stderr)
+            logger.exception(f"處理串流訊息失敗: {str(e)}")
 
     def logout(self):
         """登出並清理狀態"""
@@ -2352,11 +2354,11 @@ class MCPServerState:
             if self.sdk:
                 result = self.sdk.logout()
                 if result:
-                    print("已成功登出", file=sys.stderr)
+                    logger.info("已成功登出")
                 else:
-                    print("登出失敗", file=sys.stderr)
+                    logger.warning("登出失敗")
         except Exception as e:
-            print(f"登出時發生錯誤: {str(e)}", file=sys.stderr)
+            logger.exception(f"登出時發生錯誤: {str(e)}")
         finally:
             # 清理狀態
             self.sdk = None
@@ -2458,14 +2460,14 @@ def main():
         indicators_service = AnalysisService(mcp, config.sdk, config.accounts)
         streaming_service = StreamingService(mcp, server_state)
 
-        print("富邦證券MCP server運行中...", file=sys.stderr)
+        logger.info("富邦證券MCP server運行中...")
         mcp.run()
     except KeyboardInterrupt:
-        print("收到中斷信號，正在優雅關閉...", file=sys.stderr)
+        logger.info("收到中斷信號，正在優雅關閉...")
         server_state.logout()
         sys.exit(0)
     except Exception as e:
-        print(f"啟動伺服器時發生錯誤: {str(e)}", file=sys.stderr)
+        logger.exception(f"啟動伺服器時發生錯誤: {str(e)}")
         sys.exit(1)
 
 

@@ -20,7 +20,7 @@ from typing import Dict, List, Optional
 import datetime
 import pandas as pd
 import numpy as np
-import sys
+import logging
 
 from fubon_neo.sdk import FubonSDK
 from mcp.server.fastmcp import FastMCP
@@ -42,6 +42,7 @@ class AnalysisService:
         self.restfutopt = restfutopt
         self.db_path = config.DATABASE_PATH
         self._register_tools()
+        self.logger = logging.getLogger(__name__)
 
     def _register_tools(self):
         """註冊所有指標與分析相關的工具"""
@@ -976,7 +977,7 @@ class AnalysisService:
             }
 
         except Exception as e:
-            print(f"獲取投資組合數據時發生錯誤: {str(e)}", file=sys.stderr)
+            self.logger.exception(f"獲取投資組合數據時發生錯誤: {str(e)}")
             return None
 
     def _calculate_portfolio_volatility(self, positions, time_horizon=1):
@@ -1024,7 +1025,7 @@ class AnalysisService:
             return max(weighted_volatility, 0.05)  # 最小波動率 5%
 
         except Exception as e:
-            print(f"計算投資組合波動率時發生錯誤: {str(e)}", file=sys.stderr)
+            self.logger.exception(f"計算投資組合波動率時發生錯誤: {str(e)}")
             return 0.15  # 默認波動率
 
     def _read_local_stock_data(self, stock_code):
@@ -1062,7 +1063,7 @@ class AnalysisService:
                 return df
                 
         except Exception as e:
-            print(f"讀取SQLite數據時發生錯誤: {str(e)}", file=sys.stderr)
+            self.logger.exception(f"讀取SQLite數據時發生錯誤: {str(e)}")
             return None
 
     def _calculate_market_crash_sensitivity(self, symbol):
@@ -1096,7 +1097,7 @@ class AnalysisService:
                 return 1.0  # 默認敏感度
                 
         except Exception as e:
-            print(f"計算市場崩盤敏感度時發生錯誤: {str(e)}", file=sys.stderr)
+            self.logger.exception(f"計算市場崩盤敏感度時發生錯誤: {str(e)}")
             return 1.0
 
     def _calculate_rate_sensitivity(self, symbol):
@@ -1122,7 +1123,7 @@ class AnalysisService:
                 return 0.8  # 默認敏感度
                 
         except Exception as e:
-            print(f"計算利率敏感度時發生錯誤: {str(e)}", file=sys.stderr)
+            self.logger.exception(f"計算利率敏感度時發生錯誤: {str(e)}")
             return 0.8
 
 

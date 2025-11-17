@@ -106,7 +106,7 @@ class TestMarketDataServiceMock:
                  {'date': '2024-01-01', 'open': 100, 'high': 105, 'low': 95, 'close': 102, 'volume': 1000}
              ]), \
              patch.object(market_data_service, '_process_historical_data') as mock_process, \
-             patch.object(market_data_service, '_save_to_local_csv'):
+             patch.object(market_data_service, '_save_to_local_db'):
 
             mock_process.return_value = pd.DataFrame([{
                 'date': '2024-01-01', 'open': 100, 'high': 105, 'low': 95, 'close': 102, 'volume': 1000,
@@ -336,6 +336,31 @@ class TestMarketDataServiceMock:
         assert "成功查詢快照報價" in result["message"]
 
     @patch('fubon_api_mcp_server.market_data_service.validate_and_get_account')
+    def test_query_symbol_snapshot_with_object_return(self, mock_validate, market_data_service):
+        """測試 query_symbol_snapshot 在 SDK 回傳物件（非 dict）時仍能正規化"""
+        mock_account = Mock()
+        mock_validate.return_value = (mock_account, None)
+
+        from types import SimpleNamespace
+        item = SimpleNamespace(symbol="2330", price=650.0)
+        mock_result = Mock()
+        mock_result.is_success = True
+        mock_result.data = [item]
+        market_data_service.sdk.stock.query_symbol_snapshot.return_value = mock_result
+
+        result = market_data_service.query_symbol_snapshot({
+            "account": "1234567",
+            "market_type": "Common",
+            "stock_type": ["Stock"]
+        })
+
+        assert result["status"] == "success"
+        assert isinstance(result["data"], list)
+        assert isinstance(result["data"][0], dict)
+        assert result["data"][0]["symbol"] == "2330"
+        assert result["data"][0]["price"] == 650.0
+
+    @patch('fubon_api_mcp_server.market_data_service.validate_and_get_account')
     def test_query_symbol_quote_success(self, mock_validate, market_data_service):
         """測試查詢商品漲跌幅報表成功"""
         # 模擬帳戶驗證
@@ -354,8 +379,31 @@ class TestMarketDataServiceMock:
         })
 
         assert result["status"] == "success"
+        assert isinstance(result["data"], dict)
         assert result["data"]["symbol"] == "2330"
         assert "成功獲取股票 2330 報價資訊" in result["message"]
+
+    @patch('fubon_api_mcp_server.market_data_service.validate_and_get_account')
+    def test_query_symbol_quote_object_return(self, mock_validate, market_data_service):
+        """測試 query_symbol_quote 在 SDK 回傳物件（非 dict）時仍能正規化"""
+        mock_account = Mock()
+        mock_validate.return_value = (mock_account, None)
+
+        from types import SimpleNamespace
+        data_obj = SimpleNamespace(symbol="2330", last_price=600.0)
+        mock_result = Mock()
+        mock_result.is_success = True
+        mock_result.data = data_obj
+        market_data_service.sdk.stock.query_symbol_quote.return_value = mock_result
+
+        result = market_data_service.query_symbol_quote({
+            "account": "1234567",
+            "symbol": "2330"
+        })
+
+        assert result["status"] == "success"
+        assert result["data"]["symbol"] == "2330"
+        assert result["data"]["last_price"] == 600.0
 
     @patch('fubon_api_mcp_server.market_data_service.validate_and_get_account')
     def test_margin_quota_success(self, mock_validate, market_data_service):
@@ -378,6 +426,62 @@ class TestMarketDataServiceMock:
         assert result["status"] == "success"
         assert result["data"]["margin_tradable_quota"] == 100000
         assert "成功獲取帳戶 1234567 股票 2330 資券配額" in result["message"]
+
+    @patch('fubon_api_mcp_server.market_data_service.validate_and_get_account')
+    def test_margin_quota_with_object_return(self, mock_validate, market_data_service):
+        """測試資券配額在 SDK 回傳物件（非 dict）時仍能正規化"""
+        mock_account = Mock()
+        mock_validate.return_value = (mock_account, None)
+
+        # 物件風格回傳（沒有 dict() 方法）
+        from types import SimpleNamespace
+        data_obj = SimpleNamespace(margin_tradable_quota=50000)
+        mock_result = Mock()
+        mock_result.is_success = True
+        mock_result.data = data_obj
+        market_data_service.sdk.stock.margin_quota.return_value = mock_result
+
+        result = market_data_service.margin_quota({
+            "account": "1234567",
+            "stock_no": "2330"
+        })
+
+        assert result["status"] == "success"
+        assert isinstance(result["data"], dict)
+        assert result["data"]["margin_tradable_quota"] == 50000
+
+    @patch('fubon_api_mcp_server.market_data_service.validate_and_get_account')
+    def test_daytrade_and_stock_info_object_return(self, mock_validate, market_data_service):
+        """測試 daytrade_and_stock_info 在 SDK 回傳物件（非 dict）時仍能正規化"""
+        mock_account = Mock()
+        mock_validate.return_value = (mock_account, None)
+
+        from types import SimpleNamespace
+        data_obj = SimpleNamespace(stock_no="2330", daytrade_tradable_quota=3000)
+        mock_result = Mock()
+        mock_result.is_success = True
+        mock_result.data = data_obj
+        market_data_service.sdk.stock.daytrade_and_stock_info.return_value = mock_result
+
+        result = market_data_service.daytrade_and_stock_info({
+            "account": "1234567",
+            "stock_no": "2330"
+        })
+
+        assert result["status"] == "success"
+        assert isinstance(result["data"], dict)
+        assert result["data"]["stock_no"] == "2330"
+        assert result["data"]["daytrade_tradable_quota"] == 3000
+
+    def test_normalize_result_handles_mock_object(self, market_data_service):
+        """直接測試 _normalize_result 能夠處理 Mock 物件並回傳 dict"""
+        from types import SimpleNamespace
+        item = SimpleNamespace(symbol="2330", price=650.0)
+        normalized = market_data_service._normalize_result(item)
+        assert isinstance(normalized, dict)
+        assert normalized["symbol"] == "2330"
+        assert normalized["price"] == 650.0
+
 
     def test_get_intraday_futopt_service_not_initialized(self, market_data_service):
         """測試期貨/選擇權服務未初始化"""

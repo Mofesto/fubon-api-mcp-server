@@ -6,11 +6,13 @@ services, including account validation, error handling, and API calls.
 """
 
 import functools
-import sys
 import traceback
+import logging
 from typing import Any, Callable, Optional, Tuple, Union, List
 
 from . import config as config_module
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Error Handling Decorator
@@ -47,7 +49,7 @@ def handle_exceptions(func: Callable[..., Any]) -> Callable[..., Any]:
             relevant_tb = "\n".join(tb_lines[func_line_index:])  # Include traceback from the function name
 
             error_text = f"{func.__name__} exception: {exp}\nTraceback (most recent call last):\n{relevant_tb}"
-            print(error_text, file=sys.stderr)
+            logger.exception(error_text)
 
             # For Jupyter environments, don't exit
             # os._exit(-1)
@@ -85,7 +87,7 @@ def validate_and_get_account(account: str) -> Tuple[Optional[Any], Optional[str]
 
         # Check if SDK is already initialized
         if config_module.sdk is None:
-            print("Initializing SDK and logging in for account validation...", file=sys.stderr)
+            logger.debug("Initializing SDK and logging in for account validation...")
             # Get credentials from environment
             username = os.getenv("FUBON_USERNAME")
             password = os.getenv("FUBON_PASSWORD")
@@ -106,7 +108,7 @@ def validate_and_get_account(account: str) -> Tuple[Optional[Any], Optional[str]
             config_module.sdk = sdk
             config_module.accounts = accounts
         else:
-            print("Reusing existing SDK for account validation...", file=sys.stderr)
+            logger.debug("Reusing existing SDK for account validation...")
             accounts = config_module.accounts
 
         # Note: reststock is initialized only when needed for market data operations

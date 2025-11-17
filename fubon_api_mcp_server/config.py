@@ -4,6 +4,7 @@ Configuration module for fubon_api_mcp_server.
 
 import os
 import sys
+import logging
 from pathlib import Path
 from typing import Any, Optional
 
@@ -48,6 +49,28 @@ class Config:
 
 # Create global config instance
 config = Config()
+
+# ---------------------------
+# Global logging configuration
+# - Use environment variable LOG_LEVEL (default: INFO)
+# - Only configure basicConfig when no handlers are present to avoid
+#   reconfiguring logging during imports or tests that set handlers.
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+root_logger = logging.getLogger()
+if not root_logger.handlers:
+    numeric_level = getattr(logging, LOG_LEVEL, logging.INFO)
+    logging.basicConfig(
+        level=numeric_level,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    )
+    logging.getLogger(__name__).info(f"Logging configured, level={LOG_LEVEL}")
+else:
+    # If handlers exist, set level only
+    try:
+        root_logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+    except Exception:
+        pass
+
 
 # Global variables for SDK and accounts (set by utils.validate_and_get_account)
 sdk: Optional[Any] = None  # FubonSDK instance
