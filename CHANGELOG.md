@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- ✅ Normalize SDK responses across services: `_normalize_result` to standardize dict/object/string returns for tools.
+- 🧪 New SQLite-backed local cache for historical candles; `_save_to_local_db` and `_get_local_historical_data`.
+- 📈 `get_trading_signals` improvements and robust indicator scoring/computation.
+
+### Changed
+- 🔧 Replace print(stderr) debug statements with proper `logging` across server components (`server.py`, `utils.py`, `streaming_service.py`, `analysis_service.py`, `market_data_service.py`).
+- ♻️ Migration: historical data cache moved from CSV to SQLite and relevant API/data I/O updates.
+
+### Fixed
+- 🐛 Improved error handling and SDK result normalization for `query_symbol_snapshot`, `query_symbol_quote`, `margin_quota`, and `daytrade_and_stock_info`.
+- ✅ Tests updated/added to cover normalization and SQLite caching. All existing tests now pass.
+
 
 ## [2.1.1] - 2025-11-10
 
