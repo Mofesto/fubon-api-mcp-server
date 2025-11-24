@@ -32,6 +32,15 @@ jobs:
           ${{ runner.os }}-pip-${{ matrix.python-version }}-
           ${{ runner.os }}-pip-
 
+    - name: Install TA-Lib C library
+      run: |
+        wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
+        tar -xzf ta-lib-0.4.0-src.tar.gz
+        cd ta-lib/
+        ./configure --prefix=/usr
+        make
+        sudo make install
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -39,7 +48,7 @@ jobs:
         # Install fubon_neo from local wheel (Linux)
         pip install ./wheels/fubon_neo-2.2.5-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
         # Install other dependencies
-        pip install pandas fastmcp mcp pydantic python-dotenv
+        pip install pandas scipy fastmcp mcp pydantic python-dotenv TA-Lib
         pip install pytest pytest-cov pytest-xdist pytest-mock
         pip install flake8 black isort mypy pandas-stubs
         # Install the package itself in editable mode
