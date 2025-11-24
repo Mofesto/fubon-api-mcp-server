@@ -6,9 +6,9 @@ services, including account validation, error handling, and API calls.
 """
 
 import functools
-import traceback
 import logging
-from typing import Any, Callable, Optional, Tuple, Union, List
+import traceback
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 from . import config as config_module
 

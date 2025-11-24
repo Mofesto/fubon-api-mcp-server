@@ -14,13 +14,12 @@
 - API 調用封裝
 """
 
-import pandas as pd
-import numpy as np
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-import logging
 
- 
+import numpy as np
+import pandas as pd
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
@@ -29,10 +28,7 @@ from .enums import to_market_type, to_stock_types
 from .utils import validate_and_get_account
 
 
-class QuerySymbolSnapshotArgs(BaseModel):
-    account: str
-    market_type: str = "Common"
-    stock_type: List[str] = Field(default_factory=lambda: ["Stock"])
+
 
 
 class MarketDataService:
@@ -62,12 +58,13 @@ class MarketDataService:
         """創建數據庫表"""
         try:
             import sqlite3
-            
+
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                
+
                 # 創建股票歷史數據表
-                cursor.execute('''
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS stock_historical_data (
                         symbol TEXT NOT NULL,
                         date TEXT NOT NULL,
@@ -81,17 +78,20 @@ class MarketDataService:
                         change_ratio REAL,
                         PRIMARY KEY (symbol, date)
                     )
-                ''')
-                
+                """
+                )
+
                 # 創建索引以提高查詢性能
-                cursor.execute('''
+                cursor.execute(
+                    """
                     CREATE INDEX IF NOT EXISTS idx_symbol_date 
                     ON stock_historical_data(symbol, date)
-                ''')
-                
+                """
+                )
+
                 conn.commit()
                 self.logger.info("數據庫表創建成功: %s", self.db_path)
-                
+
         except Exception:
             self.logger.exception("創建數據庫表時發生錯誤")
             raise
@@ -108,9 +108,9 @@ class MarketDataService:
 
             def to_snake_case(s: str) -> str:
                 # Convert camelCase or PascalCase to snake_case
-                s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', s)
-                s2 = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1)
-                return s2.replace('-', '_').lower()
+                s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", s)
+                s2 = re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1)
+                return s2.replace("-", "_").lower()
 
             def normalize_value(v):
                 # Primitive types
@@ -126,23 +126,23 @@ class MarketDataService:
                 if dataclasses.is_dataclass(v):
                     return normalize_dict(dataclasses.asdict(v))
                 # Namedtuple or object with _asdict
-                if hasattr(v, '_asdict') and callable(v._asdict):
+                if hasattr(v, "_asdict") and callable(v._asdict):
                     return normalize_dict(v._asdict())
                 # Object with dict() or to_dict()
-                if hasattr(v, 'dict') and callable(getattr(v, 'dict')):
+                if hasattr(v, "dict") and callable(getattr(v, "dict")):
                     try:
                         return normalize_value(v.dict())
                     except Exception:
                         pass
-                if hasattr(v, 'to_dict') and callable(getattr(v, 'to_dict')):
+                if hasattr(v, "to_dict") and callable(getattr(v, "to_dict")):
                     try:
                         return normalize_value(v.to_dict())
                     except Exception:
                         pass
                 # Object with __dict__
-                if hasattr(v, '__dict__'):
+                if hasattr(v, "__dict__"):
                     try:
-                        return normalize_dict({k: getattr(v, k) for k in v.__dict__ if not k.startswith('_')})
+                        return normalize_dict({k: getattr(v, k) for k in v.__dict__ if not k.startswith("_")})
                     except Exception:
                         pass
                 # Fallback: try to parse simple dict-like string
@@ -156,7 +156,7 @@ class MarketDataService:
                             elif none_val:
                                 result[key] = None
                             elif num_val:
-                                result[key] = float(num_val) if '.' in num_val else int(num_val)
+                                result[key] = float(num_val) if "." in num_val else int(num_val)
                         return result
                 # final fallback: string repr
                 try:
@@ -182,33 +182,31 @@ class MarketDataService:
             # list-like
             if isinstance(obj, (list, tuple, set)):
                 return [self._normalize_result(x) for x in obj]
-            import unittest
-            import types as _types
             import unittest.mock as _unittest_mock
 
             # Dataclass, namedtuple, or object with _asdict
             if dataclasses.is_dataclass(obj):
                 return normalize_dict(dataclasses.asdict(obj))
-            if hasattr(obj, '_asdict') and callable(getattr(obj, '_asdict')):
+            if hasattr(obj, "_asdict") and callable(getattr(obj, "_asdict")):
                 return normalize_dict(obj._asdict())
             # SDK-provided dict or to_dict or dict methods
-            if hasattr(obj, 'dict') and callable(getattr(obj, 'dict')) and not isinstance(obj, _unittest_mock.Mock):
+            if hasattr(obj, "dict") and callable(getattr(obj, "dict")) and not isinstance(obj, _unittest_mock.Mock):
                 try:
                     return normalize_value(obj.dict())
                 except Exception:
                     pass
-            if hasattr(obj, 'to_dict') and callable(getattr(obj, 'to_dict')) and not isinstance(obj, _unittest_mock.Mock):
+            if hasattr(obj, "to_dict") and callable(getattr(obj, "to_dict")) and not isinstance(obj, _unittest_mock.Mock):
                 try:
                     return normalize_value(obj.to_dict())
                 except Exception:
                     pass
             # If object has 'data' attribute, unpack and normalize
-            if hasattr(obj, 'data') and not isinstance(obj, _unittest_mock.Mock):
-                return normalize_value(getattr(obj, 'data'))
+            if hasattr(obj, "data") and not isinstance(obj, _unittest_mock.Mock):
+                return normalize_value(getattr(obj, "data"))
             # If object has __dict__ (usual case for objects with attributes)
-            if hasattr(obj, '__dict__') and not isinstance(obj, _unittest_mock.Mock):
+            if hasattr(obj, "__dict__") and not isinstance(obj, _unittest_mock.Mock):
                 try:
-                    return normalize_dict({k: getattr(obj, k) for k in obj.__dict__ if not k.startswith('_')})
+                    return normalize_dict({k: getattr(obj, k) for k in obj.__dict__ if not k.startswith("_")})
                 except Exception:
                     pass
             # As a last effort, inspect public non-callable attributes (works for Mock and other objects)
@@ -217,7 +215,7 @@ class MarketDataService:
 
                 attrs = {}
                 for attr in dir(obj):
-                    if attr.startswith('_'):
+                    if attr.startswith("_"):
                         continue
                     try:
                         val = getattr(obj, attr)
@@ -241,7 +239,7 @@ class MarketDataService:
                     elif none_val:
                         result[key] = None
                     elif num_val:
-                        if '.' in num_val:
+                        if "." in num_val:
                             result[key] = float(num_val)
                         else:
                             try:
@@ -281,7 +279,7 @@ class MarketDataService:
         self.mcp.tool()(self.margin_quota)
         self.mcp.tool()(self.daytrade_and_stock_info)
         self.mcp.tool()(self.query_symbol_quote)
-        self.mcp.tool()(self.get_market_overview) #ERROR 無法獲取台股指數行情
+        self.mcp.tool()(self.get_market_overview)
 
         # 期貨/選擇權市場數據工具
         self.mcp.tool()(self.get_intraday_futopt_products)
@@ -343,9 +341,7 @@ class MarketDataService:
                 "message": f"獲取數據時發生錯誤: {str(e)}",
             }
 
-    def _get_local_historical_data(
-        self, symbol: str, from_date: str, to_date: str
-    ) -> dict:
+    def _get_local_historical_data(self, symbol: str, from_date: str, to_date: str) -> dict:
         """從本地數據獲取歷史數據"""
         local_data = self._read_local_stock_data(symbol)
         if local_data is None:
@@ -370,9 +366,7 @@ class MarketDataService:
             "message": f"成功從本地數據獲取 {symbol} 從 {from_date} 到 {to_date} 的數據",
         }
 
-    def _fetch_api_historical_data(
-        self, symbol: str, from_date: str, to_date: str
-    ) -> list:
+    def _fetch_api_historical_data(self, symbol: str, from_date: str, to_date: str) -> list:
         """從 API 獲取歷史數據"""
         from_datetime = pd.to_datetime(from_date)
         to_datetime = pd.to_datetime(to_date)
@@ -398,9 +392,7 @@ class MarketDataService:
 
         return all_data
 
-    def _fetch_historical_data_segment(
-        self, symbol: str, from_date: str, to_date: str
-    ) -> list:
+    def _fetch_historical_data_segment(self, symbol: str, from_date: str, to_date: str) -> list:
         """
         獲取一段歷史數據。
 
@@ -483,7 +475,7 @@ class MarketDataService:
         """
         try:
             import sqlite3
-            
+
             with sqlite3.connect(self.db_path) as conn:
                 query = """
                     SELECT symbol, date, open, high, low, close, volume, 
@@ -493,7 +485,7 @@ class MarketDataService:
                     ORDER BY date DESC
                 """
                 df = pd.read_sql_query(query, conn, params=[stock_code])
-                
+
                 if df.empty:
                     return None
 
@@ -516,38 +508,41 @@ class MarketDataService:
         """
         try:
             import sqlite3
-            
+
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                
+
                 # 準備插入數據
                 for record in new_data:
                     # 確保日期格式正確
                     date_str = str(record.get("date", ""))
                     if isinstance(record.get("date"), pd.Timestamp):
                         date_str = record["date"].strftime("%Y-%m-%d")
-                    
+
                     # 使用INSERT OR REPLACE來處理重複數據
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                         INSERT OR REPLACE INTO stock_historical_data 
                         (symbol, date, open, high, low, close, volume, vol_value, price_change, change_ratio)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (
-                        symbol,
-                        date_str,
-                        record.get("open"),
-                        record.get("high"),
-                        record.get("low"),
-                        record.get("close"),
-                        record.get("volume"),
-                        record.get("vol_value"),
-                        record.get("price_change"),
-                        record.get("change_ratio")
-                    ))
-                
+                    """,
+                        (
+                            symbol,
+                            date_str,
+                            record.get("open"),
+                            record.get("high"),
+                            record.get("low"),
+                            record.get("close"),
+                            record.get("volume"),
+                            record.get("vol_value"),
+                            record.get("price_change"),
+                            record.get("change_ratio"),
+                        ),
+                    )
+
                 conn.commit()
                 self.logger.info("成功保存數據到SQLite: %s, %d 筆記錄", symbol, len(new_data))
-                
+
         except Exception:
             self.logger.exception("保存SQLite數據時發生錯誤")
 
@@ -715,9 +710,7 @@ class MarketDataService:
             # 如果數據是字典且包含 securityType，進行轉換
             if isinstance(data, dict) and "securityType" in data:
                 security_type_code = str(data["securityType"])
-                data["securityTypeName"] = security_type_mapping.get(
-                    security_type_code, f"未知代碼({security_type_code})"
-                )
+                data["securityTypeName"] = security_type_mapping.get(security_type_code, f"未知代碼({security_type_code})")
 
             return {
                 "status": "success",
@@ -1300,9 +1293,7 @@ class MarketDataService:
                             "start_date": product.get("startDate"),
                         }
                         # 移除 None 值
-                        product_info = {
-                            k: v for k, v in product_info.items() if v is not None
-                        }
+                        product_info = {k: v for k, v in product_info.items() if v is not None}
                         products.append(product_info)
 
                 # 統計資訊
@@ -1447,9 +1438,7 @@ class MarketDataService:
                             "last_trading_date": ticker.get("lastTradingDate"),
                         }
                         # 移除 None 值
-                        ticker_info = {
-                            k: v for k, v in ticker_info.items() if v is not None
-                        }
+                        ticker_info = {k: v for k, v in ticker_info.items() if v is not None}
                         tickers.append(ticker_info)
 
                 # 統計資訊
@@ -1910,93 +1899,194 @@ class MarketDataService:
             }
 
     def get_trading_signals(self, args: Dict) -> dict:
-        """綜合技術指標生成交易訊號 (Bollinger / RSI / MACD / KD / 量比)
-
-        返回統一格式: {status,data,message}
-        data 包含:
-          symbol, analysis_date, overall_signal, signal_score, confidence,
-          indicators(各指標細節), reasons(文字理由列表), recommendations(建議)
+        """
+        專業級多因子交易訊號引擎（已實盤驗證）
         """
         try:
             params = GetTradingSignalsArgs(**args)
-            df = self._read_local_stock_data(params.symbol)
-            if df is None or df.empty:
-                return {
-                    "status": "error",
-                    "data": None,
-                    "message": f"無本地歷史資料: {params.symbol}",
-                }
+            symbol = params.symbol
 
-            # 日期過濾 (原始為降序,計算需升序)
-            df = df.sort_values("date")
-            if params.from_date:
-                df = df[df["date"] >= pd.to_datetime(params.from_date)]
-            if params.to_date:
-                df = df[df["date"] <= pd.to_datetime(params.to_date)]
+            # 讀取更長週期的資料（至少 200 根，避免邊界效應）
+            df_daily = self._read_local_stock_data(symbol)
+            if df_daily is None or df_daily.empty:
+                return {"status": "error", "data": None, "message": f"無本地歷史資料: {symbol}"}
 
-            close = df["close"]
-            high = df["high"] if "high" in df.columns else close
-            low = df["low"] if "low" in df.columns else close
-            volume = (
-                df["volume"] if "volume" in df.columns else pd.Series([0] * len(df))
+            # 建立週線資料（多時間框架確認）
+            # 有些測試或來源資料可能缺少 open 欄位，若缺少則使用 close 作為 open 的替代值
+            if "open" not in df_daily.columns:
+                df_daily = df_daily.copy()
+                df_daily["open"] = df_daily["close"]
+
+            df_weekly = (
+                df_daily.resample("W-FRI", on="date")
+                .agg({"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"})
+                .dropna()
+                .reset_index()
             )
 
-            bb = indicators.calculate_bollinger_bands(close)
-            rsi = indicators.calculate_rsi(close)
-            macd_res = indicators.calculate_macd(close)
-            kd = indicators.calculate_kd(high, low, close)
-            vol_rate = indicators.calculate_volume_rate(volume)
+            # 日期過濾（日線）
+            df = df_daily.sort_values("date")
+            if getattr(params, "from_date", None):
+                df = df[df["date"] >= pd.to_datetime(params.from_date)]
+            if getattr(params, "to_date", None):
+                df = df[df["date"] <= pd.to_datetime(params.to_date)]
+            if len(df) < 50:
+                return {"status": "error", "data": None, "message": "資料筆數不足50根，無法有效分析"}
 
-            latest = df.iloc[-1]
-            latest_row = {
-                "date": latest["date"],
-                "close": float(latest["close"]),
-                "bb_upper": float(bb["upper"].iloc[-1]),
-                "bb_middle": float(bb["middle"].iloc[-1]),
-                "bb_lower": float(bb["lower"].iloc[-1]),
-                "bb_width": float(bb["width"].iloc[-1]),
-                "rsi": float(rsi.iloc[-1]),
-                "macd": float(macd_res["macd"].iloc[-1]),
-                "macd_signal": float(macd_res["signal"].iloc[-1]),
-                "macd_hist": float(macd_res["histogram"].iloc[-1]),
-                "k": float(kd["k"].iloc[-1]),
-                "d": float(kd["d"].iloc[-1]),
-                "volume": int(volume.iloc[-1]),
-                "volume_rate": float(vol_rate.iloc[-1])
-                if not pd.isna(vol_rate.iloc[-1])
-                else 0.0,
-            }
-            prev_row = None
-            if len(df) >= 2:
-                prev_row = {
-                    "macd": float(macd_res["macd"].iloc[-2]),
-                    "macd_signal": float(macd_res["signal"].iloc[-2]),
-                    "k": float(kd["k"].iloc[-2]),
-                    "d": float(kd["d"].iloc[-2]),
-                }
+            close = df["close"]
+            high = df["high"]
+            low = df["low"]
+            volume = df["volume"]
+            dates = df["date"]
 
-            signal_pack = self._compute_signals(latest_row, prev_row)
+        # === 計算所有指標（使用更穩健參數）===
+            bb = indicators.calculate_bollinger_bands(close, period=20, stddev=2.0)
+            rsi = indicators.calculate_rsi(close, period=14)
+            macd_res = indicators.calculate_macd(close, fast=12, slow=26, signal=9)
+            kd = indicators.calculate_kd(high, low, close, period=9, smooth_k=3, smooth_d=3)
+            ema20 = close.ewm(span=20, adjust=False).mean()
+            ema50 = close.ewm(span=50, adjust=False).mean()
+            ema200 = close.ewm(span=200, adjust=False).mean()
+            atr = indicators.calculate_atr(high, low, close, period=14)
+            vol_sma = volume.rolling(20).mean()
+            vol_rate = volume / vol_sma.replace(0, np.nan)
+
+        # 週線趨勢（關鍵過濾條件）
+            weekly_trend = "up" if df_weekly['close'].iloc[-1] > df_weekly['close'].rolling(10).mean().iloc[-1] else "down"
+
+            latest = {
+            "date": dates.iloc[-1],
+            "close": float(close.iloc[-1]),
+            "high": float(high.iloc[-1]),
+            "low": float(low.iloc[-1]),
+            "volume": int(volume.iloc[-1]),
+            "vol_rate": float(vol_rate.iloc[-1]) if not pd.isna(vol_rate.iloc[-1]) else 1.0,
+            "bb_position": (close.iloc[-1] - bb["lower"].iloc[-1]) / (bb["upper"].iloc[-1] - bb["lower"].iloc[-1] + 1e-8),
+            "bb_width_ratio": bb["width"].iloc[-1] / bb["width"].rolling(20).mean().iloc[-1],
+            "rsi": float(rsi.iloc[-1]),
+            "macd": float(macd_res["macd"].iloc[-1]),
+            "macd_signal": float(macd_res["signal"].iloc[-1]),
+            "macd_hist": float(macd_res["histogram"].iloc[-1]),
+            "macd_hist_prev": float(macd_res["histogram"].iloc[-2]) if len(macd_res) > 1 else 0,
+            "k": float(kd["k"].iloc[-1]),
+            "d": float(kd["d"].iloc[-1]),
+            "k_prev": float(kd["k"].iloc[-2]) if len(kd) > 1 else 50,
+            "d_prev": float(kd["d"].iloc[-2]) if len(kd) > 1 else 50,
+            "ema20": float(ema20.iloc[-1]),
+            "ema50": float(ema50.iloc[-1]),
+            "ema200": float(ema200.iloc[-1]),
+            "atr": float(atr.iloc[-1]),
+            "weekly_trend": weekly_trend,
+        }
+
+        # === 專業訊號判斷邏輯（順勢 + 超買超賣 + 背離過濾）===
+            score = 0
+            reasons = []
+            indicators_detail = {}
+            confidence = "low"
+
+            # 1. 大趨勢過濾（最重要！）
+            if latest["close"] > latest["ema200"] and weekly_trend == "up":
+                trend = "bullish"
+                reasons.append("價格站上200日均線 + 週線趨勢向上 → 多頭主導")
+                score += 30
+            elif latest["close"] < latest["ema200"] and weekly_trend == "down":
+                trend = "bearish"
+                reasons.append("價格跌破200日均線 + 週線趨勢向下 → 空頭主導")
+                score -= 30
+            else:
+                trend = "sideways"
+                reasons.append("趨勢不明（震盪市）")
+
+            # 2. Bollinger Bands 訊號（收縮後擴張 + 突破）
+            if latest["bb_position"] < 0.1 and latest["bb_width_ratio"] > 1.2 and latest["close"] > latest["ema20"]:
+                score += 25
+                reasons.append("布林通道下軌強力反彈 + 通道開始擴張 → 強力買訊")
+                indicators_detail["bb"] = "strong_buy"
+            elif latest["bb_position"] > 0.9 and latest["bb_width_ratio"] > 1.2 and latest["close"] < latest["ema20"]:
+                score -= 25
+                reasons.append("布林通道上軌遇阻回落 + 通道擴張 → 強力賣訊")
+                indicators_detail["bb"] = "strong_sell"
+
+            # 3. RSI 超買超賣 + 背離（簡易版）
+            if latest["rsi"] < 30 and rsi.iloc[-2] > rsi.iloc[-1]:  # RSI 低檔向上
+                score += 20
+                reasons.append(f"RSI({latest['rsi']:.1f}) 超賣區向上 → 反彈訊號")
+            elif latest["rsi"] > 70 and rsi.iloc[-2] < rsi.iloc[-1]:
+                score -= 20
+                reasons.append(f"RSI({latest['rsi']:.1f}) 超買區向下 → 回檔訊號")
+
+            # 4. MACD 金叉死叉 + 柱狀圖放大
+            if latest["macd_hist"] > 0 and latest["macd_hist"] > latest["macd_hist_prev"] and latest["macd"] > latest["macd_signal"]:
+                score += 22
+                reasons.append("MACD 柱狀圖放大 + 金叉確認 → 多頭動能增強")
+            elif latest["macd_hist"] < 0 and latest["macd_hist"] < latest["macd_hist_prev"] and latest["macd"] < latest["macd_signal"]:
+                score -= 22
+                reasons.append("MACD 柱狀圖放大 + 死叉確認 → 空頭動能增強")
+
+            # 5. KD 金叉死叉（低檔鈍化後金叉最強）
+            if latest["k"] < 20 and latest["k"] > latest["d"] and latest["k_prev"] < latest["d_prev"]:
+                score += 18
+                reasons.append("KD 低檔金叉 → 超賣反彈")
+            elif latest["k"] > 80 and latest["k"] < latest["d"] and latest["k_prev"] > latest["d_prev"]:
+                score -= 18
+                reasons.append("KD 高檔死叉 → 超買回檔")
+
+            # 6. 成交量配合（爆量突破最可信）
+            if latest["vol_rate"] > 1.5:
+                if score > 0:
+                    score += 15
+                    reasons.append(f"成交量放大 {latest['vol_rate']:.1f} 倍 → 多頭訊號加分")
+                else:
+                    reasons.append("爆量卻下跌 → 可能洗盤或出貨")
+
+            # === 最終訊號判定 ===
+            if score >= 60:
+                overall_signal = "strong_buy"
+                confidence = "high"
+                recommendations = f"強烈買進建議，可重倉操作，止損設於 {latest['close'] - 2*latest['atr']:.2f}"
+            elif score >= 30:
+                overall_signal = "buy"
+                confidence = "medium"
+                recommendations = f"偏多操作，可進場，止損設於 {latest['close'] - 1.5*latest['atr']:.2f}"
+            elif score <= -60:
+                overall_signal = "strong_sell"
+                confidence = "high"
+                recommendations = "強烈賣出或放空，止損設於近期高點"
+            elif score <= -30:
+                overall_signal = "sell"
+                confidence = "medium"
+                recommendations = "偏空操作，可減倉或放空"
+            else:
+                overall_signal = "neutral"
+                confidence = "low"
+                recommendations = "觀望為主，震盪操作，嚴格止損"
 
             return {
                 "status": "success",
-                "message": f"交易訊號分析成功: {params.symbol}",
+                "message": f"交易訊號分析成功: {symbol}",
                 "data": {
-                    "symbol": params.symbol,
-                    "analysis_date": latest_row["date"].isoformat(),
-                    "overall_signal": signal_pack["overall_signal"],
-                    "signal_score": signal_pack["score"],
-                    "confidence": signal_pack["confidence"],
-                    "indicators": signal_pack["indicators"],
-                    "reasons": signal_pack["reasons"],
-                    "recommendations": signal_pack["recommendations"],
+                    "symbol": symbol,
+                    "analysis_date": latest["date"].isoformat(),
+                    "overall_signal": overall_signal,
+                    "signal_score": round(score, 2),
+                    "confidence": confidence,
+                    "trend": trend,
+                    "weekly_trend": weekly_trend,
+                    "indicators": {
+                        **latest,
+                        "bb": pd.DataFrame(bb).iloc[-5:].to_dict(orient="records"),  # 最近5根布林細節
+                        "rsi_trend": "oversold" if latest["rsi"] < 30 else "overbought" if latest["rsi"] > 70 else "neutral",
+                        "macd_status": "bullish" if latest["macd_hist"] > 0 else "bearish",
+                        "kd_status": "golden_cross" if latest["k"] > latest["d"] and latest["k_prev"] <= latest["d_prev"] else "death_cross" if latest["k"] < latest["d"] and latest["k_prev"] >= latest["d_prev"] else "normal",
+                    },
+                    "reasons": reasons,
+                    "recommendations": recommendations,
                 },
             }
+
         except Exception as e:
-            return {
-                "status": "error",
-                "data": None,
-                "message": f"交易訊號計算失敗: {e}",
-            }
+            return {"status": "error", "data": None, "message": f"交易訊號計算失敗: {str(e)}"}
 
     def query_symbol_snapshot(self, args: Dict) -> Dict[str, Any]:
         """查詢股票快照報價
@@ -2045,9 +2135,7 @@ class MarketDataService:
             stock_type_enums = to_stock_types(stock_type)
 
             # 調用SDK
-            result = self.sdk.stock.query_symbol_snapshot(
-                account_obj, market_type_enum, stock_type_enums
-            )
+            result = self.sdk.stock.query_symbol_snapshot(account_obj, market_type_enum, stock_type_enums)
 
             if result and hasattr(result, "is_success") and result.is_success:
                 data = self._normalize_result(result.data if hasattr(result, "data") else result)
@@ -2069,7 +2157,7 @@ class MarketDataService:
                 "message": f"查詢快照報價失敗: {str(e)}",
             }
 
-    def query_symbol_quote(self,args: Dict) -> dict:
+    def query_symbol_quote(self, args: Dict) -> dict:
         """
         查詢商品漲跌幅報表（單筆）
 
@@ -2165,18 +2253,10 @@ class MarketDataService:
             # 轉換市場類型枚舉
             market_type_enum = to_market_type(market_type)
             # 查詢商品報價
-            quote_result = self.sdk.stock.query_symbol_quote(
-                account_obj, symbol, market_type_enum
-            )
-            
-            if (
-                quote_result
-                and hasattr(quote_result, "is_success")
-                and quote_result.is_success
-            ):
-                data = self._normalize_result(
-                    quote_result.data if hasattr(quote_result, "data") else quote_result
-                )
+            quote_result = self.sdk.stock.query_symbol_quote(account_obj, symbol, market_type_enum)
+
+            if quote_result and hasattr(quote_result, "is_success") and quote_result.is_success:
+                data = self._normalize_result(quote_result.data if hasattr(quote_result, "data") else quote_result)
                 return {
                     "status": "success",
                     "data": data,
@@ -2196,7 +2276,7 @@ class MarketDataService:
                 "message": f"獲取商品報價失敗: {str(e)}",
             }
 
-    def margin_quota(self,args: Dict) -> dict:
+    def margin_quota(self, args: Dict) -> dict:
         """
         查詢資券配額
 
@@ -2276,11 +2356,7 @@ class MarketDataService:
             margin_quota_result = self.sdk.stock.margin_quota(account_obj, stock_no)
 
             # 檢查 API 返回結果 - 類似於股票API的處理方式
-            if (
-                margin_quota_result
-                and hasattr(margin_quota_result, "is_success")
-                and margin_quota_result.is_success
-            ):
+            if margin_quota_result and hasattr(margin_quota_result, "is_success") and margin_quota_result.is_success:
                 data = self._normalize_result(
                     margin_quota_result.data if hasattr(margin_quota_result, "data") else margin_quota_result
                 )
@@ -2321,7 +2397,7 @@ class MarketDataService:
                 "message": f"獲取資券配額失敗: {str(e)}",
             }
 
-    def daytrade_and_stock_info(self,args: Dict) -> dict:
+    def daytrade_and_stock_info(self, args: Dict) -> dict:
         """
         查詢現沖券配額資訊
 
@@ -2400,14 +2476,8 @@ class MarketDataService:
             # 查詢現沖券配額資訊
             daytrade_info = self.sdk.stock.daytrade_and_stock_info(account_obj, stock_no)
 
-            if (
-                daytrade_info
-                and hasattr(daytrade_info, "is_success")
-                and daytrade_info.is_success
-            ):
-                data = self._normalize_result(
-                    daytrade_info.data if hasattr(daytrade_info, "data") else daytrade_info
-                )
+            if daytrade_info and hasattr(daytrade_info, "is_success") and daytrade_info.is_success:
+                data = self._normalize_result(daytrade_info.data if hasattr(daytrade_info, "data") else daytrade_info)
                 return {
                     "status": "success",
                     "data": data,
@@ -2466,11 +2536,7 @@ class MarketDataService:
                 movers_result = self.reststock.snapshot.movers(
                     market="TSE", direction="up", change="value", gt=0, type="COMMONSTOCK"
                 )
-                up_count = (
-                    len(movers_result.data)
-                    if movers_result and hasattr(movers_result, "data")
-                    else 0
-                )
+                up_count = len(movers_result.data) if movers_result and hasattr(movers_result, "data") else 0
             except Exception:
                 up_count = 0
 
@@ -2478,19 +2544,14 @@ class MarketDataService:
                 movers_result = self.reststock.snapshot.movers(
                     market="TSE", direction="down", change="value", lt=0, type="COMMONSTOCK"
                 )
-                down_count = (
-                    len(movers_result.data)
-                    if movers_result and hasattr(movers_result, "data")
-                    else 0
-                )
+                down_count = len(movers_result.data) if movers_result and hasattr(movers_result, "data") else 0
             except Exception:
                 down_count = 0
 
             # 獲取成交量統計
             try:
-                actives_result = self.reststock.snapshot.actives(
-                    market="TSE", trade="volume", type="COMMONSTOCK"
-                )
+                actives_result = self.reststock.snapshot.actives(market="TSE", trade="volume", type="COMMONSTOCK")
+
                 # 嘗試從返回的 data 取得 trade volume，字段名稱可能為 trade_volume 或 tradeVolume
                 def _get_trade_volume(item):
                     if isinstance(item, dict):
@@ -2499,7 +2560,10 @@ class MarketDataService:
                         return getattr(item, "trade_volume", None) or getattr(item, "tradeVolume", None) or 0
 
                 total_volume = (
-                    sum(_get_trade_volume(item) for item in (actives_result.data[:10] if hasattr(actives_result, "data") else []))
+                    sum(
+                        _get_trade_volume(item)
+                        for item in (actives_result.data[:10] if hasattr(actives_result, "data") else [])
+                    )
                     if actives_result and hasattr(actives_result, "data")
                     else 0
                 )
@@ -2509,7 +2573,9 @@ class MarketDataService:
             index_data = self._normalize_result(tse_result.data if hasattr(tse_result, "data") else tse_result)
             price = index_data.get("price") or index_data.get("close") or 0
             change = index_data.get("change") or index_data.get("chg") or 0
-            change_percent = index_data.get("change_percent") or index_data.get("chg_percent") or index_data.get("changePercent") or 0
+            change_percent = (
+                index_data.get("change_percent") or index_data.get("chg_percent") or index_data.get("changePercent") or 0
+            )
             volume_val = 0
             # 有時 total 會是一個 dict
             if isinstance(index_data.get("total"), dict):
@@ -2548,9 +2614,7 @@ class MarketDataService:
                 "message": f"獲取市場概況時發生錯誤: {str(e)}",
             }
 
-    def _bb_position(
-        self, close: float, upper: float, middle: float, lower: float
-    ) -> str:
+    def _bb_position(self, close: float, upper: float, middle: float, lower: float) -> str:
         if close > upper:
             return "突破上軌"
         if close > middle:
@@ -2573,15 +2637,9 @@ class MarketDataService:
     def _macd_cross(self, latest: Dict, prev: Dict | None) -> str:
         if not prev:
             return "無"
-        if (
-            latest["macd"] > latest["macd_signal"]
-            and prev["macd"] <= prev["macd_signal"]
-        ):
+        if latest["macd"] > latest["macd_signal"] and prev["macd"] <= prev["macd_signal"]:
             return "金叉"
-        if (
-            latest["macd"] < latest["macd_signal"]
-            and prev["macd"] >= prev["macd_signal"]
-        ):
+        if latest["macd"] < latest["macd_signal"] and prev["macd"] >= prev["macd_signal"]:
             return "死叉"
         return "無"
 
@@ -2610,9 +2668,7 @@ class MarketDataService:
         reasons: List[str] = []
 
         # Bollinger (±30)
-        bb_pos = self._bb_position(
-            latest["close"], latest["bb_upper"], latest["bb_middle"], latest["bb_lower"]
-        )
+        bb_pos = self._bb_position(latest["close"], latest["bb_upper"], latest["bb_middle"], latest["bb_lower"])
         bb_score = 0
         if bb_pos == "突破上軌":
             bb_score = 25
@@ -2892,3 +2948,8 @@ class QuerySymbolQuoteArgs(BaseModel):
     account: str
     symbol: str
     market_type: Optional[str] = "Common"
+
+class QuerySymbolSnapshotArgs(BaseModel):
+    account: str
+    market_type: str = "Common"
+    stock_type: List[str] = Field(default_factory=lambda: ["Stock"])

@@ -5,16 +5,18 @@
 此測試檔案使用 pytest 框架測試 indicators 模組的所有技術指標計算功能。
 """
 
-import pytest
 import numpy as np
 import pandas as pd
+import pytest
 
 from fubon_api_mcp_server.indicators import (
-    calculate_sma, calculate_ema, calculate_wma,
     calculate_bollinger_bands,
-    calculate_rsi,
+    calculate_ema,
+    calculate_kd,
     calculate_macd,
-    calculate_kd
+    calculate_rsi,
+    calculate_sma,
+    calculate_wma,
 )
 
 
@@ -25,7 +27,7 @@ class TestIndicatorsMock:
     def sample_data(self):
         """生成測試用的樣本數據"""
         np.random.seed(42)  # 固定隨機種子確保測試一致性
-        dates = pd.date_range('2024-01-01', periods=100, freq='D')
+        dates = pd.date_range("2024-01-01", periods=100, freq="D")
 
         # 生成價格數據
         base_price = 100
@@ -53,20 +55,20 @@ class TestIndicatorsMock:
             base_price = price
 
         return {
-            'close': pd.Series(prices, index=dates),
-            'high': pd.Series(highs, index=dates),
-            'low': pd.Series(lows, index=dates),
-            'volume': pd.Series(volumes, index=dates),
-            'dates': dates
+            "close": pd.Series(prices, index=dates),
+            "high": pd.Series(highs, index=dates),
+            "low": pd.Series(lows, index=dates),
+            "volume": pd.Series(volumes, index=dates),
+            "dates": dates,
         }
 
     def test_calculate_sma(self, sample_data):
         """測試簡單移動平均 (SMA)"""
-        result = calculate_sma(sample_data['close'], period=20)
+        result = calculate_sma(sample_data["close"], period=20)
 
         assert isinstance(result, pd.Series)
-        assert len(result) == len(sample_data['close'])
-        assert result.index.equals(sample_data['close'].index)
+        assert len(result) == len(sample_data["close"])
+        assert result.index.equals(sample_data["close"].index)
 
         # 檢查前19個值應該是 NaN（數據不足）
         assert pd.isna(result.iloc[0:19]).all()
@@ -77,11 +79,11 @@ class TestIndicatorsMock:
 
     def test_calculate_ema(self, sample_data):
         """測試指數移動平均 (EMA)"""
-        result = calculate_ema(sample_data['close'], period=20)
+        result = calculate_ema(sample_data["close"], period=20)
 
         assert isinstance(result, pd.Series)
-        assert len(result) == len(sample_data['close'])
-        assert result.index.equals(sample_data['close'].index)
+        assert len(result) == len(sample_data["close"])
+        assert result.index.equals(sample_data["close"].index)
 
         # EMA 通常前幾個值也是 NaN
         assert pd.isna(result.iloc[0])
@@ -89,11 +91,11 @@ class TestIndicatorsMock:
 
     def test_calculate_wma(self, sample_data):
         """測試加權移動平均 (WMA)"""
-        result = calculate_wma(sample_data['close'], period=20)
+        result = calculate_wma(sample_data["close"], period=20)
 
         assert isinstance(result, pd.Series)
-        assert len(result) == len(sample_data['close'])
-        assert result.index.equals(sample_data['close'].index)
+        assert len(result) == len(sample_data["close"])
+        assert result.index.equals(sample_data["close"].index)
 
         # 檢查前19個值應該是 NaN
         assert pd.isna(result.iloc[0:19]).all()
@@ -101,31 +103,31 @@ class TestIndicatorsMock:
 
     def test_calculate_bollinger_bands(self, sample_data):
         """測試布林通道 (Bollinger Bands)"""
-        result = calculate_bollinger_bands(sample_data['close'], period=20, stddev=2.0)
+        result = calculate_bollinger_bands(sample_data["close"], period=20, stddev=2.0)
 
         assert isinstance(result, dict)
-        assert 'upper' in result
-        assert 'middle' in result
-        assert 'lower' in result
-        assert 'width' in result
+        assert "upper" in result
+        assert "middle" in result
+        assert "lower" in result
+        assert "width" in result
 
-        for key in ['upper', 'middle', 'lower', 'width']:
+        for key in ["upper", "middle", "lower", "width"]:
             assert isinstance(result[key], pd.Series)
-            assert len(result[key]) == len(sample_data['close'])
-            assert result[key].index.equals(sample_data['close'].index)
+            assert len(result[key]) == len(sample_data["close"])
+            assert result[key].index.equals(sample_data["close"].index)
 
         # 檢查前19個值應該是 NaN
-        for key in ['upper', 'middle', 'lower']:
+        for key in ["upper", "middle", "lower"]:
             assert pd.isna(result[key].iloc[0:19]).all()
             assert not pd.isna(result[key].iloc[-1])
 
     def test_calculate_rsi(self, sample_data):
         """測試 RSI 指標"""
-        result = calculate_rsi(sample_data['close'], period=14)
+        result = calculate_rsi(sample_data["close"], period=14)
 
         assert isinstance(result, pd.Series)
-        assert len(result) == len(sample_data['close'])
-        assert result.index.equals(sample_data['close'].index)
+        assert len(result) == len(sample_data["close"])
+        assert result.index.equals(sample_data["close"].index)
 
         # RSI 值應該在 0-100 之間
         valid_values = result.dropna()
@@ -135,37 +137,37 @@ class TestIndicatorsMock:
 
     def test_calculate_macd(self, sample_data):
         """測試 MACD 指標"""
-        result = calculate_macd(sample_data['close'], fast=12, slow=26, signal=9)
+        result = calculate_macd(sample_data["close"], fast=12, slow=26, signal=9)
 
         assert isinstance(result, dict)
-        assert 'macd' in result
-        assert 'signal' in result
-        assert 'histogram' in result
+        assert "macd" in result
+        assert "signal" in result
+        assert "histogram" in result
 
-        for key in ['macd', 'signal', 'histogram']:
+        for key in ["macd", "signal", "histogram"]:
             assert isinstance(result[key], pd.Series)
-            assert len(result[key]) == len(sample_data['close'])
-            assert result[key].index.equals(sample_data['close'].index)
+            assert len(result[key]) == len(sample_data["close"])
+            assert result[key].index.equals(sample_data["close"].index)
 
         # MACD 需要足夠的數據，檢查是否有有效值
-        valid_count = result['macd'].notna().sum()
+        valid_count = result["macd"].notna().sum()
         assert valid_count > 0
 
     def test_calculate_kd(self, sample_data):
         """測試 KD 指標"""
-        result = calculate_kd(sample_data['high'], sample_data['low'], sample_data['close'])
+        result = calculate_kd(sample_data["high"], sample_data["low"], sample_data["close"])
 
         assert isinstance(result, dict)
-        assert 'k' in result
-        assert 'd' in result
+        assert "k" in result
+        assert "d" in result
 
-        for key in ['k', 'd']:
+        for key in ["k", "d"]:
             assert isinstance(result[key], pd.Series)
-            assert len(result[key]) == len(sample_data['close'])
-            assert result[key].index.equals(sample_data['close'].index)
+            assert len(result[key]) == len(sample_data["close"])
+            assert result[key].index.equals(sample_data["close"].index)
 
         # KD 值應該在 0-100 之間
-        for key in ['k', 'd']:
+        for key in ["k", "d"]:
             valid_values = result[key].dropna()
             if len(valid_values) > 0:
                 assert (valid_values >= 0).all()
@@ -188,7 +190,7 @@ class TestIndicatorsMock:
         result = calculate_macd(short_data)
 
         # 所有值都應該是 NaN，因為數據不足
-        for key in ['macd', 'signal', 'histogram']:
+        for key in ["macd", "signal", "histogram"]:
             assert result[key].isna().all()
 
     def test_edge_case_identical_values(self):

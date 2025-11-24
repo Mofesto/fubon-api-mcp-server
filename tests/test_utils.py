@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import pytest
 from unittest.mock import Mock
+
+import pytest
 
 from fubon_api_mcp_server.utils import normalize_item
 

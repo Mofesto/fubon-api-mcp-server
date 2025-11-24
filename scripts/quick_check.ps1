@@ -99,33 +99,35 @@ $results = @()
 # Black formatting (auto-fix)
 $results += Invoke-QuickCheck `
     -Name "Code formatting (black)" `
-    -Command "black" `
-    -Arguments @("--check", "--quiet", "fubon_api_mcp_server", "tests", "--exclude", "_version.py") `
-    -FixCommand "black" `
-    -FixArguments @("--quiet", "fubon_api_mcp_server", "tests", "--exclude", "_version.py")
+    -Command "python" `
+    -Arguments @("-m", "black", "--check", "--quiet", "fubon_api_mcp_server", "tests", "--exclude", "_version.py") `
+    -FixCommand "python" `
+    -FixArguments @("-m", "black", "--quiet", "fubon_api_mcp_server", "tests", "--exclude", "_version.py")
 
 # Import sorting (auto-fix)
 $results += Invoke-QuickCheck `
     -Name "Import sorting (isort)" `
-    -Command "isort" `
-    -Arguments @("--check-only", "fubon_api_mcp_server", "tests", "--skip", "_version.py") `
-    -FixCommand "isort" `
-    -FixArguments @("fubon_api_mcp_server", "tests", "--skip", "_version.py")
+    -Command "python" `
+    -Arguments @("-m", "isort", "--check-only", "--quiet", "fubon_api_mcp_server", "tests", "--skip", "fubon_api_mcp_server/_version.py") `
+    -FixCommand "python" `
+    -FixArguments @("-m", "isort", "fubon_api_mcp_server", "tests", "--skip", "fubon_api_mcp_server/_version.py")
 
-# Flake8 critical errors (no auto-fix)
+# Flake8 critical errors (no auto-fix) - use ruff to attempt fixes
 $results += Invoke-QuickCheck `
     -Name "Critical code errors (flake8)" `
-    -Command "flake8" `
-    -Arguments @("fubon_api_mcp_server", "tests", "--select=E9,F63,F7,F82", "--quiet")
+    -Command "python" `
+    -Arguments @("-m", "flake8", "fubon_api_mcp_server", "tests", "--select=E9,F63,F7,F82", "--quiet") `
+    -FixCommand "python" `
+    -FixArguments @("-m", "ruff", "check", "--fix", "fubon_api_mcp_server", "tests")
 
 # Quick test run (most important tests only)
 Write-Host "Running quick tests... " -NoNewline
 
 try {
-    $testOutput = & pytest -q --tb=no `
-        tests/test_config.py `
-        tests/test_models.py `
-        tests/test_package.py 2>&1
+    $testOutput = & python -m pytest -q --tb=no `
+        tests/test_utils.py `
+        tests/test_reports_service.py `
+        tests/test_account_service.py 2>&1
     
     $testSuccess = $LASTEXITCODE -eq 0
     

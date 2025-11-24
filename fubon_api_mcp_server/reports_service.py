@@ -35,6 +35,7 @@ except ImportError:
             self.latest_order_changed_reports = []
             self.latest_filled_reports = []
             self.latest_event_reports = []
+
     server_state = MockServerState()
 
 

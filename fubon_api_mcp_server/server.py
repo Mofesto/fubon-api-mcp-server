@@ -40,20 +40,24 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from fubon_api_mcp_server.utils import validate_and_get_account, normalize_item
+from fubon_api_mcp_server.utils import normalize_item, validate_and_get_account
 
 # Set encoding for stdout and stderr to handle Chinese characters properly
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-import pandas as pd
 import logging
+
+import pandas as pd
 from dotenv import load_dotenv
 from fubon_neo.sdk import Condition, ConditionDayTrade, ConditionOrder, FubonSDK
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
-from . import indicators
+# 配置模組導入
+from . import config, indicators
+from .account_service import AccountService
+from .analysis_service import AnalysisService
 
 # 本地模組導入
 from .enums import (
@@ -78,14 +82,9 @@ from .enums import (
 
 # 服務類導入
 from .market_data_service import MarketDataService
-from .trading_service import TradingService
-from .account_service import AccountService
 from .reports_service import ReportsService
-from .analysis_service import AnalysisService
 from .streaming_service import StreamingService
-
-# 配置模組導入
-from . import config
+from .trading_service import TradingService
 
 # 加載環境變數配置
 load_dotenv()
@@ -95,9 +94,7 @@ load_dotenv()
 # =============================================================================
 
 # 數據目錄配置 - 用於儲存本地快取的股票歷史數據
-DEFAULT_DATA_DIR = (
-    Path.home() / "Library" / "Application Support" / "fubon-mcp" / "data"
-)
+DEFAULT_DATA_DIR = Path.home() / "Library" / "Application Support" / "fubon-mcp" / "data"
 BASE_DATA_DIR = Path(os.getenv("FUBON_DATA_DIR", DEFAULT_DATA_DIR))
 
 # 確保數據目錄存在
@@ -127,8 +124,6 @@ def process_historical_data(df: pd.DataFrame) -> pd.DataFrame:
     df["price_change"] = df["close"] - df["open"]  # 漲跌
     df["change_ratio"] = (df["close"] - df["open"]) / df["open"] * 100  # 漲跌幅
     return df
-
-
 
 
 # 環境變數中的認證資訊
@@ -183,14 +178,10 @@ def handle_exceptions(func):
             tb_lines = traceback.format_exc().splitlines()
 
             # Find the index of the line related to the original function
-            func_line_index = next(
-                (i for i, line in enumerate(tb_lines) if func.__name__ in line), -1
-            )
+            func_line_index = next((i for i, line in enumerate(tb_lines) if func.__name__ in line), -1)
 
             # Highlight the specific part in the traceback where the exception occurred
-            relevant_tb = "\n".join(
-                tb_lines[func_line_index:]
-            )  # Include traceback from the function name
+            relevant_tb = "\n".join(tb_lines[func_line_index:])  # Include traceback from the function name
 
             error_text = f"{func.__name__} exception: {exp}\nTraceback (most recent call last):\n{relevant_tb}"
             logger.exception(error_text)
@@ -356,9 +347,7 @@ def save_to_local_csv(symbol: str, new_data: list):
         new_df["date"] = pd.to_datetime(new_df["date"])
 
         # 創建臨時檔案進行原子寫入
-        with tempfile.NamedTemporaryFile(
-            mode="w", delete=False, suffix=".csv"
-        ) as temp_file:
+        with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv") as temp_file:
             temp_path = Path(temp_file.name)
 
             try:
@@ -369,9 +358,7 @@ def save_to_local_csv(symbol: str, new_data: list):
 
                     # 合併數據並刪除重複項（以日期為鍵）
                     combined_df = pd.concat([existing_df, new_df])
-                    combined_df = combined_df.drop_duplicates(
-                        subset=["date"], keep="last"
-                    )
+                    combined_df = combined_df.drop_duplicates(subset=["date"], keep="last")
                     combined_df = combined_df.sort_values(by="date", ascending=False)
                 else:
                     combined_df = new_df.sort_values(by="date", ascending=False)
@@ -480,9 +467,7 @@ def get_portfolio_summary(account):
         # 處理投資組合數據
         portfolio_data = {
             "account": account,
-            "total_positions": len(inventory_result["data"])
-            if inventory_result["data"]
-            else 0,
+            "total_positions": len(inventory_result["data"]) if inventory_result["data"] else 0,
             "positions": [],
             "summary": {
                 "total_market_value": 0,
@@ -517,9 +502,7 @@ def get_portfolio_summary(account):
             nd = normalize_item(pnl_item, ["stock_no", "unrealized_profit", "unrealized_loss"])
             symbol = nd["stock_no"]
             if symbol in inventory_dict:
-                inventory_dict[symbol]["unrealized_pnl"] = (
-                    nd["unrealized_profit"] + nd["unrealized_loss"]
-                )
+                inventory_dict[symbol]["unrealized_pnl"] = nd["unrealized_profit"] + nd["unrealized_loss"]
 
         # 計算總計
         for symbol, data in inventory_dict.items():
@@ -531,22 +514,16 @@ def get_portfolio_summary(account):
                 "market_value": data["market_value"],
                 "unrealized_pnl": data.get("unrealized_pnl", 0),
                 "pnl_percent": (
-                    data.get("unrealized_pnl", 0)
-                    / (data["cost_price"] * data["quantity"])
-                )
-                * 100
-                if data["cost_price"] * data["quantity"] > 0
-                else 0,
+                    (data.get("unrealized_pnl", 0) / (data["cost_price"] * data["quantity"])) * 100
+                    if data["cost_price"] * data["quantity"] > 0
+                    else 0
+                ),
             }
             portfolio_data["positions"].append(position)
 
             portfolio_data["summary"]["total_market_value"] += data["market_value"]
-            portfolio_data["summary"]["total_cost"] += (
-                data["cost_price"] * data["quantity"]
-            )
-            portfolio_data["summary"]["total_unrealized_pnl"] += data.get(
-                "unrealized_pnl", 0
-            )
+            portfolio_data["summary"]["total_cost"] += data["cost_price"] * data["quantity"]
+            portfolio_data["summary"]["total_unrealized_pnl"] += data.get("unrealized_pnl", 0)
 
         result = {
             "status": "success",
@@ -663,9 +640,7 @@ def get_account_summary(account):
         try:
             bank_result = account_service.get_bank_balance({"account": account})
             if bank_result.get("status") == "success":
-                summary_data["financial_info"]["bank_balance"] = bank_result.get(
-                    "data"
-                )
+                summary_data["financial_info"]["bank_balance"] = bank_result.get("data")
         except:
             summary_data["financial_info"]["bank_balance"] = None
 
@@ -683,11 +658,7 @@ def get_account_summary(account):
         # 獲取交易資訊
         try:
             order_result = trading_service.get_order_results({"account": account})
-            if (
-                order_result
-                and order_result.get("status") == "success"
-                and order_result.get("data")
-            ):
+            if order_result and order_result.get("status") == "success" and order_result.get("data"):
                 active_orders = 0
                 for order in order_result["data"]:
                     if getattr(order, "status", "") not in ["Filled", "Cancelled"]:
@@ -783,12 +754,8 @@ class QuerySymbolSnapshotArgs(BaseModel):
 
 class GetIntradayTickersArgs(BaseModel):
     market: str  # 市場別，可選 TSE 上市；OTC 上櫃；ESB 興櫃一般板；TIB 臺灣創新板；PSB 興櫃戰略新板
-    type: Optional[str] = (
-        None  # 類型，可選 EQUITY 股票；INDEX 指數；WARRANT 權證；ODDLOT 盤中零股
-    )
-    exchange: Optional[str] = (
-        None  # 交易所，可選 TWSE 臺灣證券交易所；TPEx 證券櫃檯買賣中心
-    )
+    type: Optional[str] = None  # 類型，可選 EQUITY 股票；INDEX 指數；WARRANT 權證；ODDLOT 盤中零股
+    exchange: Optional[str] = None  # 交易所，可選 TWSE 臺灣證券交易所；TPEx 證券櫃檯買賣中心
     industry: Optional[str] = None  # 產業別
     isNormal: Optional[bool] = None  # 查詢正常股票
     isAttention: Optional[bool] = None  # 查詢注意股票
@@ -851,32 +818,22 @@ class GetHistoricalStatsArgs(BaseModel):
 class GetIntradayProductsArgs(BaseModel):
     type: Optional[str] = None  # 類型，可選 FUTURE 期貨；OPTION 選擇權
     exchange: Optional[str] = None  # 交易所，可選 TAIFEX 臺灣期貨交易所
-    session: Optional[str] = (
-        None  # 交易時段，可選 REGULAR 一般交易 或 AFTERHOURS 盤後交易
-    )
-    contractType: Optional[str] = (
-        None  # 契約類別，可選 I 指數類；R 利率類；B 債券類；C 商品類；S 股票類；E 匯率類
-    )
+    session: Optional[str] = None  # 交易時段，可選 REGULAR 一般交易 或 AFTERHOURS 盤後交易
+    contractType: Optional[str] = None  # 契約類別，可選 I 指數類；R 利率類；B 債券類；C 商品類；S 股票類；E 匯率類
     status: Optional[str] = None  # 契約狀態，可選 N 正常；P 暫停交易；U 即將上市
 
 
 class GetIntradayFutOptTickersArgs(BaseModel):
     type: str  # 類型，可選 FUTURE 期貨；OPTION 選擇權
     exchange: Optional[str] = None  # 交易所，可選 TAIFEX 臺灣期貨交易所
-    session: Optional[str] = (
-        None  # 交易時段，可選 REGULAR 一般交易 或 AFTERHOURS 盤後交易
-    )
+    session: Optional[str] = None  # 交易時段，可選 REGULAR 一般交易 或 AFTERHOURS 盤後交易
     product: Optional[str] = None  # 產品代碼
-    contractType: Optional[str] = (
-        None  # 契約類別，可選 I 指數類；R 利率類；B 債券類；C 商品類；S 股票類；E 匯率類
-    )
+    contractType: Optional[str] = None  # 契約類別，可選 I 指數類；R 利率類；B 債券類；C 商品類；S 股票類；E 匯率類
 
 
 class GetIntradayFutOptTickerArgs(BaseModel):
     symbol: str  # 商品代碼
-    session: Optional[str] = (
-        None  # 交易時段，可選 REGULAR 一般交易 或 AFTERHOURS 盤後交易
-    )
+    session: Optional[str] = None  # 交易時段，可選 REGULAR 一般交易 或 AFTERHOURS 盤後交易
 
 
 class GetIntradayFutOptQuoteArgs(BaseModel):
@@ -990,9 +947,7 @@ class TimeSliceSplitArgs(BaseModel):
 
         # 驗證股數必須為1000的倍數
         if self.single_quantity % 1000 != 0:
-            raise ValueError(
-                f"single_quantity 必須為1000的倍數（張數），輸入值 {self.single_quantity} 股無效"
-            )
+            raise ValueError(f"single_quantity 必須為1000的倍數（張數），輸入值 {self.single_quantity} 股無效")
 
         # 如果提供了 split_count，自動計算 total_quantity
         if self.split_count is not None and self.split_count > 0:
@@ -1003,17 +958,12 @@ class TimeSliceSplitArgs(BaseModel):
                     f"total_quantity ({self.total_quantity}) 與 split_count * single_quantity ({self.split_count * self.single_quantity}) 不一致"
                 )
 
-        if (
-            self.total_quantity is not None
-            and self.total_quantity <= self.single_quantity
-        ):
+        if self.total_quantity is not None and self.total_quantity <= self.single_quantity:
             raise ValueError("total_quantity 必須大於 single_quantity")
 
         # 驗證總股數也必須為1000的倍數
         if self.total_quantity is not None and self.total_quantity % 1000 != 0:
-            raise ValueError(
-                f"total_quantity 必須為1000的倍數（張數），輸入值 {self.total_quantity} 股無效"
-            )
+            raise ValueError(f"total_quantity 必須為1000的倍數（張數），輸入值 {self.total_quantity} 股無效")
 
         # 針對 method 類型的檢核
         try:
@@ -1028,9 +978,7 @@ class TimeSliceSplitArgs(BaseModel):
 
             m = getattr(_TS, self.method)
         except Exception:
-            raise ValueError(
-                "method 無效，必須是 TimeSliceOrderType 的成員名稱 (Type1/Type2/Type3) 或 'TimeSlice' (自動推斷)"
-            )
+            raise ValueError("method 無效，必須是 TimeSliceOrderType 的成員名稱 (Type1/Type2/Type3) 或 'TimeSlice' (自動推斷)")
 
 
 # =============================================================================
@@ -1084,14 +1032,6 @@ class GetTradingSignalsArgs(BaseModel):
 
 # =============================================================================
 # 技術指標/交易訊號工具函式
-
-
-
-
-
-
-
-
 
 
 # =============================================================================
@@ -1289,9 +1229,7 @@ def portfolio_rebalancing(account: str) -> str:
 
 
 @mcp.prompt()
-def trading_strategy_builder(
-    symbol: str, strategy_type: str = "trend_following"
-) -> str:
+def trading_strategy_builder(symbol: str, strategy_type: str = "trend_following") -> str:
     """建立客製化交易策略
 
     這個提示會根據指定的股票和策略類型，建立適合的交易策略框架。
@@ -1713,13 +1651,13 @@ def options_strategy_optimizer(symbol: str, market_view: str = "neutral") -> str
 
     view_desc = view_descriptions.get(market_view, "市場觀點")
 
-    return f"""請為{symbol}提供基於{view_desc}的選擇權策略優化建議：
+    return f"""請提供{symbol}的選擇權策略優化建議，基於{view_desc}：
 
 1. **市場環境分析**
    - 使用 get_trading_signals 工具分析{symbol}技術指標
    - 評估當前波動率環境
    - 分析選擇權隱含波動率
-   - 評估市場對{symbol}的預期
+   - 評估市場對未來波動的預期
 
 2. **策略適配性分析**
    - 根據{view_desc}推薦適合策略
@@ -1923,9 +1861,7 @@ class MCPServerState:
 
             MCPServerState._initialized = True
 
-    def initialize_sdk(
-        self, username: str, password: str, pfx_path: str, pfx_password: str = ""
-    ):
+    def initialize_sdk(self, username: str, password: str, pfx_path: str, pfx_password: str = ""):
         """初始化SDK"""
         try:
             logger.info("正在初始化富邦證券SDK...")
@@ -1935,11 +1871,7 @@ class MCPServerState:
             self.reststock = self.sdk.marketdata.rest_client.stock
             self.restfutopt = self.sdk.marketdata.rest_client.futopt
 
-            if (
-                not self.accounts
-                or not hasattr(self.accounts, "is_success")
-                or not self.accounts.is_success
-            ):
+            if not self.accounts or not hasattr(self.accounts, "is_success") or not self.accounts.is_success:
                 raise ValueError("登入失敗，請檢查憑證是否正確")
 
             # 設定主動回報事件回調函數
@@ -1966,11 +1898,7 @@ class MCPServerState:
 
     def validate_account(self, account: str) -> tuple:
         """驗證帳戶並返回帳戶對象"""
-        if (
-            not self.accounts
-            or not hasattr(self.accounts, "is_success")
-            or not self.accounts.is_success
-        ):
+        if not self.accounts or not hasattr(self.accounts, "is_success") or not self.accounts.is_success:
             return None, "帳戶認證失敗，請檢查憑證是否過期"
 
         account_obj = self.get_account_object(account)
@@ -1983,9 +1911,7 @@ class MCPServerState:
         """獲取快取的資源數據"""
         if resource_key in self._resource_cache:
             cache_entry = self._resource_cache[resource_key]
-            if datetime.now() - cache_entry["timestamp"] < timedelta(
-                seconds=self._cache_ttl
-            ):
+            if datetime.now() - cache_entry["timestamp"] < timedelta(seconds=self._cache_ttl):
                 return cache_entry["data"]
             else:
                 # 快取過期，刪除
@@ -2019,9 +1945,7 @@ class MCPServerState:
             self._resource_cache.clear()
 
     # Phase 2: 訂閱管理方法
-    def subscribe_market_data(
-        self, symbol: str, data_type: str = "quote", callback=None
-    ) -> str:
+    def subscribe_market_data(self, symbol: str, data_type: str = "quote", callback=None) -> str:
         """訂閱市場數據"""
         if not self.sdk:
             logger.warning("SDK 未初始化")
@@ -2224,9 +2148,7 @@ class MCPServerState:
                     logger.exception(f"事件監聽器回調失敗: {str(e)}")
 
     # Phase 2: WebSocket 串流管理
-    def start_websocket_stream(
-        self, symbol: str, data_type: str = "quote", interval: int = 1
-    ) -> str:
+    def start_websocket_stream(self, symbol: str, data_type: str = "quote", interval: int = 1) -> str:
         """啟動 WebSocket 串流"""
         if not self.sdk:
             return None
@@ -2419,14 +2341,10 @@ def main():
     try:
         # 檢查必要的環境變數
         if not all([username, password, pfx_path]):
-            raise ValueError(
-                "FUBON_USERNAME, FUBON_PASSWORD, and FUBON_PFX_PATH environment variables are required"
-            )
+            raise ValueError("FUBON_USERNAME, FUBON_PASSWORD, and FUBON_PFX_PATH environment variables are required")
 
         # 使用新的狀態管理系統初始化SDK
-        success = server_state.initialize_sdk(
-            username, password, pfx_path, pfx_password or ""
-        )
+        success = server_state.initialize_sdk(username, password, pfx_path, pfx_password or "")
         if not success:
             raise ValueError("登入失敗，請檢查憑證是否正確")
 
@@ -2437,16 +2355,8 @@ def main():
         config.restfutopt = server_state.restfutopt
 
         # 初始化服務實例
-        global \
-            market_data_service, \
-            trading_service, \
-            account_service, \
-            reports_service, \
-            indicators_service, \
-            streaming_service
-        market_data_service = MarketDataService(
-            mcp, BASE_DATA_DIR, config.reststock, config.restfutopt, config.sdk
-        )
+        global market_data_service, trading_service, account_service, reports_service, indicators_service, streaming_service
+        market_data_service = MarketDataService(mcp, BASE_DATA_DIR, config.reststock, config.restfutopt, config.sdk)
         trading_service = TradingService(
             mcp,
             config.sdk,
@@ -2457,7 +2367,9 @@ def main():
         )
         account_service = AccountService(mcp, config.sdk, config.accounts)
         reports_service = ReportsService(mcp, config.sdk, config.accounts)
-        indicators_service = AnalysisService(mcp, config.sdk, config.accounts)
+        indicators_service = AnalysisService(
+            mcp, config.sdk, config.accounts, config.reststock, config.restfutopt
+        )
         streaming_service = StreamingService(mcp, server_state)
 
         logger.info("富邦證券MCP server運行中...")

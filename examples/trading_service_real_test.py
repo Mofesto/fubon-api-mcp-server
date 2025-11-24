@@ -251,8 +251,116 @@ def main():
         # )
         # test_results.append(("place_order", result))
 
-        # 其他：cancel_order / modify_price / modify_quantity / 各式條件單
-        # 建議按照您的需求逐一開啟上方範例並調整參數後測試
+        # --- 進階條件單範例 (Cookbook) ---
+        # 以下範例展示如何使用進階條件單功能，請根據需求取消註解並修改參數
+
+        # 1. 多條件單 (Multi-Condition Order)
+        # 情境：當台積電(2330)成交價大於 1000 且 總量大於 50000 張時，以 1005 元買進 1000 股
+        # result = run_test(
+        #     "多條件單測試",
+        #     trading_service.place_multi_condition_order,
+        #     {
+        #         "account": test_account,
+        #         "start_date": datetime.now().strftime("%Y%m%d"),
+        #         "end_date": datetime.now().strftime("%Y%m%d"),
+        #         "stop_sign": "Full",
+        #         "conditions": [
+        #             {
+        #                 "market_type": "Reference",
+        #                 "symbol": "2330",
+        #                 "trigger": "MatchedPrice",
+        #                 "trigger_value": "1000",
+        #                 "comparison": "Greater"
+        #             },
+        #             {
+        #                 "market_type": "Reference",
+        #                 "symbol": "2330",
+        #                 "trigger": "TotalQuantity",
+        #                 "trigger_value": "50000",
+        #                 "comparison": "Greater"
+        #             }
+        #         ],
+        #         "order": {
+        #             "buy_sell": "Buy",
+        #             "symbol": "2330",
+        #             "price": "1005",
+        #             "quantity": 1000
+        #         }
+        #     }
+        # )
+        # test_results.append(("place_multi_condition_order", result))
+
+        # 2. 分時分量單 (Time-Slice Order)
+        # 情境：將 5000 股 (5張) 台積電，每 30 秒下 1000 股 (1張)，共分 5 次
+        # result = run_test(
+        #     "分時分量單測試",
+        #     trading_service.place_time_slice_order,
+        #     {
+        #         "account": test_account,
+        #         "start_date": datetime.now().strftime("%Y%m%d"),
+        #         "end_date": datetime.now().strftime("%Y%m%d"),
+        #         "stop_sign": "Full",
+        #         "split": {
+        #             "method": "Type1",
+        #             "interval": 30,
+        #             "single_quantity": 1000,
+        #             "total_quantity": 5000,
+        #             "start_time": "090000"
+        #         },
+        #         "order": {
+        #             "buy_sell": "Buy",
+        #             "symbol": "2330",
+        #             "price": "1000",
+        #             "quantity": 5000
+        #         }
+        #     }
+        # )
+        # test_results.append(("place_time_slice_order", result))
+
+        # 3. 停損停利條件單 (TPSL Order)
+        # 情境：當台積電成交價大於 1000 時買進，並設定停利 1050，停損 950
+        # result = run_test(
+        #     "停損停利條件單測試",
+        #     trading_service.place_tpsl_condition_order,
+        #     {
+        #         "account": test_account,
+        #         "start_date": datetime.now().strftime("%Y%m%d"),
+        #         "end_date": datetime.now().strftime("%Y%m%d"),
+        #         "stop_sign": "Full",
+        #         "condition": {
+        #             "market_type": "Reference",
+        #             "symbol": "2330",
+        #             "trigger": "MatchedPrice",
+        #             "trigger_value": "1000",
+        #             "comparison": "Greater"
+        #         },
+        #         "order": {
+        #             "buy_sell": "Buy",
+        #             "symbol": "2330",
+        #             "price": "1005",
+        #             "quantity": 1000
+        #         },
+        #         "tpsl": {
+        #             "stop_sign": "Full",
+        #             "tp": {
+        #                 "time_in_force": "ROD",
+        #                 "price_type": "Limit",
+        #                 "order_type": "Stock",
+        #                 "target_price": "1050",
+        #                 "price": "1050"
+        #             },
+        #             "sl": {
+        #                 "time_in_force": "ROD",
+        #                 "price_type": "Limit",
+        #                 "order_type": "Stock",
+        #                 "target_price": "950",
+        #                 "price": "950"
+        #             }
+        #         }
+        #     }
+        # )
+        # test_results.append(("place_tpsl_condition_order", result))
+
     else:
         print_section("實單操作測試（已停用）")
         print("未設定 ENABLE_LIVE_TRADING_TESTS=1，略過所有送單/改單/取消/條件單測試。")

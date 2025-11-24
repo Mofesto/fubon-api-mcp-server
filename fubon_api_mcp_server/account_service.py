@@ -49,11 +49,7 @@ class AccountService:
             return {k: self._to_dict(v) for k, v in obj.items()}
         try:
             # Try vars() first
-            return {
-                k: self._to_dict(v)
-                for k, v in vars(obj).items()
-                if not k.startswith("_")
-            }
+            return {k: self._to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")}
         except Exception:
             # Fallback: try to extract common attributes using getattr
             common_attrs = [
@@ -302,9 +298,7 @@ class AccountService:
                 return {"status": "error", "data": None, "message": error}
 
             # 調用 SDK 獲取結算資訊
-            result = self.sdk.accounting.query_settlement(
-                account_obj, validated_args.range
-            )
+            result = self.sdk.accounting.query_settlement(account_obj, validated_args.range)
 
             if result and hasattr(result, "is_success") and result.is_success:
                 return {
@@ -324,7 +318,6 @@ class AccountService:
                 "data": None,
                 "message": f"獲取結算資訊時發生錯誤: {str(e)}",
             }
-
 
     def get_realized_pnl(self, args: Dict) -> dict:
         """
@@ -378,9 +371,7 @@ class AccountService:
                 return {"status": "error", "data": None, "message": error}
 
             # 調用 SDK 獲取已實現損益摘要
-            result = self.sdk.accounting.realized_gains_and_loses_summary(
-                account=account_obj
-            )
+            result = self.sdk.accounting.realized_gains_and_loses_summary(account=account_obj)
 
             if result and hasattr(result, "is_success") and result.is_success:
                 return {
@@ -458,9 +449,6 @@ class GetMaintenanceArgs(BaseModel):
 class GetSettlementInfoArgs(BaseModel):
     account: str
     range: Optional[str] = "0d"
-
-
-
 
 
 class GetRealizedPnlArgs(BaseModel):

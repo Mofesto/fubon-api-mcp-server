@@ -16,19 +16,19 @@
 - 市場情緒分析
 """
 
-from typing import Dict, List, Optional
 import datetime
-import pandas as pd
-import numpy as np
 import logging
+from typing import Dict, List, Optional
 
+import numpy as np
+import pandas as pd
 from fubon_neo.sdk import FubonSDK
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
-from .utils import validate_and_get_account
 from . import indicators
 from .config import config
+from .utils import validate_and_get_account
 
 
 class AnalysisService:
@@ -52,6 +52,250 @@ class AnalysisService:
         self.mcp.tool()(self.calculate_performance_attribution)
         self.mcp.tool()(self.detect_arbitrage_opportunities)
         self.mcp.tool()(self.generate_market_sentiment_index)
+        self.mcp.tool()(self.analyze_stock)
+
+    def analyze_stock(self, args: Dict) -> dict:
+        """
+        對指定股票進行全方位技術分析並生成交易計畫
+
+        整合多種技術指標 (MA, BB, RSI, MACD, KD, ATR) 進行綜合評估，
+        判斷市場趨勢 (多/空/盤整)，識別支撐壓力位，並生成具體的交易計畫 (進場/停損/停利)。
+
+        Args:
+            symbol (str): 股票代碼
+            account (str, optional): 帳戶號碼 (用於獲取庫存資訊作為參考)
+
+        Returns:
+            dict: 分析報告，包含趨勢判斷、指標訊號、支撐壓力、交易計畫
+        """
+        try:
+            validated_args = AnalyzeStockArgs(**args)
+            symbol = validated_args.symbol
+            account = validated_args.account
+
+            # 1. 獲取歷史數據
+            df = self._read_local_stock_data(symbol)
+
+            # 如果本地沒有數據或數據太舊，嘗試從 API 獲取
+            if df is None or df.empty or (datetime.datetime.now() - df["date"].max()).days > 3:
+                if self.reststock:
+                    # 獲取最近 365 天數據
+                    end_date = datetime.datetime.now()
+                    start_date = end_date - datetime.timedelta(days=365)
+
+                    try:
+                        params = {
+                            "symbol": symbol,
+                            "from": start_date.strftime("%Y-%m-%d"),
+                            "to": end_date.strftime("%Y-%m-%d"),
+                        }
+                        response = self.reststock.historical.candles(**params)
+                        
+                        # 處理 SDK 回應
+                        api_data = None
+                        if hasattr(response, "is_success") and response.is_success:
+                            api_data = response.data if hasattr(response, "data") else getattr(response, "result", None)
+                        elif isinstance(response, dict) and "data" in response:
+                            api_data = response["data"]
+                            
+                        if api_data:
+                            df = pd.DataFrame(api_data)
+                            df["date"] = pd.to_datetime(df["date"])
+                            df = df.sort_values(by="date", ascending=False)
+                            # 簡單處理，不保存到 DB (避免重複邏輯)，直接使用
+                            df["vol_value"] = df["close"] * df["volume"]
+                            df["price_change"] = df["close"] - df["open"]
+                            df["change_ratio"] = (df["price_change"] / df["open"]) * 100
+                    except Exception as e:
+                        self.logger.warning(f"嘗試從 API 獲取數據失敗: {e}")
+
+            if df is None or df.empty or len(df) < 60:
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": f"數據不足，無法進行有效分析 (需要至少 60 筆歷史數據)。請先使用 market_data_service 更新 {symbol} 的歷史數據。",
+                }
+
+            # 確保數據按日期升序排列以進行指標計算
+            df_calc = df.sort_values("date", ascending=True).copy()
+
+            close = df_calc["close"]
+            high = df_calc["high"]
+            low = df_calc["low"]
+            volume = df_calc["volume"]
+
+            # 2. 計算技術指標
+            # 均線
+            ma5 = indicators.calculate_sma(close, 5)
+            ma10 = indicators.calculate_sma(close, 10)
+            ma20 = indicators.calculate_sma(close, 20)
+            ma60 = indicators.calculate_sma(close, 60)
+
+            # 布林通道
+            bb = indicators.calculate_bollinger_bands(close)
+
+            # 動量指標
+            rsi = indicators.calculate_rsi(close)
+            macd = indicators.calculate_macd(close)
+            kd = indicators.calculate_kd(high, low, close)
+
+            # 波動率
+            atr = indicators.calculate_atr(high, low, close)
+
+            # 3. 綜合分析
+            current_price = close.iloc[-1]
+            prev_price = close.iloc[-2]
+
+            # 趨勢判斷
+            trend_score = 0
+            trend_signals = []
+
+            # 均線排列
+            if ma5.iloc[-1] > ma20.iloc[-1] > ma60.iloc[-1]:
+                trend_score += 2
+                trend_signals.append("均線多頭排列")
+            elif ma5.iloc[-1] < ma20.iloc[-1] < ma60.iloc[-1]:
+                trend_score -= 2
+                trend_signals.append("均線空頭排列")
+
+            # 價格與均線關係
+            if current_price > ma20.iloc[-1]:
+                trend_score += 1
+            else:
+                trend_score -= 1
+
+            # MACD
+            if macd["histogram"].iloc[-1] > 0:
+                trend_score += 1
+                if macd["histogram"].iloc[-1] > macd["histogram"].iloc[-2]:
+                    trend_signals.append("MACD柱狀圖增長")
+            else:
+                trend_score -= 1
+
+            # 判斷趨勢
+            if trend_score >= 3:
+                trend = "強勢多頭"
+            elif trend_score >= 1:
+                trend = "偏多震盪"
+            elif trend_score <= -3:
+                trend = "強勢空頭"
+            elif trend_score <= -1:
+                trend = "偏空震盪"
+            else:
+                trend = "盤整"
+
+            # 4. 支撐與壓力
+            # 簡單使用近期高低點和布林通道
+            recent_high = high.tail(20).max()
+            recent_low = low.tail(20).min()
+
+            resistance = min(recent_high, bb["upper"].iloc[-1])
+            support = max(recent_low, bb["lower"].iloc[-1])
+
+            # 5. 交易訊號與計畫
+            signal = "觀望"
+            confidence = "低"
+            plan = {}
+
+            # 多頭訊號
+            bullish_conditions = 0
+            if rsi.iloc[-1] < 30:
+                bullish_conditions += 1  # 超賣
+            if kd["k"].iloc[-1] < 20 and kd["k"].iloc[-1] > kd["d"].iloc[-1]:
+                bullish_conditions += 1  # 低檔金叉
+            if current_price > ma20.iloc[-1] and prev_price <= ma20.iloc[-2]:
+                bullish_conditions += 1  # 突破月線
+            if current_price < bb["lower"].iloc[-1]:
+                bullish_conditions += 1  # 跌破下軌 (乖離過大)
+
+            # 空頭訊號
+            bearish_conditions = 0
+            if rsi.iloc[-1] > 70:
+                bearish_conditions += 1  # 超買
+            if kd["k"].iloc[-1] > 80 and kd["k"].iloc[-1] < kd["d"].iloc[-1]:
+                bearish_conditions += 1  # 高檔死叉
+            if current_price < ma20.iloc[-1] and prev_price >= ma20.iloc[-2]:
+                bearish_conditions += 1  # 跌破月線
+            if current_price > bb["upper"].iloc[-1]:
+                bearish_conditions += 1  # 突破上軌 (乖離過大)
+
+            if bullish_conditions >= 2:
+                signal = "買進"
+                confidence = "高" if trend_score >= 0 else "中"
+
+                # 交易計畫
+                entry_price = current_price
+                stop_loss = support * 0.98  # 支撐下方 2%
+                take_profit = current_price + (current_price - stop_loss) * 2  # 風報比 1:2
+
+                plan = {
+                    "action": "Buy",
+                    "entry_range": [current_price * 0.99, current_price * 1.01],
+                    "stop_loss": stop_loss,
+                    "take_profit": take_profit,
+                    "risk_reward_ratio": 2.0,
+                }
+
+            elif bearish_conditions >= 2:
+                signal = "賣出"
+                confidence = "高" if trend_score <= 0 else "中"
+
+                # 交易計畫
+                entry_price = current_price
+                stop_loss = resistance * 1.02  # 壓力上方 2%
+                take_profit = current_price - (stop_loss - current_price) * 2  # 風報比 1:2
+
+                plan = {
+                    "action": "Sell",
+                    "entry_range": [current_price * 0.99, current_price * 1.01],
+                    "stop_loss": stop_loss,
+                    "take_profit": take_profit,
+                    "risk_reward_ratio": 2.0,
+                }
+
+            return {
+                "status": "success",
+                "data": {
+                    "symbol": symbol,
+                    "date": df_calc["date"].iloc[-1].strftime("%Y-%m-%d"),
+                    "price": {
+                        "current": float(current_price),
+                        "change": float(df_calc["price_change"].iloc[-1]),
+                        "change_percent": float(df_calc["change_ratio"].iloc[-1]),
+                    },
+                    "trend": {
+                        "direction": trend,
+                        "score": trend_score,
+                        "signals": trend_signals,
+                    },
+                    "indicators": {
+                        "rsi": float(rsi.iloc[-1]),
+                        "macd": float(macd["histogram"].iloc[-1]),
+                        "kd_k": float(kd["k"].iloc[-1]),
+                        "kd_d": float(kd["d"].iloc[-1]),
+                        "ma20": float(ma20.iloc[-1]),
+                        "atr": float(atr.iloc[-1]),
+                    },
+                    "levels": {
+                        "support": float(support),
+                        "resistance": float(resistance),
+                    },
+                    "analysis": {
+                        "signal": signal,
+                        "confidence": confidence,
+                        "plan": plan,
+                    },
+                },
+                "message": f"完成 {symbol} 技術分析: {trend}，建議 {signal}",
+            }
+
+        except Exception as e:
+            self.logger.exception(f"分析股票失敗: {str(e)}")
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"分析股票失敗: {str(e)}",
+            }
 
     def calculate_portfolio_var(self, args: Dict) -> dict:
         """
@@ -92,11 +336,7 @@ class AnalysisService:
             # 獲取投資組合數據
             portfolio_data = self._get_portfolio_data(account)
             if not portfolio_data:
-                return {
-                    "status": "error",
-                    "data": None,
-                    "message": "無法獲取投資組合數據，請先獲取投資組合摘要"
-                }
+                return {"status": "error", "data": None, "message": "無法獲取投資組合數據，請先獲取投資組合摘要"}
 
             # 模擬VaR計算（實際實現會使用歷史數據和統計方法）
             positions = portfolio_data.get("inventory", [])
@@ -104,7 +344,7 @@ class AnalysisService:
 
             # 使用技術指標計算實際波動率
             volatility = self._calculate_portfolio_volatility(positions, time_horizon)
-            
+
             if method == "historical":
                 # 使用歷史模擬法，基於實際波動率估計
                 var_estimate = total_value * volatility * (1 - confidence_level) ** 0.5
@@ -173,11 +413,7 @@ class AnalysisService:
             # 獲取投資組合數據
             portfolio_data = self._get_portfolio_data(account)
             if not portfolio_data:
-                return {
-                    "status": "error",
-                    "data": None,
-                    "message": "無法獲取投資組合數據，請先獲取投資組合摘要"
-                }
+                return {"status": "error", "data": None, "message": "無法獲取投資組合數據，請先獲取投資組合摘要"}
 
             positions = portfolio_data.get("inventory", [])
             results = []
@@ -191,48 +427,54 @@ class AnalysisService:
                     for pos in positions:
                         symbol = pos.get("stock_no", "")
                         market_value = pos.get("market_value", 0)
-                        
+
                         # 使用技術指標評估個股對市場崩盤的敏感度
                         sensitivity = self._calculate_market_crash_sensitivity(symbol)
                         adjusted_drop = equity_drop * sensitivity
-                        
+
                         loss = market_value * abs(adjusted_drop)
-                        losses.append({
-                            "stock_no": symbol,
-                            "current_value": market_value,
-                            "projected_loss": loss,
-                            "loss_percentage": abs(adjusted_drop),
-                            "sensitivity": sensitivity,
-                        })
+                        losses.append(
+                            {
+                                "stock_no": symbol,
+                                "current_value": market_value,
+                                "projected_loss": loss,
+                                "loss_percentage": abs(adjusted_drop),
+                                "sensitivity": sensitivity,
+                            }
+                        )
 
                 elif scenario_name == "rate_hike":
                     rate_increase = scenario.get("rate_increase", 0.02)
                     for pos in positions:
                         symbol = pos.get("stock_no", "")
                         market_value = pos.get("market_value", 0)
-                        
+
                         # 使用技術指標評估個股對利率變化的敏感度
                         sensitivity = self._calculate_rate_sensitivity(symbol)
                         loss = market_value * rate_increase * sensitivity
-                        
-                        losses.append({
-                            "stock_no": symbol,
-                            "current_value": market_value,
-                            "projected_loss": loss,
-                            "loss_percentage": rate_increase * sensitivity,
-                            "sensitivity": sensitivity,
-                        })
+
+                        losses.append(
+                            {
+                                "stock_no": symbol,
+                                "current_value": market_value,
+                                "projected_loss": loss,
+                                "loss_percentage": rate_increase * sensitivity,
+                                "sensitivity": sensitivity,
+                            }
+                        )
 
                 total_loss = sum(loss.get("projected_loss", 0) for loss in losses)
                 total_value = sum(pos.get("market_value", 0) for pos in positions)
 
-                results.append({
-                    "scenario": scenario_name,
-                    "total_portfolio_value": total_value,
-                    "total_projected_loss": total_loss,
-                    "loss_percentage": total_loss / total_value if total_value > 0 else 0,
-                    "position_losses": losses,
-                })
+                results.append(
+                    {
+                        "scenario": scenario_name,
+                        "total_portfolio_value": total_value,
+                        "total_projected_loss": total_loss,
+                        "loss_percentage": total_loss / total_value if total_value > 0 else 0,
+                        "position_losses": losses,
+                    }
+                )
 
             return {
                 "status": "success",
@@ -293,11 +535,7 @@ class AnalysisService:
                 # 如果沒有快取數據，直接獲取投資組合摘要
                 # 獲取庫存資訊
                 inventory_result = self.sdk.accounting.inventories(account_obj)
-                if (
-                    not inventory_result
-                    or not hasattr(inventory_result, "is_success")
-                    or not inventory_result.is_success
-                ):
+                if not inventory_result or not hasattr(inventory_result, "is_success") or not inventory_result.is_success:
                     return {
                         "status": "error",
                         "data": None,
@@ -307,20 +545,13 @@ class AnalysisService:
                 # 獲取未實現損益
                 pnl_result = self.sdk.accounting.unrealized_gains_and_loses(account_obj)
                 unrealized_data = []
-                if (
-                    pnl_result
-                    and hasattr(pnl_result, "is_success")
-                    and pnl_result.is_success
-                    and hasattr(pnl_result, "data")
-                ):
+                if pnl_result and hasattr(pnl_result, "is_success") and pnl_result.is_success and hasattr(pnl_result, "data"):
                     unrealized_data = pnl_result.data
 
                 # 處理投資組合數據
                 portfolio_data = {
                     "account": account,
-                    "total_positions": len(inventory_result.data)
-                    if hasattr(inventory_result, "data")
-                    else 0,
+                    "total_positions": len(inventory_result.data) if hasattr(inventory_result, "data") else 0,
                     "positions": [],
                     "summary": {
                         "total_market_value": 0,
@@ -345,16 +576,16 @@ class AnalysisService:
                 for pnl_item in unrealized_data:
                     symbol = getattr(pnl_item, "stock_no", "")
                     if symbol in inventory_dict:
-                        inventory_dict[symbol]["unrealized_pnl"] = getattr(
-                            pnl_item, "unrealized_profit", 0
-                        ) + getattr(pnl_item, "unrealized_loss", 0)
+                        inventory_dict[symbol]["unrealized_pnl"] = getattr(pnl_item, "unrealized_profit", 0) + getattr(
+                            pnl_item, "unrealized_loss", 0
+                        )
 
                 # 計算總計
                 for symbol, data in inventory_dict.items():
                     # 如果庫存沒有市場價格，嘗試獲取即時報價
                     if data["market_price"] == 0 or data["market_value"] == 0:
                         try:
-                            if hasattr(self, 'reststock') and self.reststock:
+                            if hasattr(self, "reststock") and self.reststock:
                                 quote_result = self.reststock.intraday.quote(symbol=symbol)
                                 if hasattr(quote_result, "dict"):
                                     quote_data = quote_result.dict()
@@ -400,22 +631,16 @@ class AnalysisService:
                         "market_value": data["market_value"],
                         "unrealized_pnl": data.get("unrealized_pnl", 0),
                         "pnl_percent": (
-                            data.get("unrealized_pnl", 0)
-                            / (data["cost_price"] * data["quantity"])
-                        )
-                        * 100
-                        if data["cost_price"] * data["quantity"] > 0
-                        else 0,
+                            (data.get("unrealized_pnl", 0) / (data["cost_price"] * data["quantity"])) * 100
+                            if data["cost_price"] * data["quantity"] > 0
+                            else 0
+                        ),
                     }
                     portfolio_data["positions"].append(position)
 
                     portfolio_data["summary"]["total_market_value"] += data["market_value"]
-                    portfolio_data["summary"]["total_cost"] += (
-                        data["cost_price"] * data["quantity"]
-                    )
-                    portfolio_data["summary"]["total_unrealized_pnl"] += data.get(
-                        "unrealized_pnl", 0
-                    )
+                    portfolio_data["summary"]["total_cost"] += data["cost_price"] * data["quantity"]
+                    portfolio_data["summary"]["total_unrealized_pnl"] += data.get("unrealized_pnl", 0)
 
             positions = portfolio_data.get("inventory", [])
 
@@ -436,11 +661,7 @@ class AnalysisService:
                     equal_weight = 1.0 / num_positions
                     current_weights = {stock: equal_weight for stock in current_weights.keys()}
                 else:
-                    return {
-                        "status": "error",
-                        "data": None,
-                        "message": "投資組合沒有有效持倉，無法進行優化"
-                    }
+                    return {"status": "error", "data": None, "message": "投資組合沒有有效持倉，無法進行優化"}
             else:
                 # 正規化權重
                 for stock in current_weights:
@@ -535,11 +756,7 @@ class AnalysisService:
             # 獲取投資組合數據
             portfolio_data = self._get_portfolio_data(account)
             if not portfolio_data:
-                return {
-                    "status": "error",
-                    "data": None,
-                    "message": "無法獲取投資組合數據，請先獲取投資組合摘要"
-                }
+                return {"status": "error", "data": None, "message": "無法獲取投資組合數據，請先獲取投資組合摘要"}
 
             positions = portfolio_data.get("inventory", [])
 
@@ -550,16 +767,16 @@ class AnalysisService:
                 "excess_return": 0.023,  # 2.3% 超額報酬
                 "attribution_breakdown": {
                     "asset_allocation": 0.012,  # 資產配置貢獻
-                    "stock_selection": 0.008,   # 個股選擇貢獻
-                    "interaction": 0.003,       # 交互作用
-                    "timing": 0.0,             # 時機選擇（中性）
+                    "stock_selection": 0.008,  # 個股選擇貢獻
+                    "interaction": 0.003,  # 交互作用
+                    "timing": 0.0,  # 時機選擇（中性）
                 },
                 "sector_attribution": {
                     "科技股": {"weight": 0.45, "return": 0.12, "contribution": 0.054},
                     "金融股": {"weight": 0.20, "return": 0.05, "contribution": 0.010},
                     "傳產股": {"weight": 0.15, "return": 0.03, "contribution": 0.005},
                     "其他": {"weight": 0.20, "return": 0.08, "contribution": 0.016},
-                }
+                },
             }
 
             return {
@@ -617,17 +834,19 @@ class AnalysisService:
                     fair_basis = 2.5  # 合理基差
 
                     if abs(basis - fair_basis) > 3.0:  # 基差偏離門檻
-                        opportunities.append({
-                            "type": "cash_futures",
-                            "symbol": symbol,
-                            "cash_price": cash_price,
-                            "futures_price": futures_price,
-                            "basis": basis,
-                            "fair_basis": fair_basis,
-                            "deviation": basis - fair_basis,
-                            "opportunity": "sell_futures" if basis > fair_basis else "buy_futures",
-                            "potential_profit": abs(basis - fair_basis) * 0.8,  # 扣除交易成本
-                        })
+                        opportunities.append(
+                            {
+                                "type": "cash_futures",
+                                "symbol": symbol,
+                                "cash_price": cash_price,
+                                "futures_price": futures_price,
+                                "basis": basis,
+                                "fair_basis": fair_basis,
+                                "deviation": basis - fair_basis,
+                                "opportunity": "sell_futures" if basis > fair_basis else "buy_futures",
+                                "potential_profit": abs(basis - fair_basis) * 0.8,  # 扣除交易成本
+                            }
+                        )
 
                 if "statistical" in arbitrage_types:
                     # 統計套利 - 配對交易機會
@@ -641,15 +860,17 @@ class AnalysisService:
                         z_score = (spread - mean_spread) / std_spread
 
                         if abs(z_score) > 2.0:  # 統計顯著偏離
-                            opportunities.append({
-                                "type": "statistical",
-                                "symbol": symbol,
-                                "spread": spread,
-                                "mean_spread": mean_spread,
-                                "z_score": z_score,
-                                "opportunity": "long_short" if z_score > 0 else "short_long",
-                                "confidence": min(abs(z_score) / 3.0, 1.0),
-                            })
+                            opportunities.append(
+                                {
+                                    "type": "statistical",
+                                    "symbol": symbol,
+                                    "spread": spread,
+                                    "mean_spread": mean_spread,
+                                    "z_score": z_score,
+                                    "opportunity": "long_short" if z_score > 0 else "short_long",
+                                    "confidence": min(abs(z_score) / 3.0, 1.0),
+                                }
+                            )
 
             return {
                 "status": "success",
@@ -699,11 +920,11 @@ class AnalysisService:
             # 使用台積電作為代表性股票來計算技術指標情緒
             symbol = "2330"  # 台積電
             df = self._read_local_stock_data(symbol)
-            
+
             if df is not None and not df.empty:
                 # 按日期升序排序以進行計算
                 df = df.sort_values("date").tail(lookback_period)  # 取最近的 lookback_period 天
-                
+
                 if len(df) >= 14:  # 需要足夠的數據來計算指標
                     close = df["close"]
                     high = df["high"] if "high" in df.columns else close
@@ -715,15 +936,15 @@ class AnalysisService:
                         rsi = indicators.calculate_rsi(close)
                         macd_res = indicators.calculate_macd(close)
                         bb = indicators.calculate_bollinger_bands(close)
-                        
+
                         # 計算各指標的情緒分數 (0-1之間，1表示最樂觀)
                         rsi_score = 1 - abs(rsi.iloc[-1] - 50) / 50  # RSI越接近50越中性
                         macd_score = 1 if macd_res["histogram"].iloc[-1] > 0 else 0  # MACD柱狀圖為正表示樂觀
                         bb_position = (close.iloc[-1] - bb["lower"].iloc[-1]) / (bb["upper"].iloc[-1] - bb["lower"].iloc[-1])
                         bb_score = min(max(bb_position, 0), 1)  # 布林通道位置分數
-                        
+
                         composite_score = (rsi_score + macd_score + bb_score) / 3
-                        
+
                         sentiment_components["technical"] = {
                             "rsi_value": float(rsi.iloc[-1]),
                             "rsi_sentiment": "樂觀" if rsi.iloc[-1] > 60 else "悲觀" if rsi.iloc[-1] < 40 else "中性",
@@ -738,26 +959,28 @@ class AnalysisService:
                         # 成交量情緒 - 使用實際數據計算
                         vol_rate = indicators.calculate_volume_rate(volume)
                         obv = indicators.calculate_obv(close, volume)
-                        
+
                         # 成交量趨勢 (最近5天平均 vs 之前平均)
                         recent_vol = volume.tail(5).mean()
                         prev_vol = volume.head(-5).mean() if len(volume) > 5 else volume.mean()
                         vol_trend = recent_vol / prev_vol if prev_vol > 0 else 1
-                        
+
                         # OBV趨勢
                         obv_trend = 1 if obv.iloc[-1] > obv.iloc[0] else 0
-                        
+
                         # 量比分數
                         vol_rate_score = min(vol_rate.iloc[-1] / 2, 1)  # 量比>2為極度活躍
-                        
+
                         composite_score = (vol_trend / 2 + obv_trend + vol_rate_score) / 3
-                        
+
                         sentiment_components["volume"] = {
                             "volume_trend": float(vol_trend),
                             "volume_trend_sentiment": "放量" if vol_trend > 1.2 else "縮量" if vol_trend < 0.8 else "正常",
                             "obv_trend": "上升" if obv_trend > 0.5 else "下降",
                             "volume_rate": float(vol_rate.iloc[-1]),
-                            "volume_rate_sentiment": "極度活躍" if vol_rate.iloc[-1] > 2 else "活躍" if vol_rate.iloc[-1] > 1.5 else "正常",
+                            "volume_rate_sentiment": (
+                                "極度活躍" if vol_rate.iloc[-1] > 2 else "活躍" if vol_rate.iloc[-1] > 1.5 else "正常"
+                            ),
                             "composite_score": float(composite_score),
                         }
                 else:
@@ -849,8 +1072,14 @@ class AnalysisService:
                         "bullish": "市場健康，適合積極投資",
                         "neutral": "市場平衡，可考慮均衡配置",
                         "bearish": "市場謹慎，建議減倉或對沖",
-                        "extreme_bearish": "市場恐慌，可能存在買入機會"
-                    }.get(sentiment_level.replace("極度", "extreme_").replace("樂觀", "bullish").replace("悲觀", "bearish").replace("中性", "neutral"), ""),
+                        "extreme_bearish": "市場恐慌，可能存在買入機會",
+                    }.get(
+                        sentiment_level.replace("極度", "extreme_")
+                        .replace("樂觀", "bullish")
+                        .replace("悲觀", "bearish")
+                        .replace("中性", "neutral"),
+                        "",
+                    ),
                 },
                 "message": f"成功生成市場情緒指數：{sentiment_level} ({overall_sentiment:.2%})",
             }
@@ -879,22 +1108,13 @@ class AnalysisService:
 
             # 獲取庫存資訊
             inventory_result = self.sdk.accounting.inventories(account_obj)
-            if (
-                not inventory_result
-                or not hasattr(inventory_result, "is_success")
-                or not inventory_result.is_success
-            ):
+            if not inventory_result or not hasattr(inventory_result, "is_success") or not inventory_result.is_success:
                 return None
 
             # 獲取未實現損益
             pnl_result = self.sdk.accounting.unrealized_gains_and_loses(account_obj)
             unrealized_data = []
-            if (
-                pnl_result
-                and hasattr(pnl_result, "is_success")
-                and pnl_result.is_success
-                and hasattr(pnl_result, "data")
-            ):
+            if pnl_result and hasattr(pnl_result, "is_success") and pnl_result.is_success and hasattr(pnl_result, "data"):
                 unrealized_data = pnl_result.data
 
             # 處理投資組合數據
@@ -912,9 +1132,9 @@ class AnalysisService:
             for pnl_item in unrealized_data:
                 symbol = getattr(pnl_item, "stock_no", "")
                 if symbol in inventory_dict:
-                    inventory_dict[symbol]["unrealized_pnl"] = getattr(
-                        pnl_item, "unrealized_profit", 0
-                    ) + getattr(pnl_item, "unrealized_loss", 0)
+                    inventory_dict[symbol]["unrealized_pnl"] = getattr(pnl_item, "unrealized_profit", 0) + getattr(
+                        pnl_item, "unrealized_loss", 0
+                    )
 
             # 轉換為標準格式
             positions = []
@@ -922,7 +1142,7 @@ class AnalysisService:
                 # 如果庫存沒有市場價格，嘗試獲取即時報價
                 if data["market_price"] == 0 or data["market_value"] == 0:
                     try:
-                        if hasattr(self, 'reststock') and self.reststock:
+                        if hasattr(self, "reststock") and self.reststock:
                             quote_result = self.reststock.intraday.quote(symbol=symbol)
                             if hasattr(quote_result, "dict"):
                                 quote_data = quote_result.dict()
@@ -1013,7 +1233,7 @@ class AnalysisService:
                     returns = df["close"].pct_change().dropna()
                     daily_volatility = returns.std()
                     # 年化波動率
-                    annualized_volatility = daily_volatility * (252 ** 0.5)  # 252個交易日
+                    annualized_volatility = daily_volatility * (252**0.5)  # 252個交易日
                     # 調整時間範圍
                     volatility = annualized_volatility * (time_horizon / 252) ** 0.5
                 else:
@@ -1043,7 +1263,7 @@ class AnalysisService:
         """
         try:
             import sqlite3
-            
+
             with sqlite3.connect(self.db_path) as conn:
                 query = """
                     SELECT symbol, date, open, high, low, close, volume, 
@@ -1053,15 +1273,15 @@ class AnalysisService:
                     ORDER BY date DESC
                 """
                 df = pd.read_sql_query(query, conn, params=[stock_code])
-                
+
                 if df.empty:
                     return None
-                
+
                 # 將date列轉換為datetime
                 df["date"] = pd.to_datetime(df["date"])
-                
+
                 return df
-                
+
         except Exception as e:
             self.logger.exception(f"讀取SQLite數據時發生錯誤: {str(e)}")
             return None
@@ -1069,10 +1289,10 @@ class AnalysisService:
     def _calculate_market_crash_sensitivity(self, symbol):
         """
         計算個股對市場崩盤的敏感度，使用技術指標
-        
+
         Args:
             symbol: 股票代碼
-            
+
         Returns:
             float: 敏感度係數 (0.5-2.0)
         """
@@ -1082,20 +1302,20 @@ class AnalysisService:
                 # 使用布林通道位置評估波動性
                 bb = indicators.calculate_bollinger_bands(df["close"])
                 bb_position = (df["close"].iloc[-1] - bb["lower"].iloc[-1]) / (bb["upper"].iloc[-1] - bb["lower"].iloc[-1])
-                
+
                 # 使用 ATR 評估波動性
                 atr = indicators.calculate_atr(df["high"], df["low"], df["close"])
                 volatility = atr.iloc[-1] / df["close"].iloc[-1]
-                
+
                 # 計算敏感度：波動性越高，對市場崩盤越敏感
                 base_sensitivity = 1.0
                 bb_factor = 1.5 if bb_position > 0.8 else 0.8 if bb_position < 0.2 else 1.0
                 vol_factor = min(max(volatility * 50, 0.5), 2.0)  # 波動率轉換為係數
-                
+
                 return base_sensitivity * bb_factor * vol_factor
             else:
                 return 1.0  # 默認敏感度
-                
+
         except Exception as e:
             self.logger.exception(f"計算市場崩盤敏感度時發生錯誤: {str(e)}")
             return 1.0
@@ -1103,10 +1323,10 @@ class AnalysisService:
     def _calculate_rate_sensitivity(self, symbol):
         """
         計算個股對利率變化的敏感度
-        
+
         Args:
             symbol: 股票代碼
-            
+
         Returns:
             float: 敏感度係數
         """
@@ -1116,18 +1336,25 @@ class AnalysisService:
                 # 使用 RSI 評估動量
                 rsi = indicators.calculate_rsi(df["close"])
                 momentum = rsi.iloc[-1] / 50 - 1  # 將 RSI 轉換為動量指標
-                
+
                 # 高動量股票對利率變化更敏感
                 return max(0.3, min(1.5, 0.8 + momentum * 0.4))
             else:
                 return 0.8  # 默認敏感度
-                
+
         except Exception as e:
             self.logger.exception(f"計算利率敏感度時發生錯誤: {str(e)}")
             return 0.8
 
 
 # 參數模型定義
+class AnalyzeStockArgs(BaseModel):
+    """股票分析參數模型"""
+
+    symbol: str
+    account: Optional[str] = None  # 用於獲取庫存資訊作為參考
+
+
 class CalculatePortfolioVaRArgs(BaseModel):
     """投資組合VaR計算參數模型"""
 
@@ -1135,7 +1362,6 @@ class CalculatePortfolioVaRArgs(BaseModel):
     confidence_level: float = Field(0.95, ge=0.8, le=0.999)  # 信心水準，預設95%
     time_horizon: int = Field(1, ge=1, le=30)  # 時間範圍（天），預設1天
     method: str = Field("historical", pattern="^(historical|parametric|monte_carlo)$")  # 計算方法
-
 
 
 class RunPortfolioStressTestArgs(BaseModel):
@@ -1154,7 +1380,6 @@ class OptimizePortfolioAllocationArgs(BaseModel):
     optimization_method: str = Field("max_sharpe", pattern="^(max_sharpe|min_volatility|target_return)$")  # 優化方法
 
 
-
 class CalculatePerformanceAttributionArgs(BaseModel):
     """績效歸因分析參數模型"""
 
@@ -1168,6 +1393,7 @@ class DetectArbitrageOpportunitiesArgs(BaseModel):
 
     symbols: List[str]  # 要監控的股票代碼列表
     arbitrage_types: List[str] = ["cash_futures", "statistical"]  # 套利類型
+
 
 class GenerateMarketSentimentIndexArgs(BaseModel):
     """市場情緒指數參數模型"""

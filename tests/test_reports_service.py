@@ -18,8 +18,9 @@ pytest tests/test_reports_service.py::TestReportsServiceMock -v
 pytest tests/test_reports_service.py::TestReportsServiceIntegration -v
 """
 
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 from mcp.server.fastmcp import FastMCP
 
 from fubon_api_mcp_server.reports_service import ReportsService
@@ -49,12 +50,13 @@ class TestReportsServiceMock:
         """建立 ReportsService 實例"""
         return ReportsService(mock_mcp, mock_sdk, mock_accounts)
 
-    @patch('fubon_api_mcp_server.reports_service.server_state.latest_order_reports')
-    @patch('fubon_api_mcp_server.reports_service.server_state.latest_order_changed_reports')
-    @patch('fubon_api_mcp_server.reports_service.server_state.latest_filled_reports')
-    @patch('fubon_api_mcp_server.reports_service.server_state.latest_event_reports')
-    def test_get_all_reports(self, mock_event_reports, mock_filled_reports,
-                           mock_order_changed_reports, mock_order_reports, reports_service):
+    @patch("fubon_api_mcp_server.reports_service.server_state.latest_order_reports")
+    @patch("fubon_api_mcp_server.reports_service.server_state.latest_order_changed_reports")
+    @patch("fubon_api_mcp_server.reports_service.server_state.latest_filled_reports")
+    @patch("fubon_api_mcp_server.reports_service.server_state.latest_event_reports")
+    def test_get_all_reports(
+        self, mock_event_reports, mock_filled_reports, mock_order_changed_reports, mock_order_reports, reports_service
+    ):
         """測試獲取所有報告"""
         # 設置模擬數據
         mock_order_reports.__iter__ = Mock(return_value=iter([{"order_id": "1"}]))
@@ -73,7 +75,7 @@ class TestReportsServiceMock:
         assert "event_reports" in result["data"]
         assert "成功獲取所有報告" in result["message"]
 
-    @patch('fubon_api_mcp_server.reports_service.server_state.latest_order_reports')
+    @patch("fubon_api_mcp_server.reports_service.server_state.latest_order_reports")
     def test_get_order_reports(self, mock_order_reports, reports_service):
         """測試獲取委託報告"""
         mock_data = [{"order_id": "1"}, {"order_id": "2"}]
@@ -86,7 +88,7 @@ class TestReportsServiceMock:
         assert result["data"] == mock_data
         assert "成功獲取委託報告，共 2 筆" in result["message"]
 
-    @patch('fubon_api_mcp_server.reports_service.server_state.latest_order_changed_reports')
+    @patch("fubon_api_mcp_server.reports_service.server_state.latest_order_changed_reports")
     def test_get_order_changed_reports(self, mock_order_changed_reports, reports_service):
         """測試獲取委託變更報告"""
         mock_data = [{"change_id": "1"}]
@@ -99,7 +101,7 @@ class TestReportsServiceMock:
         assert result["data"] == mock_data
         assert "成功獲取委託變更報告，共 1 筆" in result["message"]
 
-    @patch('fubon_api_mcp_server.reports_service.server_state.latest_filled_reports')
+    @patch("fubon_api_mcp_server.reports_service.server_state.latest_filled_reports")
     def test_get_filled_reports(self, mock_filled_reports, reports_service):
         """測試獲取成交報告"""
         mock_data = [{"fill_id": "1"}, {"fill_id": "2"}, {"fill_id": "3"}]
@@ -112,7 +114,7 @@ class TestReportsServiceMock:
         assert result["data"] == mock_data
         assert "成功獲取成交報告，共 3 筆" in result["message"]
 
-    @patch('fubon_api_mcp_server.reports_service.server_state.latest_event_reports')
+    @patch("fubon_api_mcp_server.reports_service.server_state.latest_event_reports")
     def test_get_event_reports(self, mock_event_reports, reports_service):
         """測試獲取事件報告"""
         mock_data = [{"event_id": "1"}]

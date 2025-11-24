@@ -896,7 +896,7 @@ fubon-api-mcp-server/
 - 🔒 **網路安全**: 確保網路連線的安全性
 
 ## 📝 更新日誌
-### v2.1.0 (2025-11-10)
+### v2.2.1 (2025-11-10)
 - 🤖 **Phase 3 高級分析**: 新增8項高級MCP提示與6項量化交易工具
 - 📊 **投資組合分析**: 績效分析、風險管理、投資組合優化
 - 🎯 **市場情緒分析**: 多維度情緒分析與指數生成
@@ -1024,14 +1024,14 @@ flake8 .
 
 ### PyPI Package
 - **套件名稱**: `fubon-api-mcp-server`
-- **最新版本**: 2.1.0
+- **最新版本**: 2.2.1
 - **安裝**: `pip install fubon-api-mcp-server`
 - **PyPI**: https://pypi.org/project/fubon-api-mcp-server/
 
 ### VS Code Extension
 - **Extension ID**: `mofesto.fubon-api-mcp-server`
 - **Publisher**: mofesto
-- **版本**: 2.1.0
+- **版本**: 2.2.1
 - **Marketplace**: https://marketplace.visualstudio.com/items?itemName=mofesto.fubon-api-mcp-server
 - **安裝方式**: 在 VS Code 中搜尋 "Fubon API MCP Server"
 

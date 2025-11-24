@@ -12,21 +12,21 @@ pytest tests/test_indicators_advanced.py -v
 pytest tests/test_indicators_advanced.py::TestIndicatorsAdvancedMock -v
 """
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 
 from fubon_api_mcp_server.indicators_advanced import (
-    calculate_portfolio_returns,
-    calculate_historical_var,
-    calculate_parametric_var,
-    calculate_monte_carlo_var,
-    calculate_max_drawdown,
-    calculate_tail_risk,
     assess_risk_level,
+    calculate_fear_greed_index,
+    calculate_historical_var,
     calculate_market_breadth,
+    calculate_max_drawdown,
     calculate_money_flow,
-    calculate_fear_greed_index
+    calculate_monte_carlo_var,
+    calculate_parametric_var,
+    calculate_portfolio_returns,
+    calculate_tail_risk,
 )
 
 
@@ -36,7 +36,7 @@ class TestIndicatorsAdvancedMock:
     @pytest.fixture
     def sample_stock_data(self):
         """創建樣本股票數據"""
-        dates = pd.date_range('2024-01-01', periods=100, freq='D')
+        dates = pd.date_range("2024-01-01", periods=100, freq="D")
         np.random.seed(42)
 
         # 生成模擬價格數據
@@ -44,14 +44,16 @@ class TestIndicatorsAdvancedMock:
         returns = np.random.normal(0.001, 0.02, len(dates))
         prices = base_price * np.exp(np.cumsum(returns))
 
-        return pd.DataFrame({
-            'date': dates,
-            'open': prices * (1 + np.random.normal(0, 0.01, len(dates))),
-            'high': prices * (1 + np.random.normal(0.005, 0.01, len(dates))),
-            'low': prices * (1 - np.random.normal(0.005, 0.01, len(dates))),
-            'close': prices,
-            'volume': np.random.randint(100000, 1000000, len(dates))
-        })
+        return pd.DataFrame(
+            {
+                "date": dates,
+                "open": prices * (1 + np.random.normal(0, 0.01, len(dates))),
+                "high": prices * (1 + np.random.normal(0.005, 0.01, len(dates))),
+                "low": prices * (1 - np.random.normal(0.005, 0.01, len(dates))),
+                "close": prices,
+                "volume": np.random.randint(100000, 1000000, len(dates)),
+            }
+        )
 
     @pytest.fixture
     def sample_portfolio_positions(self):
@@ -59,16 +61,18 @@ class TestIndicatorsAdvancedMock:
         return [
             {"stock_no": "2330", "quantity": 1000, "market_value": 100000},
             {"stock_no": "2454", "quantity": 500, "market_value": 50000},
-            {"stock_no": "2317", "quantity": 800, "market_value": 80000}
+            {"stock_no": "2317", "quantity": 800, "market_value": 80000},
         ]
 
     @pytest.fixture
     def mock_read_data_func(self, sample_stock_data):
         """模擬數據讀取函數"""
+
         def read_func(symbol):
             if symbol in ["2330", "2454", "2317"]:
                 return sample_stock_data.copy()
             return None
+
         return read_func
 
     def test_calculate_portfolio_returns_success(self, sample_portfolio_positions, mock_read_data_func):
@@ -93,20 +97,18 @@ class TestIndicatorsAdvancedMock:
 
     def test_calculate_portfolio_returns_insufficient_data(self, sample_portfolio_positions):
         """測試計算投資組合收益率 - 數據不足"""
+
         def mock_read_insufficient(symbol):
             # 返回少於20天的數據
-            dates = pd.date_range('2024-01-01', periods=10, freq='D')
-            return pd.DataFrame({
-                'date': dates,
-                'close': np.random.uniform(90, 110, 10)
-            })
+            dates = pd.date_range("2024-01-01", periods=10, freq="D")
+            return pd.DataFrame({"date": dates, "close": np.random.uniform(90, 110, 10)})
 
         returns = calculate_portfolio_returns(sample_portfolio_positions, 60, mock_read_insufficient)
         assert returns is None
 
     def test_calculate_historical_var(self, sample_stock_data):
         """測試歷史模擬法計算 VaR"""
-        returns = sample_stock_data['close'].pct_change().dropna()
+        returns = sample_stock_data["close"].pct_change().dropna()
         total_value = 1000000
 
         result = calculate_historical_var(returns, 0.95, total_value)
@@ -121,7 +123,7 @@ class TestIndicatorsAdvancedMock:
 
     def test_calculate_parametric_var(self, sample_stock_data):
         """測試參數法計算 VaR"""
-        returns = sample_stock_data['close'].pct_change().dropna()
+        returns = sample_stock_data["close"].pct_change().dropna()
         total_value = 1000000
 
         result = calculate_parametric_var(returns, 0.95, total_value)
@@ -135,7 +137,7 @@ class TestIndicatorsAdvancedMock:
 
     def test_calculate_monte_carlo_var(self, sample_stock_data):
         """測試蒙地卡羅模擬法計算 VaR"""
-        returns = sample_stock_data['close'].pct_change().dropna()
+        returns = sample_stock_data["close"].pct_change().dropna()
         total_value = 1000000
 
         result = calculate_monte_carlo_var(returns, 0.95, total_value, 10000)
@@ -149,7 +151,7 @@ class TestIndicatorsAdvancedMock:
 
     def test_calculate_max_drawdown(self, sample_stock_data):
         """測試計算最大回撤"""
-        returns = sample_stock_data['close'].pct_change().dropna()
+        returns = sample_stock_data["close"].pct_change().dropna()
         total_value = 1000000
 
         result = calculate_max_drawdown(returns, total_value)
@@ -165,7 +167,7 @@ class TestIndicatorsAdvancedMock:
 
     def test_calculate_tail_risk(self, sample_stock_data):
         """測試計算尾部風險指標"""
-        returns = sample_stock_data['close'].pct_change().dropna()
+        returns = sample_stock_data["close"].pct_change().dropna()
 
         result = calculate_tail_risk(returns, 0.95)
 
@@ -225,6 +227,7 @@ class TestIndicatorsAdvancedMock:
 
     def test_calculate_market_breadth_no_data(self):
         """測試計算市場廣度指標 - 無數據"""
+
         def mock_read_none(symbol):
             return None
 
@@ -248,12 +251,7 @@ class TestIndicatorsAdvancedMock:
 
     def test_calculate_money_flow_insufficient_data(self):
         """測試計算資金流向指標 - 數據不足"""
-        df = pd.DataFrame({
-            'high': [100, 101],
-            'low': [99, 100],
-            'close': [100, 101],
-            'volume': [1000, 1100]
-        })
+        df = pd.DataFrame({"high": [100, 101], "low": [99, 100], "close": [100, 101], "volume": [1000, 1100]})
 
         result = calculate_money_flow(df)
         assert result["mfi"] == 50

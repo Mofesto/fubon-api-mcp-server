@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 
 from fubon_api_mcp_server import server
 
@@ -84,18 +85,17 @@ class TestServerAccountIntegration:
         mock_validate.return_value = (Mock(account="1234567"), None)
 
         # patch account_service for bank balance and unrealized pnl
-        with patch.object(server, "account_service") as mock_account_service, patch.object(
-            server, "trading_service"
-        ) as mock_trading_service:
+        with (
+            patch.object(server, "account_service") as mock_account_service,
+            patch.object(server, "trading_service") as mock_trading_service,
+        ):
             mock_account_service.get_bank_balance.return_value = {
                 "status": "success",
                 "data": {"balance": 100000},
             }
             mock_account_service.get_unrealized_pnl.return_value = {
                 "status": "success",
-                "data": [
-                    {"stock_no": "2330", "unrealized_profit": 100, "unrealized_loss": 0}
-                ],
+                "data": [{"stock_no": "2330", "unrealized_profit": 100, "unrealized_loss": 0}],
             }
             mock_trading_service.get_order_results.return_value = {
                 "status": "success",

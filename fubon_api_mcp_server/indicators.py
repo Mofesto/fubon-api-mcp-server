@@ -39,7 +39,7 @@ def calculate_bollinger_bands(data: pd.Series, period: int = 20, stddev: float =
         "upper": pd.Series(upper, index=data.index),
         "middle": pd.Series(middle, index=data.index),
         "lower": pd.Series(lower, index=data.index),
-        "width": pd.Series(width, index=data.index)
+        "width": pd.Series(width, index=data.index),
     }
 
 
@@ -54,7 +54,7 @@ def calculate_macd(data: pd.Series, fast: int = 12, slow: int = 26, signal: int 
     return {
         "macd": pd.Series(macd, index=data.index),
         "signal": pd.Series(macdsignal, index=data.index),
-        "histogram": pd.Series(macdhist, index=data.index)
+        "histogram": pd.Series(macdhist, index=data.index),
     }
 
 
@@ -62,12 +62,15 @@ def calculate_kd(
     high: pd.Series, low: pd.Series, close: pd.Series, period: int = 9, smooth_k: int = 3, smooth_d: int = 3
 ) -> Dict[str, pd.Series]:
     """KD (Stochastic) 指標 %K / %D"""
-    slowk, slowd = talib.STOCH(high.values.astype(float), low.values.astype(float), close.values.astype(float),
-                               fastk_period=period, slowk_period=smooth_k, slowd_period=smooth_d)
-    return {
-        "k": pd.Series(slowk, index=high.index),
-        "d": pd.Series(slowd, index=high.index)
-    }
+    slowk, slowd = talib.STOCH(
+        high.values.astype(float),
+        low.values.astype(float),
+        close.values.astype(float),
+        fastk_period=period,
+        slowk_period=smooth_k,
+        slowd_period=smooth_d,
+    )
+    return {"k": pd.Series(slowk, index=high.index), "d": pd.Series(slowd, index=high.index)}
 
 
 def calculate_volume_rate(volume: pd.Series, period: int = 20) -> pd.Series:
@@ -85,22 +88,34 @@ def calculate_wma(data: pd.Series, period: int) -> pd.Series:
 
 def calculate_atr(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
     """平均真實波幅 (ATR) - 衡量價格波動性"""
-    return pd.Series(talib.ATR(high.values.astype(float), low.values.astype(float), close.values.astype(float), timeperiod=period), index=high.index)
+    return pd.Series(
+        talib.ATR(high.values.astype(float), low.values.astype(float), close.values.astype(float), timeperiod=period),
+        index=high.index,
+    )
 
 
 def calculate_adx(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
     """平均趨向指標 (ADX) - 衡量趨勢強度"""
-    return pd.Series(talib.ADX(high.values.astype(float), low.values.astype(float), close.values.astype(float), timeperiod=period), index=high.index)
+    return pd.Series(
+        talib.ADX(high.values.astype(float), low.values.astype(float), close.values.astype(float), timeperiod=period),
+        index=high.index,
+    )
 
 
 def calculate_williams_r(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 14) -> pd.Series:
     """Williams %R - 類似於 Stochastic，但使用不同的計算方式"""
-    return pd.Series(talib.WILLR(high.values.astype(float), low.values.astype(float), close.values.astype(float), timeperiod=period), index=high.index)
+    return pd.Series(
+        talib.WILLR(high.values.astype(float), low.values.astype(float), close.values.astype(float), timeperiod=period),
+        index=high.index,
+    )
 
 
 def calculate_cci(high: pd.Series, low: pd.Series, close: pd.Series, period: int = 20) -> pd.Series:
     """順勢指標 (CCI) - 用於識別超買超賣區域"""
-    return pd.Series(talib.CCI(high.values.astype(float), low.values.astype(float), close.values.astype(float), timeperiod=period), index=high.index)
+    return pd.Series(
+        talib.CCI(high.values.astype(float), low.values.astype(float), close.values.astype(float), timeperiod=period),
+        index=high.index,
+    )
 
 
 def calculate_roc(data: pd.Series, period: int = 10) -> pd.Series:

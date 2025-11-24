@@ -163,9 +163,7 @@ class StreamingService:
             return {
                 "status": "success",
                 "data": subscriptions,
-                "total_market_subscriptions": len(
-                    subscriptions.get("market_subscriptions", {})
-                ),
+                "total_market_subscriptions": len(subscriptions.get("market_subscriptions", {})),
                 "total_active_streams": len(subscriptions.get("active_streams", {})),
                 "message": f"成功獲取活躍訂閱資訊，共 {len(subscriptions.get('active_streams', {}))} 個活躍串流",
             }
@@ -523,39 +521,46 @@ class StreamingService:
 # Pydantic 參數驗證模型
 class SubscribeMarketDataArgs(BaseModel):
     """訂閱市場數據參數"""
+
     symbol: str = Field(..., description="股票代碼或期貨合約代碼")
     data_type: str = Field("quote", description="數據類型：quote, candles, volume")
 
 
 class UnsubscribeMarketDataArgs(BaseModel):
     """取消訂閱市場數據參數"""
+
     stream_id: str = Field(..., description="訂閱時返回的 stream_id")
 
 
 class GetActiveSubscriptionsArgs(BaseModel):
     """獲取活躍訂閱參數（無參數）"""
+
     pass
 
 
 class GetRealtimeDataArgs(BaseModel):
     """獲取即時數據參數"""
+
     symbol: str = Field(..., description="股票代碼或期貨合約代碼")
 
 
 class RegisterEventListenerArgs(BaseModel):
     """註冊事件監聽器參數"""
+
     event_type: str = Field(..., description="事件類型，如 order_update, price_alert, connection_status")
     listener_id: str = Field(..., description="監聽器唯一識別碼")
 
 
 class UnregisterEventListenerArgs(BaseModel):
     """取消註冊事件監聽器參數"""
+
     event_type: str = Field(..., description="事件類型")
     listener_id: str = Field(..., description="監聽器唯一識別碼")
 
 
 class StartWebSocketStreamArgs(BaseModel):
     """啟動 WebSocket 串流參數"""
+
     symbol: str = Field(..., description="股票代碼或期貨合約代碼")
     data_type: str = Field("quote", description="數據類型：quote, candles, volume")
     interval: int = Field(1, description="更新間隔（秒）", ge=1)
@@ -563,16 +568,19 @@ class StartWebSocketStreamArgs(BaseModel):
 
 class StopWebSocketStreamArgs(BaseModel):
     """停止 WebSocket 串流參數"""
+
     stream_id: str = Field(..., description="串流 ID")
 
 
 class GetStreamStatusArgs(BaseModel):
     """獲取串流狀態參數"""
+
     stream_id: str = Field(..., description="串流 ID")
 
 
 class PushRealtimeUpdateArgs(BaseModel):
     """推送即時更新參數"""
+
     symbol: str = Field(..., description="股票代碼或期貨合約代碼")
     data: Dict = Field(..., description="要推送的數據")
     data_type: str = Field("quote", description="數據類型：quote, candles, volume")
