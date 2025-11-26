@@ -34,17 +34,18 @@ class TestConfig:
         assert "fubon-mcp" in str(config.DEFAULT_DATA_DIR)
         assert "data" in str(config.DEFAULT_DATA_DIR)
 
-    @patch.dict(os.environ, {"FUBON_DATA_DIR": "/custom/data/path"})
-    def test_config_custom_data_dir(self):
-        """測試自訂資料目錄"""
+    def test_config_custom_data_dir(self, tmp_path):
+        """測試自訂資料目錄 (使用可寫入的臨時目錄)"""
         import importlib
 
         from fubon_api_mcp_server import config as config_module
 
-        importlib.reload(config_module)
-        config = config_module.Config()
+        custom_path = tmp_path / "custom" / "data" / "path"
+        with patch.dict(os.environ, {"FUBON_DATA_DIR": str(custom_path)}):
+            importlib.reload(config_module)
+            config = config_module.Config()
 
-        assert config.BASE_DATA_DIR == Path("/custom/data/path")
+            assert config.BASE_DATA_DIR == custom_path
 
     @patch.dict(os.environ, {"FUBON_USERNAME": "testuser", "FUBON_PASSWORD": "testpass"})
     def test_config_credentials_from_env(self):
