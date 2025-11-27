@@ -84,91 +84,33 @@ class TradingService:
             return [self._to_dict(x) for x in obj]
         if isinstance(obj, dict):
             return {k: self._to_dict(v) for k, v in obj.items()}
+        
+        # 嘗試使用 vars() 取得所有屬性
         try:
-            return {k: self._to_dict(v) for k, v in vars(obj).items() if not k.startswith("_")}
-        except Exception:
-            # fallback - try common attrs
-            common_attrs = [
-                "name",
-                "account",
-                "branch_no",
-                "account_type",
-                "id_no",
-                "status",
-                "date",
-                "stock_no",
-                "order_no",
-                "order_type",
-                "function_type",
-                "seq_no",
-                "asset_type",
-                "market",
-                "market_type",
-                "price_type",
-                "price",
-                "quantity",
-                "time_in_force",
-                "is_pre_order",
-                "after_price_type",
-                "after_price",
-                "unit",
-                "after_qty",
-                "filled_money",
-                "before_qty",
-                "before_price",
-                "user_def",
-                "last_time",
-                "error_message",
-                "lastday_qty",
-                "buy_qty",
-                "buy_filled_qty",
-                "buy_value",
-                "today_qty",
-                "tradable_qty",
-                "sell_qty",
-                "sell_filled_qty",
-                "sell_value",
-                "odd",
-                "balance",
-                "available_balance",
-                "currency",
-                "maintenance_ratio",
-                "maintenance_summary",
-                "maintenance_detail",
-                "account_obj",
-                "details",
-                "settlement_date",
-                "buy_fee",
-                "buy_settlement",
-                "buy_tax",
-                "sell_fee",
-                "sell_settlement",
-                "sell_tax",
-                "total_bs_value",
-                "total_fee",
-                "total_tax",
-                "total_settlement_amount",
-                "start_date",
-                "end_date",
-                "buy_sell",
-                "filled_qty",
-                "filled_price",
-                "realized_profit",
-                "realized_loss",
-                "cost_price",
-                "tradable_qty",
-                "unrealized_profit",
-                "unrealized_loss",
-                "filled_avg_price",
-                "realized_profit_and_loss",
-            ]
-            result = {}
-            for attr in common_attrs:
-                if hasattr(obj, attr):
-                    result[attr] = self._to_dict(getattr(obj, attr))
-            if result:
-                return result
-            return str(obj)
+            obj_vars = vars(obj)
+            if obj_vars:
+                return {k: self._to_dict(v) for k, v in obj_vars.items() if not k.startswith("_")}
+        except (TypeError, Exception):
+            pass
+        
+        # fallback - 使用 dir() 和 getattr() 取得所有公開屬性
+        # 這對於某些 SDK 物件（如 pyo3/rust 綁定）更可靠
+        result = {}
+        for attr in dir(obj):
+            if attr.startswith("_"):
+                continue
+            try:
+                value = getattr(obj, attr)
+                # 跳過方法和可調用物件
+                if callable(value):
+                    continue
+                result[attr] = self._to_dict(value)
+            except (AttributeError, Exception):
+                continue
+        
+        if result:
+            return result
+        return str(obj)
 
     def _normalize_order_result(self, raw_obj):
         """
@@ -221,14 +163,14 @@ class TradingService:
 
     def _stock_client(self):
         """Return the stock client if present, otherwise the top-level SDK (for backward compatibility with tests)."""
-        # If top-level SDK has stock-related methods (place_order/place_condition_order etc.)
+        # If top-level SDK has stock-related methods (place_order/single_condition etc.)
         # prefer it so tests that mock `sdk.place_order` still work. Otherwise fall back to sdk.stock.
         top_level_methods = [
             "place_order",
-            "place_condition_order",
+            "single_condition",
             "cancel_order",
-            "place_multi_condition_order",
-            "place_daytrade_condition_order",
+            "multi_condition",
+            "single_condition_day_trade",
             "place_time_slice_order",
             "get_order_results",
             "get_order_results_detail",
@@ -245,7 +187,8 @@ class TradingService:
         """Return the best client to call for a given method name.
 
         If a stock client has a configured mock for method_name (side_effect/return_value) prefer it,
-        else if the top-level sdk has a configured mock prefer it, otherwise prefer stock if available.
+        else if the top-level sdk has a configured mock prefer it, otherwise check which client
+        actually has the method and prefer that one.
         """
         stock = getattr(self.sdk, "stock", None)
         stock_method = getattr(stock, method_name, None) if stock is not None else None
@@ -263,7 +206,12 @@ class TradingService:
             return stock
         if top_method is not None and is_configured(top_method):
             return self.sdk
-        # fallback
+        # fallback: prefer the client that actually has the method
+        if stock_method is not None:
+            return stock
+        if top_method is not None:
+            return self.sdk
+        # If neither has the method, fallback to stock if available
         return stock if stock is not None else self.sdk
 
     def _register_tools(self):
@@ -828,38 +776,91 @@ class TradingService:
             if error:
                 return {"status": "error", "data": None, "message": error}
 
-            # 處理 price_type
-            order_params = validated_args.order.copy()
+            # 構建 Condition 物件（處理可能的 JSON 字串）
+            cond = validated_args.condition
+            if isinstance(cond, str):
+                import json
+                cond = json.loads(cond)
+            
+            condition_obj = Condition(
+                market_type=to_trading_type(cond.get("market_type", "Reference")),
+                symbol=cond.get("symbol", ""),
+                trigger=to_trigger_content(cond.get("trigger", "MatchedPrice")),
+                trigger_value=str(cond.get("trigger_value", "")),
+                comparison=to_operator(cond.get("comparison", "LessThan")),
+            )
+
+            # 構建 ConditionOrder 物件（處理可能的 JSON 字串）
+            order_params = validated_args.order
+            if isinstance(order_params, str):
+                import json
+                order_params = json.loads(order_params)
+            else:
+                order_params = order_params.copy() if isinstance(order_params, dict) else order_params
+            
+            price_val = order_params.get("price", "")
             if order_params.get("price_type") in ["Market", "LimitUp", "LimitDown"]:
-                order_params["price"] = ""
+                price_val = ""
 
-            # 構建條件單參數
-            condition_params = {
-                "account": account_obj,
-                "start_date": validated_args.start_date,
-                "end_date": validated_args.end_date,
-                "stop_sign": validated_args.stop_sign,
-                "condition": validated_args.condition,
-                "order": order_params,
-            }
+            order_obj = ConditionOrder(
+                buy_sell=to_bs_action(order_params.get("buy_sell", "Buy")),
+                symbol=order_params.get("symbol", ""),
+                quantity=int(order_params.get("quantity", 0)),
+                price=str(price_val),
+                market_type=to_condition_market_type(order_params.get("market_type", "Common")),
+                price_type=to_condition_price_type(order_params.get("price_type", "Limit")),
+                time_in_force=to_time_in_force(order_params.get("time_in_force", "ROD")),
+                order_type=to_condition_order_type(order_params.get("order_type", "Stock")),
+            )
 
-            # 添加停損停利參數（如果有）
+            # 調用 SDK 建立條件單（使用官方 single_condition API）
+            stock_client = self._stock_client_for("single_condition")
+            
+            # 根據是否有 tpsl 參數決定呼叫方式
             if validated_args.tpsl:
-                condition_params["tpsl"] = validated_args.tpsl
-
-            # 調用 SDK 建立條件單
-            stock_client = self._stock_client_for("place_condition_order")
-            result = stock_client.place_condition_order(**condition_params)
+                tpsl_param = validated_args.tpsl
+                if isinstance(tpsl_param, str):
+                    import json
+                    tpsl_param = json.loads(tpsl_param)
+                result = stock_client.single_condition(
+                    account_obj,
+                    validated_args.start_date,
+                    validated_args.end_date,
+                    to_stop_sign(validated_args.stop_sign),
+                    condition_obj,
+                    order_obj,
+                    tpsl_param,
+                )
+            else:
+                result = stock_client.single_condition(
+                    account_obj,
+                    validated_args.start_date,
+                    validated_args.end_date,
+                    to_stop_sign(validated_args.stop_sign),
+                    condition_obj,
+                    order_obj,
+                )
 
             if result and hasattr(result, "is_success") and result.is_success:
+                # 根據官方文件，回傳資料包含 guid 欄位
+                result_data = self._to_dict(result.data)
+                # 處理 result_data 可能是字串或物件的情況
+                if isinstance(result_data, dict):
+                    guid = result_data.get("guid", "N/A")
+                elif hasattr(result.data, "guid"):
+                    guid = result.data.guid
+                    result_data = {"guid": guid}
+                else:
+                    guid = str(result_data) if result_data else "N/A"
+                    result_data = {"guid": guid}
                 return {
                     "status": "success",
-                    "data": self._to_dict(result.data),
-                    "message": f"條件單建立成功，條件單號: {result.data.get('condition_no', 'N/A')}",
+                    "data": result_data,
+                    "message": f"條件單建立成功，條件單號: {guid}",
                 }
             else:
                 error_msg = "條件單建立失敗"
-                if result and hasattr(result, "message"):
+                if result and hasattr(result, "message") and result.message:
                     error_msg = f"條件單建立失敗: {result.message}"
                 return {"status": "error", "data": None, "message": error_msg}
 
@@ -1507,35 +1508,64 @@ class TradingService:
             if error:
                 return {"status": "error", "data": None, "message": error}
 
-            # 處理 price_type
+            # 構建 Condition 物件
+            cond = validated_args.condition
+            condition_obj = Condition(
+                market_type=to_trading_type(cond.get("market_type", "Reference")),
+                symbol=cond.get("symbol", ""),
+                trigger=to_trigger_content(cond.get("trigger", "MatchedPrice")),
+                trigger_value=str(cond.get("trigger_value", "")),
+                comparison=to_operator(cond.get("comparison", "LessThan")),
+            )
+
+            # 構建 ConditionOrder 物件
             order_params = validated_args.order.copy()
+            price_val = order_params.get("price", "")
             if order_params.get("price_type") in ["Market", "LimitUp", "LimitDown"]:
-                order_params["price"] = ""
+                price_val = ""
 
-            # 構建停損停利條件單參數
-            condition_params = {
-                "account": account_obj,
-                "start_date": validated_args.start_date,
-                "end_date": validated_args.end_date,
-                "stop_sign": validated_args.stop_sign,
-                "condition": validated_args.condition,
-                "order": order_params,
-                "tpsl": validated_args.tpsl,
-            }
+            order_obj = ConditionOrder(
+                buy_sell=to_bs_action(order_params.get("buy_sell", "Buy")),
+                symbol=order_params.get("symbol", ""),
+                quantity=int(order_params.get("quantity", 0)),
+                price=str(price_val),
+                market_type=to_condition_market_type(order_params.get("market_type", "Common")),
+                price_type=to_condition_price_type(order_params.get("price_type", "Limit")),
+                time_in_force=to_time_in_force(order_params.get("time_in_force", "ROD")),
+                order_type=to_condition_order_type(order_params.get("order_type", "Stock")),
+            )
 
-            # 調用 SDK 建立停損停利條件單
-            stock_client = self._stock_client_for("place_condition_order")
-            result = stock_client.place_condition_order(**condition_params)
+            # 調用 SDK 建立停損停利條件單（使用官方 single_condition API）
+            stock_client = self._stock_client_for("single_condition")
+            result = stock_client.single_condition(
+                account_obj,
+                validated_args.start_date,
+                validated_args.end_date,
+                to_stop_sign(validated_args.stop_sign),
+                condition_obj,
+                order_obj,
+                validated_args.tpsl,
+            )
 
             if result and hasattr(result, "is_success") and result.is_success:
+                result_data = self._to_dict(result.data)
+                # 處理 result_data 可能是字串或物件的情況
+                if isinstance(result_data, dict):
+                    guid = result_data.get("guid", "N/A")
+                elif hasattr(result.data, "guid"):
+                    guid = result.data.guid
+                    result_data = {"guid": guid}
+                else:
+                    guid = str(result_data) if result_data else "N/A"
+                    result_data = {"guid": guid}
                 return {
                     "status": "success",
-                    "data": self._to_dict(result.data),
-                    "message": f"停損停利條件單建立成功，條件單號: {result.data.get('condition_no', 'N/A')}",
+                    "data": result_data,
+                    "message": f"停損停利條件單建立成功，條件單號: {guid}",
                 }
             else:
                 error_msg = "停損停利條件單建立失敗"
-                if result and hasattr(result, "message"):
+                if result and hasattr(result, "message") and result.message:
                     error_msg = f"停損停利條件單建立失敗: {result.message}"
                 return {"status": "error", "data": None, "message": error_msg}
 

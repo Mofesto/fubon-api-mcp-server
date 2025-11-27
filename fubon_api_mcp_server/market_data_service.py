@@ -295,7 +295,7 @@ class MarketDataService:
 
     def historical_candles(self, args: Dict) -> dict:
         """
-        獲取歷史數據，優先使用本地數據，如果本地沒有再使用 API
+        獲取歷史數據，優先使用本地數據，如果本地沒有或資料過舊則自動從 API 更新
 
         Args:
             symbol (str): 股票代碼，必須為文字格式，例如: '2330'、'00878'
@@ -308,6 +308,9 @@ class MarketDataService:
             symbol = validated_args.symbol
             from_date = validated_args.from_date
             to_date = validated_args.to_date
+
+            # 確保資料是最新的（檢查並自動更新過舊資料）
+            self._ensure_fresh_data(symbol, to_date)
 
             # 嘗試從本地數據獲取
             local_result = self._get_local_historical_data(symbol, from_date, to_date)
@@ -366,6 +369,97 @@ class MarketDataService:
             "message": f"成功從本地數據獲取 {symbol} 從 {from_date} 到 {to_date} 的數據",
         }
 
+    def _ensure_fresh_data(self, symbol: str, to_date: str = None, min_days: int = 0):
+        """
+        確保本地資料是最新的，如果過舊則自動從 API 更新。
+
+        此方法會檢查本地快取的最新日期，如果距離目標日期超過 1 天（排除週末），
+        則自動從 API 取得缺失的資料並合併到本地快取。
+
+        Args:
+            symbol (str): 股票代碼
+            to_date (str, optional): 目標結束日期，格式 YYYY-MM-DD，預設為今天
+            min_days (int, optional): 最少需要的資料天數，如果本地資料不足會嘗試補齊
+        """
+        import datetime
+
+        try:
+            # 設定目標日期
+            if to_date:
+                target_date = pd.to_datetime(to_date).date()
+            else:
+                target_date = datetime.date.today()
+
+            # 讀取本地資料
+            local_data = self._read_local_stock_data(symbol)
+
+            need_fetch = False
+            fetch_from = None
+            fetch_to = target_date.strftime("%Y-%m-%d")
+
+            if local_data is None or local_data.empty:
+                # 本地沒有資料，需要從 API 獲取
+                need_fetch = True
+                # 預設獲取一年的資料
+                fetch_from = (target_date - datetime.timedelta(days=365)).strftime("%Y-%m-%d")
+                self.logger.info(f"本地無 {symbol} 資料，將從 API 獲取")
+            else:
+                # 檢查本地資料的最新日期
+                latest_local_date = local_data["date"].max()
+                if hasattr(latest_local_date, "date"):
+                    latest_local_date = latest_local_date.date()
+                elif isinstance(latest_local_date, str):
+                    latest_local_date = datetime.datetime.strptime(latest_local_date, "%Y-%m-%d").date()
+
+                # 計算日期差距（排除週末的簡單判斷）
+                days_diff = (target_date - latest_local_date).days
+
+                # 如果最新資料日期比目標日期早超過 1 天（考慮週末為 3 天），則更新
+                # 週一到週五，如果差距 > 1 天就更新
+                # 週末則允許差距 > 3 天
+                weekday = target_date.weekday()
+                max_allowed_diff = 3 if weekday == 0 else 1  # 週一允許 3 天差距
+
+                if days_diff > max_allowed_diff:
+                    need_fetch = True
+                    # 從本地最新日期的下一天開始取
+                    fetch_from = (latest_local_date + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+                    self.logger.info(f"{symbol} 本地資料過舊（最新: {latest_local_date}），將更新至 {fetch_to}")
+
+                # 檢查資料是否足夠
+                if min_days > 0 and len(local_data) < min_days:
+                    need_fetch = True
+                    # 計算需要多少天的資料
+                    oldest_local_date = local_data["date"].min()
+                    if hasattr(oldest_local_date, "date"):
+                        oldest_local_date = oldest_local_date.date()
+                    # 往前取更多資料
+                    extra_days = min_days - len(local_data) + 30  # 多取 30 天緩衝
+                    new_from = (oldest_local_date - datetime.timedelta(days=extra_days)).strftime("%Y-%m-%d")
+                    if fetch_from is None or new_from < fetch_from:
+                        fetch_from = new_from
+                    self.logger.info(f"{symbol} 資料不足 {min_days} 天，將補充資料")
+
+            # 如果需要更新，從 API 取得新資料
+            if need_fetch and fetch_from:
+                try:
+                    new_data = self._fetch_api_historical_data(symbol, fetch_from, fetch_to)
+
+                    if new_data and len(new_data) > 0:
+                        # 處理並保存到本地
+                        df = pd.DataFrame(new_data)
+                        df = self._process_historical_data(df)
+                        self._save_to_local_db(symbol, df.to_dict("records"))
+                        self.logger.info(f"成功更新 {symbol} 資料，新增 {len(new_data)} 筆")
+
+                except Exception as e:
+                    self.logger.warning(f"從 API 更新 {symbol} 資料失敗: {e}")
+                    # 更新失敗不拋出異常，繼續使用現有資料
+
+        except Exception as e:
+            self.logger.warning(f"檢查資料新鮮度時發生錯誤: {e}")
+            # 不拋出異常，繼續使用現有資料
+
     def _fetch_api_historical_data(self, symbol: str, from_date: str, to_date: str) -> list:
         """從 API 獲取歷史數據"""
         from_datetime = pd.to_datetime(from_date)
@@ -374,11 +468,11 @@ class MarketDataService:
 
         all_data = []
 
-        if date_diff > 365:
+        if date_diff > 365-1:
             # 分段獲取數據
             current_from = from_datetime
             while current_from < to_datetime:
-                current_to = min(current_from + pd.Timedelta(days=365), to_datetime)
+                current_to = min(current_from + pd.Timedelta(days=365-1), to_datetime)
                 segment_data = self._fetch_historical_data_segment(
                     symbol,
                     current_from.strftime("%Y-%m-%d"),
@@ -1901,15 +1995,31 @@ class MarketDataService:
     def get_trading_signals(self, args: Dict) -> dict:
         """
         專業級多因子交易訊號引擎（已實盤驗證）
+
+        自動確保資料是最新的，如果本地資料過舊或不足會自動從 API 更新。
         """
         try:
             params = GetTradingSignalsArgs(**args)
             symbol = params.symbol
 
+            # 技術指標分析需要的最少資料天數
+            MIN_REQUIRED_DAYS = 220  # 200日均線 + 20天緩衝
+
+            # 確保資料是最新且足夠的（自動從 API 更新）
+            self._ensure_fresh_data(symbol, min_days=MIN_REQUIRED_DAYS)
+
             # 讀取更長週期的資料（至少 200 根，避免邊界效應）
             df_daily = self._read_local_stock_data(symbol)
             if df_daily is None or df_daily.empty:
-                return {"status": "error", "data": None, "message": f"無本地歷史資料: {symbol}"}
+                return {"status": "error", "data": None, "message": f"無法取得 {symbol} 歷史資料，請確認股票代碼正確且 API 服務正常"}
+
+            # 如果資料仍不足，返回明確的錯誤訊息
+            if len(df_daily) < 50:
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": f"資料筆數不足（目前 {len(df_daily)} 筆，需要至少 50 筆），可能是新上市股票或 API 暫時無法取得資料",
+                }
 
             # 建立週線資料（多時間框架確認）
             # 有些測試或來源資料可能缺少 open 欄位，若缺少則使用 close 作為 open 的替代值
@@ -1931,7 +2041,7 @@ class MarketDataService:
             if getattr(params, "to_date", None):
                 df = df[df["date"] <= pd.to_datetime(params.to_date)]
             if len(df) < 50:
-                return {"status": "error", "data": None, "message": "資料筆數不足50根，無法有效分析"}
+                return {"status": "error", "data": None, "message": f"指定日期範圍內資料筆數不足 50 筆（目前 {len(df)} 筆），請調整日期範圍"}
 
             close = df["close"]
             high = df["high"]

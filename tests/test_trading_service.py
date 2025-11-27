@@ -399,27 +399,33 @@ class TestTradingServiceMock:
         mock_account_obj = Mock()
         mock_validate.return_value = (mock_account_obj, None)
 
-        # 模擬 SDK 下條件單成功
+        # 模擬 SDK 下條件單成功（使用官方 single_condition API）
         mock_result = Mock()
         mock_result.is_success = True
-        mock_result.data = {"condition_no": "COND001"}
-        trading_service.sdk.place_condition_order = Mock(return_value=mock_result)
-        # Also set stock.place_condition_order to the same mock for compatibility
-        trading_service.sdk.stock.place_condition_order = trading_service.sdk.place_condition_order
+        mock_result.data = {"guid": "44150047-8977-40b1-953c-ce270f36150"}
+        trading_service.sdk.single_condition = Mock(return_value=mock_result)
+        # Also set stock.single_condition to the same mock for compatibility
+        trading_service.sdk.stock.single_condition = trading_service.sdk.single_condition
 
         result = trading_service.place_condition_order(
             {
                 "account": "1234567",
-                "start_date": "2025-01-01",
-                "end_date": "2025-12-31",
+                "start_date": "20250101",
+                "end_date": "20251231",
                 "stop_sign": "Full",
-                "condition": {"price": 500.0, "operator": "GreaterThan"},
-                "order": {"buy_sell": "Buy", "symbol": "2330", "price": "500.0", "quantity": 1000},
+                "condition": {
+                    "market_type": "Reference",
+                    "symbol": "2330",
+                    "trigger": "MatchedPrice",
+                    "trigger_value": "500",
+                    "comparison": "LessThan"
+                },
+                "order": {"buy_sell": "Buy", "symbol": "2330", "price": "500", "quantity": 1000},
             }
         )
 
         assert result["status"] == "success"
-        assert result["data"]["condition_no"] == "COND001"
+        assert result["data"]["guid"] == "44150047-8977-40b1-953c-ce270f36150"
         assert "條件單建立成功" in result["message"]
 
     @patch("fubon_api_mcp_server.trading_service.validate_and_get_account")
@@ -757,8 +763,9 @@ class TestTradingServiceMock:
 
         mock_result = Mock()
         mock_result.is_success = True
-        mock_result.data = {"condition_no": "TPSL001"}
-        trading_service.sdk.stock.place_condition_order = Mock(return_value=mock_result)
+        mock_result.data = {"guid": "44150047-8977-40b1-953c-ce270f36150"}
+        trading_service.sdk.single_condition = Mock(return_value=mock_result)
+        trading_service.sdk.stock.single_condition = trading_service.sdk.single_condition
 
         result = trading_service.place_tpsl_condition_order({
             "account": "1234567",
@@ -775,7 +782,7 @@ class TestTradingServiceMock:
         })
 
         assert result["status"] == "success"
-        assert result["data"]["condition_no"] == "TPSL001"
+        assert result["data"]["guid"] == "44150047-8977-40b1-953c-ce270f36150"
 
     @patch("fubon_api_mcp_server.trading_service.validate_and_get_account")
     def test_get_condition_order_by_id_success(self, mock_validate, trading_service):

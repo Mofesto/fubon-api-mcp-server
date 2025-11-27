@@ -651,7 +651,9 @@ class TestMarketDataServiceMock:
     def test_historical_candles_segmented_fetch(self, market_data_service):
         """測試歷史數據分段拉取 (超過一年) 的邏輯"""
         # patch _read_local_stock_data to return None
+        # 日期範圍 2020-01-01 ~ 2022-01-01 約 730 天，每 364 天分段，需要 3 次呼叫
         with (
+            patch.object(market_data_service, "_ensure_fresh_data"),  # Skip auto-refresh logic
             patch.object(market_data_service, "_read_local_stock_data", return_value=None),
             patch.object(
                 market_data_service,
@@ -659,6 +661,7 @@ class TestMarketDataServiceMock:
                 side_effect=[
                     [{"date": "2020-01-01", "open": 100, "high": 105, "low": 95, "close": 102, "volume": 1000}],
                     [{"date": "2021-01-01", "open": 101, "high": 106, "low": 96, "close": 103, "volume": 1100}],
+                    [{"date": "2022-01-01", "open": 102, "high": 107, "low": 97, "close": 104, "volume": 1200}],
                 ],
             ),
             patch.object(

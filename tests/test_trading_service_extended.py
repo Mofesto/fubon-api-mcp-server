@@ -202,17 +202,23 @@ class TestTradingServiceExtended:
         mock_result = Mock()
         mock_result.is_success = False
         mock_result.message = "條件單建立失敗：參數錯誤"
-        trading_service.sdk.place_condition_order = Mock(return_value=mock_result)
-        trading_service.sdk.stock.place_condition_order = trading_service.sdk.place_condition_order
+        trading_service.sdk.single_condition = Mock(return_value=mock_result)
+        trading_service.sdk.stock.single_condition = trading_service.sdk.single_condition
 
         result = trading_service.place_condition_order(
             {
                 "account": "1234567",
-                "start_date": "2025-01-01",
-                "end_date": "2025-12-31",
+                "start_date": "20250101",
+                "end_date": "20251231",
                 "stop_sign": "Full",
-                "condition": {"price": 500.0, "operator": "GreaterThan"},
-                "order": {"buy_sell": "Buy", "symbol": "2330", "price": "500.0", "quantity": 1000},
+                "condition": {
+                    "market_type": "Reference",
+                    "symbol": "2330",
+                    "trigger": "MatchedPrice",
+                    "trigger_value": "500",
+                    "comparison": "LessThan"
+                },
+                "order": {"buy_sell": "Buy", "symbol": "2330", "price": "500", "quantity": 1000},
             }
         )
 
@@ -519,7 +525,8 @@ class TestTradingServiceExtended:
         mock_result = Mock()
         mock_result.is_success = False
         mock_result.message = "停損停利條件單建立失敗：價格設定錯誤"
-        trading_service.sdk.stock.place_condition_order = Mock(return_value=mock_result)
+        trading_service.sdk.single_condition = Mock(return_value=mock_result)
+        trading_service.sdk.stock.single_condition = trading_service.sdk.single_condition
 
         result = trading_service.place_tpsl_condition_order(
             {
@@ -768,26 +775,26 @@ class TestTradingServiceExtended:
         assert "name" in result or "account" in result  # At least one of the public attrs
 
     def test_to_dict_with_object_fallback(self, trading_service):
-        """測試 _to_dict 使用 fallback 路徑處理物件"""
+        """測試 _to_dict 使用 fallback 路徑處理物件（模擬 SDK 物件）"""
 
-        class CustomObject:
+        # 建立一個類似 SDK 物件的測試物件，vars() 無法正常運作
+        class SDKLikeObject:
+            """模擬某些 SDK 物件，vars() 會失敗但 dir()/getattr() 可用"""
+            __slots__ = ['order_no', 'status', 'price']
+            
             def __init__(self):
                 self.order_no = "12345678"
                 self.status = "Active"
                 self.price = 500.0
 
-            # Override vars() to raise exception, forcing fallback
-            def __dir__(self):
-                raise AttributeError("Cannot access __dict__")
-
-        # Create an object that will fail vars() check
-        obj = type("FakeOrder", (), {"__dict__": property(lambda self: (_ for _ in ()).throw(Exception("no vars")))})()
-        obj.order_no = "12345678"
-        obj.status = "Active"
-
+        obj = SDKLikeObject()
         result = trading_service._to_dict(obj)
-        # Fallback should extract common_attrs or return str(obj)
-        assert isinstance(result, (dict, str))
+        
+        # 應該使用 dir()/getattr() fallback 成功提取屬性
+        assert isinstance(result, dict)
+        assert result.get("order_no") == "12345678"
+        assert result.get("status") == "Active"
+        assert result.get("price") == 500.0
 
     def test_normalize_order_result_with_enums(self, trading_service):
         """測試 _normalize_order_result 將 enum 字串正規化"""

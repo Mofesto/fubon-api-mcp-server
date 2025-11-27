@@ -54,12 +54,149 @@ class AnalysisService:
         self.mcp.tool()(self.generate_market_sentiment_index)
         self.mcp.tool()(self.analyze_stock)
 
+    def _ensure_fresh_data(self, symbol: str, min_days: int = 60):
+        """
+        確保本地資料是最新的，如果過舊或不足則自動從 API 更新。
+
+        此方法會檢查本地快取的最新日期，如果距離今天超過 3 天，
+        或資料筆數不足，則自動從 API 取得資料並保存到本地資料庫。
+
+        Args:
+            symbol (str): 股票代碼
+            min_days (int): 最少需要的資料天數，預設 60 天
+        """
+        try:
+            # 讀取本地資料
+            df = self._read_local_stock_data(symbol)
+
+            need_fetch = False
+            fetch_from = None
+            fetch_to = datetime.datetime.now().strftime("%Y-%m-%d")
+
+            if df is None or df.empty:
+                # 本地沒有資料
+                need_fetch = True
+                fetch_from = (datetime.datetime.now() - datetime.timedelta(days=365)).strftime("%Y-%m-%d")
+                self.logger.info(f"本地無 {symbol} 資料，將從 API 獲取")
+            else:
+                # 檢查資料新鮮度
+                latest_date = df["date"].max()
+                if hasattr(latest_date, "date"):
+                    latest_date = latest_date.date()
+                elif isinstance(latest_date, str):
+                    latest_date = datetime.datetime.strptime(latest_date, "%Y-%m-%d").date()
+
+                days_diff = (datetime.date.today() - latest_date).days
+
+                # 如果資料過舊（超過 3 天）
+                if days_diff > 3:
+                    need_fetch = True
+                    fetch_from = (latest_date + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+                    self.logger.info(f"{symbol} 本地資料過舊（最新: {latest_date}），將更新至 {fetch_to}")
+
+                # 如果資料不足
+                if len(df) < min_days:
+                    need_fetch = True
+                    oldest_date = df["date"].min()
+                    if hasattr(oldest_date, "date"):
+                        oldest_date = oldest_date.date()
+                    extra_days = min_days - len(df) + 30
+                    new_from = (oldest_date - datetime.timedelta(days=extra_days)).strftime("%Y-%m-%d")
+                    if fetch_from is None or new_from < fetch_from:
+                        fetch_from = new_from
+                    self.logger.info(f"{symbol} 資料不足 {min_days} 天，將補充資料")
+
+            # 從 API 獲取資料
+            if need_fetch and fetch_from and self.reststock:
+                try:
+                    params = {
+                        "symbol": symbol,
+                        "from": fetch_from,
+                        "to": fetch_to,
+                    }
+                    response = self.reststock.historical.candles(**params)
+
+                    api_data = None
+                    if hasattr(response, "is_success") and response.is_success:
+                        api_data = response.data if hasattr(response, "data") else getattr(response, "result", None)
+                    elif isinstance(response, dict) and "data" in response:
+                        api_data = response["data"]
+
+                    if api_data:
+                        new_df = pd.DataFrame(api_data)
+                        new_df["date"] = pd.to_datetime(new_df["date"])
+                        new_df = new_df.sort_values(by="date", ascending=False)
+                        # 添加計算欄位
+                        new_df["vol_value"] = new_df["close"] * new_df["volume"]
+                        new_df["price_change"] = new_df["close"] - new_df["open"]
+                        new_df["change_ratio"] = np.where(
+                            new_df["open"] == 0,
+                            0.0,
+                            (new_df["price_change"] / new_df["open"]) * 100,
+                        )
+                        # 保存到資料庫
+                        self._save_to_local_db(symbol, new_df.to_dict("records"))
+                        self.logger.info(f"成功更新 {symbol} 資料，新增 {len(api_data)} 筆")
+
+                except Exception as e:
+                    self.logger.warning(f"從 API 更新 {symbol} 資料失敗: {e}")
+
+        except Exception as e:
+            self.logger.warning(f"檢查資料新鮮度時發生錯誤: {e}")
+
+    def _save_to_local_db(self, symbol: str, new_data: list):
+        """
+        將新的股票數據保存到本地 SQLite 數據庫，避免重複數據。
+
+        Args:
+            symbol (str): 股票代碼
+            new_data (list): 新的股票數據列表 (dict 序列)
+        """
+        try:
+            import sqlite3
+
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+
+                for record in new_data:
+                    date_str = str(record.get("date", ""))
+                    if isinstance(record.get("date"), pd.Timestamp):
+                        date_str = record["date"].strftime("%Y-%m-%d")
+
+                    cursor.execute(
+                        """
+                        INSERT OR REPLACE INTO stock_historical_data
+                        (symbol, date, open, high, low, close, volume, vol_value, price_change, change_ratio)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            symbol,
+                            date_str,
+                            record.get("open"),
+                            record.get("high"),
+                            record.get("low"),
+                            record.get("close"),
+                            record.get("volume"),
+                            record.get("vol_value"),
+                            record.get("price_change"),
+                            record.get("change_ratio"),
+                        ),
+                    )
+
+                conn.commit()
+                self.logger.info(f"成功保存數據到SQLite: {symbol}, {len(new_data)} 筆記錄")
+
+        except Exception as e:
+            self.logger.exception(f"保存SQLite數據時發生錯誤: {e}")
+
     def analyze_stock(self, args: Dict) -> dict:
         """
         對指定股票進行全方位技術分析並生成交易計畫
 
         整合多種技術指標 (MA, BB, RSI, MACD, KD, ATR) 進行綜合評估，
         判斷市場趨勢 (多/空/盤整)，識別支撐壓力位，並生成具體的交易計畫 (進場/停損/停利)。
+
+        自動確保資料是最新的，如果本地資料過舊或不足會自動從 API 更新。
 
         Args:
             symbol (str): 股票代碼
@@ -73,47 +210,18 @@ class AnalysisService:
             symbol = validated_args.symbol
             account = validated_args.account
 
+            # 確保資料是最新且足夠的（自動從 API 更新）
+            MIN_REQUIRED_DAYS = 70  # 60日均線 + 10天緩衝
+            self._ensure_fresh_data(symbol, min_days=MIN_REQUIRED_DAYS)
+
             # 1. 獲取歷史數據
             df = self._read_local_stock_data(symbol)
-
-            # 如果本地沒有數據或數據太舊，嘗試從 API 獲取
-            if df is None or df.empty or (datetime.datetime.now() - df["date"].max()).days > 3:
-                if self.reststock:
-                    # 獲取最近 365 天數據
-                    end_date = datetime.datetime.now()
-                    start_date = end_date - datetime.timedelta(days=365)
-
-                    try:
-                        params = {
-                            "symbol": symbol,
-                            "from": start_date.strftime("%Y-%m-%d"),
-                            "to": end_date.strftime("%Y-%m-%d"),
-                        }
-                        response = self.reststock.historical.candles(**params)
-                        
-                        # 處理 SDK 回應
-                        api_data = None
-                        if hasattr(response, "is_success") and response.is_success:
-                            api_data = response.data if hasattr(response, "data") else getattr(response, "result", None)
-                        elif isinstance(response, dict) and "data" in response:
-                            api_data = response["data"]
-                            
-                        if api_data:
-                            df = pd.DataFrame(api_data)
-                            df["date"] = pd.to_datetime(df["date"])
-                            df = df.sort_values(by="date", ascending=False)
-                            # 簡單處理，不保存到 DB (避免重複邏輯)，直接使用
-                            df["vol_value"] = df["close"] * df["volume"]
-                            df["price_change"] = df["close"] - df["open"]
-                            df["change_ratio"] = (df["price_change"] / df["open"]) * 100
-                    except Exception as e:
-                        self.logger.warning(f"嘗試從 API 獲取數據失敗: {e}")
 
             if df is None or df.empty or len(df) < 60:
                 return {
                     "status": "error",
                     "data": None,
-                    "message": f"數據不足，無法進行有效分析 (需要至少 60 筆歷史數據)。請先使用 market_data_service 更新 {symbol} 的歷史數據。",
+                    "message": f"數據不足，無法進行有效分析 (需要至少 60 筆歷史數據，目前 {len(df) if df is not None else 0} 筆)。可能是新上市股票或 API 暫時無法取得資料。",
                 }
 
             # 確保數據按日期升序排列以進行指標計算
@@ -1399,4 +1507,4 @@ class GenerateMarketSentimentIndexArgs(BaseModel):
     """市場情緒指數參數模型"""
 
     index_components: List[str] = ["technical", "volume", "options"]  # 指數組成成分
-    lookback_period: int = Field(30, ge=7, le=365)  # 回顧期間（天）
+    lookback_period: int = Field(30, ge=7, le=365-1)  # 回顧期間（天）
