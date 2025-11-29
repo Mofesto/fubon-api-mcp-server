@@ -26,6 +26,8 @@ from typing import Dict, List, Optional
 
 from fubon_neo.constant import (
     ConditionPriceType,
+    SplitDescription,
+    TimeSliceOrderType,
     TPSLOrder,
     TPSLWrapper,
     TrailOrder,
@@ -171,10 +173,11 @@ class TradingService:
             "cancel_order",
             "multi_condition",
             "single_condition_day_trade",
-            "place_time_slice_order",
+            "multi_condition_day_trade",
+            "time_slice_order",
             "get_order_results",
             "get_order_results_detail",
-            "cancel_condition_order",
+            "cancel_condition_orders",
             "trail_profit",
             "get_trail_history",
             "get_condition_history",
@@ -976,38 +979,97 @@ class TradingService:
             if error:
                 return {"status": "error", "data": None, "message": error}
 
-            # 處理 price_type
-            order_params = validated_args.order.copy()
+            # 構建多個 Condition 物件（處理可能的 JSON 字串）
+            conditions_list = validated_args.conditions
+            if isinstance(conditions_list, str):
+                import json
+                conditions_list = json.loads(conditions_list)
+            
+            condition_objs = []
+            for cond in conditions_list:
+                if isinstance(cond, str):
+                    import json
+                    cond = json.loads(cond)
+                condition_objs.append(
+                    Condition(
+                        market_type=to_trading_type(cond.get("market_type", "Reference")),
+                        symbol=cond.get("symbol", ""),
+                        trigger=to_trigger_content(cond.get("trigger", "MatchedPrice")),
+                        trigger_value=str(cond.get("trigger_value", "")),
+                        comparison=to_operator(cond.get("comparison", "LessThan")),
+                    )
+                )
+
+            # 構建 ConditionOrder 物件（處理可能的 JSON 字串）
+            order_params = validated_args.order
+            if isinstance(order_params, str):
+                import json
+                order_params = json.loads(order_params)
+            else:
+                order_params = order_params.copy() if isinstance(order_params, dict) else order_params
+            
+            price_val = order_params.get("price", "")
             if order_params.get("price_type") in ["Market", "LimitUp", "LimitDown"]:
-                order_params["price"] = ""
+                price_val = ""
 
-            # 構建多條件單參數
-            condition_params = {
-                "account": account_obj,
-                "start_date": validated_args.start_date,
-                "end_date": validated_args.end_date,
-                "stop_sign": validated_args.stop_sign,
-                "conditions": validated_args.conditions,
-                "order": order_params,
-            }
+            order_obj = ConditionOrder(
+                buy_sell=to_bs_action(order_params.get("buy_sell", "Buy")),
+                symbol=order_params.get("symbol", ""),
+                quantity=int(order_params.get("quantity", 0)),
+                price=str(price_val),
+                market_type=to_condition_market_type(order_params.get("market_type", "Common")),
+                price_type=to_condition_price_type(order_params.get("price_type", "Limit")),
+                time_in_force=to_time_in_force(order_params.get("time_in_force", "ROD")),
+                order_type=to_condition_order_type(order_params.get("order_type", "Stock")),
+            )
 
-            # 添加停損停利參數（如果有）
+            # 調用 SDK 建立多條件單（使用官方 multi_condition API）
+            stock_client = self._stock_client_for("multi_condition")
+            
+            # 根據是否有 tpsl 參數決定呼叫方式
             if validated_args.tpsl:
-                condition_params["tpsl"] = validated_args.tpsl
-
-            # 調用 SDK 建立多條件單
-            stock_client = self._stock_client_for("place_multi_condition_order")
-            result = stock_client.place_multi_condition_order(**condition_params)
+                tpsl_param = validated_args.tpsl
+                if isinstance(tpsl_param, str):
+                    import json
+                    tpsl_param = json.loads(tpsl_param)
+                result = stock_client.multi_condition(
+                    account_obj,
+                    validated_args.start_date,
+                    validated_args.end_date,
+                    to_stop_sign(validated_args.stop_sign),
+                    condition_objs,
+                    order_obj,
+                    tpsl_param,
+                )
+            else:
+                result = stock_client.multi_condition(
+                    account_obj,
+                    validated_args.start_date,
+                    validated_args.end_date,
+                    to_stop_sign(validated_args.stop_sign),
+                    condition_objs,
+                    order_obj,
+                )
 
             if result and hasattr(result, "is_success") and result.is_success:
+                result_data = self._to_dict(result.data)
+                # 處理 result_data 可能是字串或物件的情況
+                if isinstance(result_data, dict):
+                    guid = result_data.get("guid", "N/A")
+                elif hasattr(result.data, "guid"):
+                    guid = result.data.guid
+                    result_data = {"guid": guid}
+                else:
+                    guid = str(result_data) if result_data else "N/A"
+                    result_data = {"guid": guid}
                 return {
                     "status": "success",
-                    "data": self._to_dict(result.data),
-                    "message": f"多條件單建立成功，條件單號: {result.data.get('condition_no', 'N/A')}",
+                    "data": result_data,
+                    "message": f"多條件單建立成功，條件單號: {guid}",
                 }
             else:
                 error_msg = "多條件單建立失敗"
-                if result and hasattr(result, "message"):
+                if result and hasattr(result, "message") and result.message:
                     error_msg = f"多條件單建立失敗: {result.message}"
                 return {"status": "error", "data": None, "message": error_msg}
 
@@ -1305,17 +1367,18 @@ class TradingService:
                     intraday=wrap.intraday,
                 )
 
-            # 呼叫 SDK：multi_condition_day_trade
+            # 呼叫 SDK：multi_condition_day_trade (位置參數)
+            # sdk.stock.multi_condition_day_trade(account, stop_sign, end_time, [conditions], order, daytrade, tpsl, fix_session)
             stock_client = self._stock_client_for("multi_condition_day_trade")
             result = stock_client.multi_condition_day_trade(
-                account=account_obj,
-                stop_sign=to_stop_sign(validated.stop_sign),
-                end_time=validated.end_time,
-                conditions=conditions,
-                order=order,
-                daytrade=daytrade_obj,
-                tpsl=tpsl,
-                fix_session=validated.fix_session,
+                account_obj,
+                to_stop_sign(validated.stop_sign),
+                validated.end_time,
+                conditions,
+                order,
+                daytrade_obj,
+                tpsl,
+                validated.fix_session,
             )
 
             if result and hasattr(result, "is_success") and result.is_success:
@@ -1439,30 +1502,71 @@ class TradingService:
             if error:
                 return {"status": "error", "data": None, "message": error}
 
-            # 處理 price_type
-            order_params = validated_args.order.copy()
-            if order_params.get("price_type") in ["Market", "LimitUp", "LimitDown"]:
-                order_params["price"] = ""
-
-            # 構建分時分量條件單參數
-            condition_params = {
-                "account": account_obj,
-                "start_date": validated_args.start_date,
-                "end_date": validated_args.end_date,
-                "stop_sign": validated_args.stop_sign,
-                "split": validated_args.split,
-                "order": order_params,
+            # 構建 SplitDescription 對象
+            split_params = validated_args.split
+            # 處理 split_count 便捷字段
+            total_qty = split_params.get("total_quantity")
+            if not total_qty and split_params.get("split_count"):
+                total_qty = split_params["split_count"] * split_params.get("single_quantity", 1000)
+            
+            # 獲取 method 類型
+            method_str = split_params.get("method", "Type1")
+            split_method = getattr(TimeSliceOrderType, method_str, TimeSliceOrderType.Type1)
+            
+            # 構建 SplitDescription（在構造函數中包含所有參數）
+            split_kwargs = {
+                "method": split_method,
+                "interval": split_params.get("interval", 300),
+                "single_quantity": split_params.get("single_quantity", 1000),
+                "total_quantity": total_qty,
+                "start_time": split_params.get("start_time", "090000"),
             }
+            # Type2/Type3 需要 end_time，在構造時直接傳入
+            if split_params.get("end_time"):
+                split_kwargs["end_time"] = split_params["end_time"]
+            
+            split = SplitDescription(**split_kwargs)
 
-            # 調用 SDK 建立分時分量條件單
-            stock_client = self._stock_client_for("place_time_slice_order")
-            result = stock_client.place_time_slice_order(**condition_params)
+            # 構建 ConditionOrder 對象
+            order_params = validated_args.order
+            price_val = order_params.get("price", "")
+            if order_params.get("price_type") in ["Market", "LimitUp", "LimitDown"]:
+                price_val = ""
+
+            order = ConditionOrder(
+                buy_sell=to_bs_action(order_params.get("buy_sell", "Buy")),
+                symbol=order_params.get("symbol"),
+                price=price_val,
+                quantity=order_params.get("quantity", 1000),
+                market_type=to_condition_market_type(order_params.get("market_type", "Common")),
+                price_type=to_condition_price_type(order_params.get("price_type", "Limit")),
+                time_in_force=to_time_in_force(order_params.get("time_in_force", "ROD")),
+                order_type=to_condition_order_type(order_params.get("order_type", "Stock")),
+            )
+
+            # 調用 SDK 建立分時分量條件單（位置參數）
+            # sdk.stock.time_slice_order(account, start_date, end_date, stop_sign, split, order)
+            stock_client = self._stock_client_for("time_slice_order")
+            result = stock_client.time_slice_order(
+                account_obj,
+                validated_args.start_date,
+                validated_args.end_date,
+                to_stop_sign(validated_args.stop_sign),
+                split,
+                order,
+            )
 
             if result and hasattr(result, "is_success") and result.is_success:
+                guid = ""
+                if hasattr(result, "data") and result.data:
+                    if isinstance(result.data, dict):
+                        guid = result.data.get("guid", "")
+                    elif hasattr(result.data, "guid"):
+                        guid = result.data.guid
                 return {
                     "status": "success",
-                    "data": self._to_dict(result.data),
-                    "message": f"分時分量條件單建立成功，GUID: {result.data.get('guid', 'N/A')}",
+                    "data": {"guid": guid},
+                    "message": f"分時分量條件單建立成功，GUID: {guid}",
                 }
             else:
                 error_msg = "分時分量條件單建立失敗"
@@ -1582,7 +1686,7 @@ class TradingService:
 
         Args:
             account (str): 帳戶號碼
-            condition_no (str): 條件單號
+            condition_no (str): 條件單號 (guid)
         """
         try:
             validated_args = CancelConditionOrderArgs(**args)
@@ -1590,19 +1694,26 @@ class TradingService:
             if error:
                 return {"status": "error", "data": None, "message": error}
 
-            # 調用 SDK 取消條件單
-            stock_client = self._stock_client_for("cancel_condition_order")
-            result = stock_client.cancel_condition_order(account=account_obj, condition_no=validated_args.condition_no)
+            # 調用 SDK 取消條件單 (SDK 方法是複數形 cancel_condition_orders)
+            stock_client = self._stock_client_for("cancel_condition_orders")
+            result = stock_client.cancel_condition_orders(account_obj, validated_args.condition_no)
 
             if result and hasattr(result, "is_success") and result.is_success:
+                # CancelResult 對象含 advisory 字段
+                data = self._to_dict(result.data) if result.data else None
+                advisory = ""
+                if isinstance(data, dict):
+                    advisory = data.get("advisory", "")
+                elif data and hasattr(data, "advisory"):
+                    advisory = data.advisory
                 return {
                     "status": "success",
-                    "data": self._to_dict(result.data),
-                    "message": f"條件單 {validated_args.condition_no} 取消成功",
+                    "data": data,
+                    "message": advisory or f"條件單 {validated_args.condition_no} 取消成功",
                 }
             else:
                 error_msg = "取消條件單失敗"
-                if result and hasattr(result, "message"):
+                if result and hasattr(result, "message") and result.message:
                     error_msg = f"取消條件單失敗: {result.message}"
                 return {"status": "error", "data": None, "message": error_msg}
 

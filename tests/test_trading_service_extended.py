@@ -234,7 +234,7 @@ class TestTradingServiceExtended:
         mock_result = Mock()
         mock_result.is_success = False
         mock_result.message = "取消失敗：條件單已觸發"
-        trading_service.sdk.stock.cancel_condition_order = Mock(return_value=mock_result)
+        trading_service.sdk.stock.cancel_condition_orders = Mock(return_value=mock_result)
 
         result = trading_service.cancel_condition_order({"account": "1234567", "condition_no": "COND001"})
 
@@ -355,7 +355,7 @@ class TestTradingServiceExtended:
         mock_result = Mock()
         mock_result.is_success = False
         mock_result.message = "分時分量單建立失敗：時間區間錯誤"
-        trading_service.sdk.stock.place_time_slice_order = Mock(return_value=mock_result)
+        trading_service.sdk.stock.time_slice_order = Mock(return_value=mock_result)
 
         result = trading_service.place_time_slice_order(
             {
@@ -415,7 +415,8 @@ class TestTradingServiceExtended:
         mock_result = Mock()
         mock_result.is_success = False
         mock_result.message = "多條件單建立失敗：條件衝突"
-        trading_service.sdk.stock.place_multi_condition_order = Mock(return_value=mock_result)
+        trading_service.sdk.multi_condition = Mock(return_value=mock_result)
+        trading_service.sdk.stock.multi_condition = trading_service.sdk.multi_condition
 
         result = trading_service.place_multi_condition_order(
             {

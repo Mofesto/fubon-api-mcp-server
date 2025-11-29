@@ -438,7 +438,7 @@ class TestTradingServiceMock:
         # 模擬 SDK 取消條件單成功
         mock_result = Mock()
         mock_result.is_success = True
-        trading_service.sdk.stock.cancel_condition_order = Mock(return_value=mock_result)
+        trading_service.sdk.stock.cancel_condition_orders = Mock(return_value=mock_result)
 
         result = trading_service.cancel_condition_order({"account": "1234567", "condition_no": "COND001"})
 
@@ -668,8 +668,9 @@ class TestTradingServiceMock:
 
         mock_result = Mock()
         mock_result.is_success = True
-        mock_result.data = {"condition_no": "MULTI001"}
-        trading_service.sdk.stock.place_multi_condition_order = Mock(return_value=mock_result)
+        mock_result.data = {"guid": "44150047-8977-40b1-953c-ce270f36150"}
+        trading_service.sdk.multi_condition = Mock(return_value=mock_result)
+        trading_service.sdk.stock.multi_condition = trading_service.sdk.multi_condition
 
         result = trading_service.place_multi_condition_order({
             "account": "1234567",
@@ -684,7 +685,7 @@ class TestTradingServiceMock:
         })
 
         assert result["status"] == "success"
-        assert result["data"]["condition_no"] == "MULTI001"
+        assert result["data"]["guid"] == "44150047-8977-40b1-953c-ce270f36150"
 
     @patch("fubon_api_mcp_server.trading_service.validate_and_get_account")
     def test_place_daytrade_condition_order_success(self, mock_validate, trading_service):
@@ -741,7 +742,7 @@ class TestTradingServiceMock:
         mock_result = Mock()
         mock_result.is_success = True
         mock_result.data = {"guid": "TS001"}
-        trading_service.sdk.stock.place_time_slice_order = Mock(return_value=mock_result)
+        trading_service.sdk.stock.time_slice_order = Mock(return_value=mock_result)
 
         result = trading_service.place_time_slice_order({
             "account": "1234567",
