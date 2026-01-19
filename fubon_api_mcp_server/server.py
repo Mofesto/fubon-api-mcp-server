@@ -1581,9 +1581,7 @@ def main():
         )
         account_service = AccountService(mcp, config.sdk, config.accounts)
         reports_service = ReportsService(mcp, config.sdk, config.accounts)
-        indicators_service = AnalysisService(
-            mcp, config.sdk, config.accounts, config.reststock, config.restfutopt
-        )
+        indicators_service = AnalysisService(mcp, config.sdk, config.accounts, config.reststock, config.restfutopt)
 
         logger.info("富邦證券MCP server運行中...")
         mcp.run()

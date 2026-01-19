@@ -40,14 +40,14 @@ from pydantic import BaseModel
 # 本地模組導入
 from .enums import (
     to_bs_action,
-    to_market_type,
-    to_order_type,
-    to_price_type,
     to_condition_market_type,
     to_condition_order_type,
     to_condition_price_type,
     to_direction,
+    to_market_type,
     to_operator,
+    to_order_type,
+    to_price_type,
     to_stop_sign,
     to_time_in_force,
     to_trading_type,
@@ -86,7 +86,7 @@ class TradingService:
             return [self._to_dict(x) for x in obj]
         if isinstance(obj, dict):
             return {k: self._to_dict(v) for k, v in obj.items()}
-        
+
         # 嘗試使用 vars() 取得所有屬性
         try:
             obj_vars = vars(obj)
@@ -94,7 +94,7 @@ class TradingService:
                 return {k: self._to_dict(v) for k, v in obj_vars.items() if not k.startswith("_")}
         except (TypeError, Exception):
             pass
-        
+
         # fallback - 使用 dir() 和 getattr() 取得所有公開屬性
         # 這對於某些 SDK 物件（如 pyo3/rust 綁定）更可靠
         result = {}
@@ -109,7 +109,7 @@ class TradingService:
                 result[attr] = self._to_dict(value)
             except (AttributeError, Exception):
                 continue
-        
+
         if result:
             return result
         return str(obj)
@@ -157,7 +157,9 @@ class TradingService:
             if "status" in det:
                 det["status"] = strip_enum_prefix(det["status"]) if isinstance(det["status"], str) else det["status"]
             if "function_type" in det:
-                det["function_type"] = strip_enum_prefix(det["function_type"]) if isinstance(det["function_type"], str) else det["function_type"]
+                det["function_type"] = (
+                    strip_enum_prefix(det["function_type"]) if isinstance(det["function_type"], str) else det["function_type"]
+                )
             normalized_details.append(det)
 
         data["details"] = normalized_details
@@ -297,7 +299,7 @@ class TradingService:
                 result = stock_client.place_order(account_obj, order_obj)
 
             if result and hasattr(result, "is_success") and result.is_success:
-                order_no = getattr(result.data, 'order_no', 'N/A') if hasattr(result, 'data') else 'N/A'
+                order_no = getattr(result.data, "order_no", "N/A") if hasattr(result, "data") else "N/A"
                 return {
                     "status": "success",
                     "data": self._to_dict(result.data),
@@ -339,7 +341,9 @@ class TradingService:
                 cancel_obj = validated_args.order_res
                 try:
                     # 優先嘗試命名參數
-                    result = stock_client.cancel_order(account=account_obj, cancel_order=cancel_obj, unblock=validated_args.unblock)
+                    result = stock_client.cancel_order(
+                        account=account_obj, cancel_order=cancel_obj, unblock=validated_args.unblock
+                    )
                 except TypeError:
                     try:
                         # positional: (account, cancel_obj, unblock)
@@ -369,13 +373,15 @@ class TradingService:
                         if itm.get("order_no") == validated_args.order_no:
                             target_order = item
                             break
-                
+
                 if target_order is None:
                     return {"status": "error", "data": None, "message": f"找不到委託單 {validated_args.order_no}，無法取消"}
 
                 cancel_obj = target_order
                 try:
-                    result = stock_client.cancel_order(account=account_obj, cancel_order=cancel_obj, unblock=validated_args.unblock)
+                    result = stock_client.cancel_order(
+                        account=account_obj, cancel_order=cancel_obj, unblock=validated_args.unblock
+                    )
                 except TypeError:
                     try:
                         result = stock_client.cancel_order(account_obj, cancel_obj, validated_args.unblock)
@@ -480,9 +486,13 @@ class TradingService:
             # 呼叫 SDK.modify_price
             try:
                 if isinstance(modify_obj, dict):
-                    result = stock_client.modify_price(account=account_obj, modify_price_obj=modify_obj, unblock=validated_args.unblock)
+                    result = stock_client.modify_price(
+                        account=account_obj, modify_price_obj=modify_obj, unblock=validated_args.unblock
+                    )
                 else:
-                    result = stock_client.modify_price(account=account_obj, modify_price_obj=modify_obj, unblock=validated_args.unblock)
+                    result = stock_client.modify_price(
+                        account=account_obj, modify_price_obj=modify_obj, unblock=validated_args.unblock
+                    )
             except TypeError:
                 # fallback: named args only
                 result = stock_client.modify_price(account=account_obj, modify_price_obj=modify_obj)
@@ -783,8 +793,9 @@ class TradingService:
             cond = validated_args.condition
             if isinstance(cond, str):
                 import json
+
                 cond = json.loads(cond)
-            
+
             condition_obj = Condition(
                 market_type=to_trading_type(cond.get("market_type", "Reference")),
                 symbol=cond.get("symbol", ""),
@@ -797,10 +808,11 @@ class TradingService:
             order_params = validated_args.order
             if isinstance(order_params, str):
                 import json
+
                 order_params = json.loads(order_params)
             else:
                 order_params = order_params.copy() if isinstance(order_params, dict) else order_params
-            
+
             price_val = order_params.get("price", "")
             if order_params.get("price_type") in ["Market", "LimitUp", "LimitDown"]:
                 price_val = ""
@@ -818,12 +830,13 @@ class TradingService:
 
             # 調用 SDK 建立條件單（使用官方 single_condition API）
             stock_client = self._stock_client_for("single_condition")
-            
+
             # 根據是否有 tpsl 參數決定呼叫方式
             if validated_args.tpsl:
                 tpsl_param = validated_args.tpsl
                 if isinstance(tpsl_param, str):
                     import json
+
                     tpsl_param = json.loads(tpsl_param)
                 result = stock_client.single_condition(
                     account_obj,
@@ -983,12 +996,14 @@ class TradingService:
             conditions_list = validated_args.conditions
             if isinstance(conditions_list, str):
                 import json
+
                 conditions_list = json.loads(conditions_list)
-            
+
             condition_objs = []
             for cond in conditions_list:
                 if isinstance(cond, str):
                     import json
+
                     cond = json.loads(cond)
                 condition_objs.append(
                     Condition(
@@ -1004,10 +1019,11 @@ class TradingService:
             order_params = validated_args.order
             if isinstance(order_params, str):
                 import json
+
                 order_params = json.loads(order_params)
             else:
                 order_params = order_params.copy() if isinstance(order_params, dict) else order_params
-            
+
             price_val = order_params.get("price", "")
             if order_params.get("price_type") in ["Market", "LimitUp", "LimitDown"]:
                 price_val = ""
@@ -1025,12 +1041,13 @@ class TradingService:
 
             # 調用 SDK 建立多條件單（使用官方 multi_condition API）
             stock_client = self._stock_client_for("multi_condition")
-            
+
             # 根據是否有 tpsl 參數決定呼叫方式
             if validated_args.tpsl:
                 tpsl_param = validated_args.tpsl
                 if isinstance(tpsl_param, str):
                     import json
+
                     tpsl_param = json.loads(tpsl_param)
                 result = stock_client.multi_condition(
                     account_obj,
@@ -1508,11 +1525,11 @@ class TradingService:
             total_qty = split_params.get("total_quantity")
             if not total_qty and split_params.get("split_count"):
                 total_qty = split_params["split_count"] * split_params.get("single_quantity", 1000)
-            
+
             # 獲取 method 類型
             method_str = split_params.get("method", "Type1")
             split_method = getattr(TimeSliceOrderType, method_str, TimeSliceOrderType.Type1)
-            
+
             # 構建 SplitDescription（在構造函數中包含所有參數）
             split_kwargs = {
                 "method": split_method,
@@ -1524,7 +1541,7 @@ class TradingService:
             # Type2/Type3 需要 end_time，在構造時直接傳入
             if split_params.get("end_time"):
                 split_kwargs["end_time"] = split_params["end_time"]
-            
+
             split = SplitDescription(**split_kwargs)
 
             # 構建 ConditionOrder 對象
@@ -2109,7 +2126,11 @@ class TradingService:
                     data_list = [self._normalize_filled_data(item) for item in data]
                 except Exception:
                     data_list = self._to_dict(data) or []
-                return {"status": "success", "data": data_list, "message": f"查詢成功，共 {len(data_list)} 筆（{start_date}~{end_date}）"}
+                return {
+                    "status": "success",
+                    "data": data_list,
+                    "message": f"查詢成功，共 {len(data_list)} 筆（{start_date}~{end_date}）",
+                }
 
             error_msg = getattr(result, "message", "未知錯誤") if result else "API 調用失敗"
             return {"status": "error", "data": None, "message": f"查詢失敗: {error_msg}"}

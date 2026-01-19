@@ -295,6 +295,8 @@ python install_fubon_neo.py
 
 ### 3. 環境配置
 
+#### 方式一：傳統 PFX 憑證認證（Traditional PFX Certificate Authentication）
+
 複製並編輯環境變數文件：
 
 ```bash
@@ -310,6 +312,88 @@ FUBON_PFX_PATH=/path/to/your/certificate.pfx
 FUBON_PFX_PASSWORD=您的憑證密碼（如果有）
 FUBON_DATA_DIR=./data
 ```
+
+#### 方式二：API-Key 認證（API-Key Authentication）✨ SDK v2.2.7+
+
+**適用場景**：
+- 🔐 需要 IP 白名單控制的自動化交易
+- 🤖 CI/CD 環境中的程式化交易
+- ☁️ 雲端環境部署（無需管理 PFX 憑證檔案）
+- 🔄 需要快速輪換憑證的場景
+
+**步驟 1：申請 API Key / Apply for API Key**
+
+前往富邦證券 API 交易平台申請 API Key：
+Visit Fubon Securities API trading platform to apply for an API Key:
+
+https://www.fbs.com.tw/TradeAPI/docs/key/
+
+**步驟 2：設定環境變數 / Set Environment Variables**
+
+編輯 `.env` 文件：
+
+```env
+# API-Key 認證（SDK v2.2.7+）
+FUBON_API_KEY=your_api_key_here
+FUBON_API_SECRET=your_api_secret_here
+FUBON_DATA_DIR=./data
+```
+
+**步驟 3：啟動服務 / Start Server**
+
+```bash
+python server.py
+# 或使用 VS Code Extension 啟動
+```
+
+**API-Key vs 傳統認證比較 / Comparison**
+
+| 特性 Feature | API-Key 認證 | 傳統 PFX 認證 |
+|-------------|-------------|--------------|
+| 認證方式 | API Key + Secret | 帳號 + 密碼 + PFX 憑證 |
+| 安全控制 | ✅ IP 白名單 | ❌ 無 |
+| 憑證管理 | ✅ 線上輪換 | ❌ 需重新下載憑證 |
+| CI/CD 友善 | ✅ 是 | ⚠️ 需管理憑證檔案 |
+| 雲端部署 | ✅ 簡單 | ⚠️ 需管理檔案路徑 |
+| SDK 版本要求 | v2.2.7+ | v2.2.4+ |
+
+**安全最佳實務 / Security Best Practices**
+
+1. **IP 白名單設定**：在富邦證券 API 平台設定允許的 IP 地址
+2. **定期輪換 API Key**：建議每 90 天更新一次 API Key
+3. **環境隔離**：開發、測試、生產環境使用不同的 API Key
+4. **權限最小化**：僅申請需要的 API 權限
+5. **密鑰保護**：
+   - ❌ 不要將 API Key 提交到版本控制
+   - ❌ 不要在日誌中記錄完整的 API Key
+   - ✅ 使用 `.env` 文件管理敏感資訊
+   - ✅ 在 CI/CD 中使用加密的環境變數
+
+**常見錯誤處理 / Common Error Handling**
+
+```python
+# 錯誤：無效的 API Key 格式
+# Error: Invalid API Key format
+無效的 API 金鑰格式 (太短) / Invalid API Key format (too short)
+
+# 錯誤：找不到 API Key
+# Error: API Key not found
+環境中找不到 API 金鑰或祕密 / API Key or Secret not found in environment
+請檢查 .env 文件是否正確設定 FUBON_API_KEY 和 FUBON_API_SECRET
+
+# 錯誤：API Key 過期或已撤銷
+# Error: API Key expired or revoked
+API 金鑰已過期或已被撤銷 / API Key has expired or been revoked
+請前往富邦證券 API 平台重新申請或檢查狀態
+```
+
+**切換認證方式 / Switch Authentication Methods**
+
+系統會自動偵測使用哪種認證方式：
+
+- 如果設定了 `FUBON_API_KEY` + `FUBON_API_SECRET` → 使用 API-Key 認證
+- 如果設定了 `FUBON_USERNAME` + `FUBON_PASSWORD` + `FUBON_PFX_PATH` → 使用傳統 PFX 認證
+- 兩種方式皆可，系統優先使用 API-Key 認證
 
 ### 4. 啟動服務
 
@@ -874,11 +958,19 @@ fubon-api-mcp-server/
 
 | 變數名稱 | 必填 | 說明 |
 |---------|------|------|
-| `FUBON_USERNAME` | ✅ | 富邦證券帳號 |
-| `FUBON_PASSWORD` | ✅ | 登入密碼 |
-| `FUBON_PFX_PATH` | ✅ | 電子憑證路徑 (.pfx) |
+| **傳統 PFX 認證** | | |
+| `FUBON_USERNAME` | ✅* | 富邦證券帳號 |
+| `FUBON_PASSWORD` | ✅* | 登入密碼 |
+| `FUBON_PFX_PATH` | ✅* | 電子憑證路徑 (.pfx) |
 | `FUBON_PFX_PASSWORD` | ❌ | 憑證密碼（如果有） |
+| **API-Key 認證 (SDK v2.2.7+)** | | |
+| `FUBON_API_KEY` | ✅** | 富邦證券 API Key |
+| `FUBON_API_SECRET` | ✅** | 富邦證券 API Secret |
+| **共用設定** | | |
 | `FUBON_DATA_DIR` | ❌ | 數據快取目錄（預設: ./data） |
+
+*必填：使用傳統 PFX 認證時  
+**必填：使用 API-Key 認證時
 
 ### 核心依賴說明
 

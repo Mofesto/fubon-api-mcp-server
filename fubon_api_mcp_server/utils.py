@@ -156,10 +156,16 @@ def validate_and_get_account(account: str) -> Tuple[Optional[Any], Optional[str]
                 accounts = sdk.login(username, password, pfx_path, pfx_password)
 
             else:
-                return None, "No valid credentials found. Provide either (FUBON_API_KEY + FUBON_API_SECRET) or (FUBON_USERNAME + FUBON_PASSWORD + FUBON_PFX_PATH) / 未找到有效憑證。請提供 (FUBON_API_KEY + FUBON_API_SECRET) 或 (FUBON_USERNAME + FUBON_PASSWORD + FUBON_PFX_PATH)"
+                return (
+                    None,
+                    "No valid credentials found. Provide either (FUBON_API_KEY + FUBON_API_SECRET) or (FUBON_USERNAME + FUBON_PASSWORD + FUBON_PFX_PATH) / 未找到有效憑證。請提供 (FUBON_API_KEY + FUBON_API_SECRET) 或 (FUBON_USERNAME + FUBON_PASSWORD + FUBON_PFX_PATH)",
+                )
 
             if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
-                return None, "Account authentication failed, please check if credentials have expired / 帳戶驗證失敗，請檢查憑證是否已過期"
+                return (
+                    None,
+                    "Account authentication failed, please check if credentials have expired / 帳戶驗證失敗，請檢查憑證是否已過期",
+                )
 
             # Store in config_module for reuse
             config_module.sdk = sdk
@@ -282,3 +288,91 @@ def normalize_item(item: Any, keys: List[str]) -> dict:
         result[k] = v if v is not None else _default_for(k)
 
     return result
+
+
+# =============================================================================
+# Certificate Export (SDK v2.2.7+ Feature)
+# =============================================================================
+
+
+def export_certificate(password: str, output_path: str) -> Tuple[bool, str]:
+    """
+    Export certificate to file (SDK v2.2.7+ feature).
+
+    This function wraps the SDK's certificate export capability, which exports
+    the user's web certificate in PKCS#12 (.pfx) format. The exported certificate
+    can be used for authentication in other applications or environments.
+
+    Args:
+        password (str): Password to protect the exported certificate
+        output_path (str): Absolute path where certificate will be saved (e.g., "/path/to/cert.pfx")
+
+    Returns:
+        tuple: (success, message)
+            - (True, "Certificate exported successfully / 憑證匯出成功") if export succeeds
+            - (False, error_message) if export fails
+
+    Error messages are bilingual (English + Traditional Chinese 繁體中文)
+
+    Example:
+        >>> success, msg = export_certificate("MySecurePassword", "/tmp/exported.pfx")
+        >>> if success:
+        ...     print("Certificate exported successfully")
+        ... else:
+        ...     print(f"Export failed: {msg}")
+
+    References:
+        - specs/001-sdk-v2.2.7-upgrade/tasks.md: T022
+        - specs/001-sdk-v2.2.7-upgrade/research.md: Certificate export format (PKCS#12)
+    """
+    try:
+        # Validate password
+        if not password or not isinstance(password, str) or not password.strip():
+            return False, "Certificate export failed: invalid password / 憑證匯出失敗: 密碼無效"
+
+        # Check SDK initialization
+        if config_module.sdk is None:
+            return False, "SDK not initialized / SDK 未初始化"
+
+        # Check if output path directory exists
+        from pathlib import Path
+
+        output_file = Path(output_path)
+        if not output_file.parent.exists():
+            return False, "Export path is not writable / 匯出路徑不可寫入"
+
+        # Call SDK export function
+        try:
+            result = config_module.sdk.export_certificate(password=password)
+        except AttributeError:
+            return (
+                False,
+                "Certificate export not supported by installed SDK version / SDK 版本不支援憑證匯出功能",
+            )
+        except Exception as e:
+            return False, f"Certificate export failed: {str(e)} / 憑證匯出失敗: {str(e)}"
+
+        # Check if export succeeded
+        if not result or not hasattr(result, "is_success") or not result.is_success:
+            error_msg = getattr(result, "message", "Unknown error")
+            return False, f"Certificate export failed: {error_msg} / 憑證匯出失敗: {error_msg}"
+
+        # Write certificate data to file
+        try:
+            cert_data = result.data
+            if not cert_data:
+                return False, "Certificate export failed: no data returned / 憑證匯出失敗: 未返回數據"
+
+            # Write binary data (PKCS#12 format)
+            with open(output_path, "wb") as f:
+                f.write(cert_data)
+
+            return True, "Certificate exported successfully / 憑證匯出成功"
+
+        except IOError as e:
+            return False, f"Export path is not writable: {str(e)} / 匯出路徑不可寫入: {str(e)}"
+        except Exception as e:
+            return False, f"Failed to write certificate file: {str(e)} / 寫入憑證檔案失敗: {str(e)}"
+
+    except Exception as e:
+        return False, f"Certificate export error: {str(e)} / 憑證匯出錯誤: {str(e)}"

@@ -28,9 +28,6 @@ from .enums import to_market_type, to_stock_types
 from .utils import validate_and_get_account
 
 
-
-
-
 class MarketDataService:
     """市場數據服務類"""
 
@@ -468,11 +465,11 @@ class MarketDataService:
 
         all_data = []
 
-        if date_diff > 365-1:
+        if date_diff > 365 - 1:
             # 分段獲取數據
             current_from = from_datetime
             while current_from < to_datetime:
-                current_to = min(current_from + pd.Timedelta(days=365-1), to_datetime)
+                current_to = min(current_from + pd.Timedelta(days=365 - 1), to_datetime)
                 segment_data = self._fetch_historical_data_segment(
                     symbol,
                     current_from.strftime("%Y-%m-%d"),
@@ -2027,7 +2024,11 @@ class MarketDataService:
             # 讀取更長週期的資料
             df_daily = self._read_local_stock_data(symbol)
             if df_daily is None or df_daily.empty:
-                return {"status": "error", "data": None, "message": f"無法取得 {symbol} 歷史資料，請確認股票代碼正確且 API 服務正常"}
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": f"無法取得 {symbol} 歷史資料，請確認股票代碼正確且 API 服務正常",
+                }
 
             if len(df_daily) < 50:
                 return {
@@ -2140,13 +2141,13 @@ class MarketDataService:
             daily_trend_strength = abs(close.iloc[-1] - ema20.iloc[-1]) / ema20.iloc[-1] * 100
 
             # 週線趨勢
-            weekly_close = df_weekly['close'].iloc[-1] if len(df_weekly) > 0 else close.iloc[-1]
-            weekly_ma10 = df_weekly['close'].rolling(10).mean().iloc[-1] if len(df_weekly) >= 10 else weekly_close
+            weekly_close = df_weekly["close"].iloc[-1] if len(df_weekly) > 0 else close.iloc[-1]
+            weekly_ma10 = df_weekly["close"].rolling(10).mean().iloc[-1] if len(df_weekly) >= 10 else weekly_close
             weekly_trend = "up" if weekly_close > weekly_ma10 else "down"
 
             # 月線趨勢
-            monthly_close = df_monthly['close'].iloc[-1] if len(df_monthly) > 0 else close.iloc[-1]
-            monthly_ma6 = df_monthly['close'].rolling(6).mean().iloc[-1] if len(df_monthly) >= 6 else monthly_close
+            monthly_close = df_monthly["close"].iloc[-1] if len(df_monthly) > 0 else close.iloc[-1]
+            monthly_ma6 = df_monthly["close"].rolling(6).mean().iloc[-1] if len(df_monthly) >= 6 else monthly_close
             monthly_trend = "up" if monthly_close > monthly_ma6 else "down"
 
             # 均線多頭/空頭排列
@@ -2179,7 +2180,7 @@ class MarketDataService:
                 adx=adx.iloc[-1] if not pd.isna(adx.iloc[-1]) else 20,
                 weekly_trend=weekly_trend,
                 monthly_trend=monthly_trend,
-                ma_alignment=ma_alignment
+                ma_alignment=ma_alignment,
             )
             factor_scores["trend"] = trend_score
             total_score += trend_score["score"] * 0.30
@@ -2198,7 +2199,7 @@ class MarketDataService:
                 d_prev=kd["d"].iloc[-2] if len(kd["d"]) > 1 else 50,
                 williams_r=williams_r.iloc[-1] if not pd.isna(williams_r.iloc[-1]) else -50,
                 cci=cci.iloc[-1] if not pd.isna(cci.iloc[-1]) else 0,
-                roc=roc.iloc[-1] if not pd.isna(roc.iloc[-1]) else 0
+                roc=roc.iloc[-1] if not pd.isna(roc.iloc[-1]) else 0,
             )
             factor_scores["momentum"] = momentum_score
             total_score += momentum_score["score"] * 0.25
@@ -2211,7 +2212,7 @@ class MarketDataService:
                 bb_lower=bb["lower"].iloc[-1],
                 bb_width=bb["width"].iloc[-1],
                 bb_width_avg=bb["width"].rolling(20).mean().iloc[-1] if len(bb["width"]) >= 20 else bb["width"].iloc[-1],
-                atr_percent=atr_percent.iloc[-1] if not pd.isna(atr_percent.iloc[-1]) else 2.0
+                atr_percent=atr_percent.iloc[-1] if not pd.isna(atr_percent.iloc[-1]) else 2.0,
             )
             factor_scores["volatility"] = volatility_score
             total_score += volatility_score["score"] * 0.15
@@ -2223,19 +2224,14 @@ class MarketDataService:
                 vol_rate=vol_rate.iloc[-1] if not pd.isna(vol_rate.iloc[-1]) else 1.0,
                 obv=obv.iloc[-1],
                 obv_ema=obv_ema.iloc[-1] if not pd.isna(obv_ema.iloc[-1]) else obv.iloc[-1],
-                price_change=latest["change_percent"]
+                price_change=latest["change_percent"],
             )
             factor_scores["volume"] = volume_score
             total_score += volume_score["score"] * 0.15
 
             # 5. 價格位置因子 (權重: 15%)
             price_position_score = self._calculate_price_position_score(
-                close=close.iloc[-1],
-                recent_high=recent_high,
-                recent_low=recent_low,
-                pivot=pivot,
-                r1=r1,
-                s1=s1
+                close=close.iloc[-1], recent_high=recent_high, recent_low=recent_low, pivot=pivot, r1=r1, s1=s1
             )
             factor_scores["price_position"] = price_position_score
             total_score += price_position_score["score"] * 0.15
@@ -2252,7 +2248,7 @@ class MarketDataService:
                 open_prices=open_price.tail(5).values,
                 high_prices=high.tail(5).values,
                 low_prices=low.tail(5).values,
-                close_prices=close.tail(5).values
+                close_prices=close.tail(5).values,
             )
 
             # === 進出場策略建議 ===
@@ -2265,7 +2261,7 @@ class MarketDataService:
                 r1=r1,
                 r2=r2,
                 recent_high=recent_high,
-                recent_low=recent_low
+                recent_low=recent_low,
             )
 
             # === 風險指標 ===
@@ -2274,7 +2270,7 @@ class MarketDataService:
                 atr=atr.iloc[-1] if not pd.isna(atr.iloc[-1]) else close.iloc[-1] * 0.02,
                 atr_percent=atr_percent.iloc[-1] if not pd.isna(atr_percent.iloc[-1]) else 2.0,
                 adx=adx.iloc[-1] if not pd.isna(adx.iloc[-1]) else 20,
-                bb_width=bb["width"].iloc[-1] if not pd.isna(bb["width"].iloc[-1]) else 0.1
+                bb_width=bb["width"].iloc[-1] if not pd.isna(bb["width"].iloc[-1]) else 0.1,
             )
 
             # === 組裝返回結果 ===
@@ -2283,16 +2279,16 @@ class MarketDataService:
                 "message": f"交易訊號分析成功: {symbol}",
                 "data": {
                     "symbol": symbol,
-                    "analysis_date": latest["date"].isoformat() if hasattr(latest["date"], "isoformat") else str(latest["date"]),
+                    "analysis_date": (
+                        latest["date"].isoformat() if hasattr(latest["date"], "isoformat") else str(latest["date"])
+                    ),
                     "current_price": latest["close"],
                     "change_percent": round(latest["change_percent"], 2),
-
                     # 核心訊號
                     "overall_signal": overall_signal,
                     "signal_score": round(total_score, 2),
                     "confidence": confidence,
                     "action_description": action_desc,
-
                     # 多時間框架趨勢
                     "trend_analysis": {
                         "daily_trend": daily_trend,
@@ -2302,7 +2298,6 @@ class MarketDataService:
                         "ma_alignment": ma_alignment,
                         "trend_consistency": self._check_trend_consistency(daily_trend, weekly_trend, monthly_trend),
                     },
-
                     # 完整技術指標
                     "technical_indicators": {
                         "moving_averages": {
@@ -2321,7 +2316,10 @@ class MarketDataService:
                             "middle": round(bb["middle"].iloc[-1], 2),
                             "lower": round(bb["lower"].iloc[-1], 2),
                             "width": round(bb["width"].iloc[-1], 4) if not pd.isna(bb["width"].iloc[-1]) else None,
-                            "position": round((close.iloc[-1] - bb["lower"].iloc[-1]) / (bb["upper"].iloc[-1] - bb["lower"].iloc[-1] + 1e-8), 2),
+                            "position": round(
+                                (close.iloc[-1] - bb["lower"].iloc[-1]) / (bb["upper"].iloc[-1] - bb["lower"].iloc[-1] + 1e-8),
+                                2,
+                            ),
                         },
                         "oscillators": {
                             "rsi_7": round(rsi_7.iloc[-1], 2) if not pd.isna(rsi_7.iloc[-1]) else None,
@@ -2334,8 +2332,14 @@ class MarketDataService:
                         },
                         "macd": {
                             "macd": round(macd_res["macd"].iloc[-1], 4) if not pd.isna(macd_res["macd"].iloc[-1]) else None,
-                            "signal": round(macd_res["signal"].iloc[-1], 4) if not pd.isna(macd_res["signal"].iloc[-1]) else None,
-                            "histogram": round(macd_res["histogram"].iloc[-1], 4) if not pd.isna(macd_res["histogram"].iloc[-1]) else None,
+                            "signal": (
+                                round(macd_res["signal"].iloc[-1], 4) if not pd.isna(macd_res["signal"].iloc[-1]) else None
+                            ),
+                            "histogram": (
+                                round(macd_res["histogram"].iloc[-1], 4)
+                                if not pd.isna(macd_res["histogram"].iloc[-1])
+                                else None
+                            ),
                             "status": "bullish" if macd_res["histogram"].iloc[-1] > 0 else "bearish",
                         },
                         "trend_strength": {
@@ -2347,7 +2351,6 @@ class MarketDataService:
                             "atr_percent": round(atr_percent.iloc[-1], 2) if not pd.isna(atr_percent.iloc[-1]) else None,
                         },
                     },
-
                     # 成交量分析
                     "volume_analysis": {
                         "current_volume": int(volume.iloc[-1]),
@@ -2355,9 +2358,10 @@ class MarketDataService:
                         "volume_ratio": round(vol_rate.iloc[-1], 2) if not pd.isna(vol_rate.iloc[-1]) else None,
                         "obv": int(obv.iloc[-1]),
                         "obv_trend": "up" if obv.iloc[-1] > obv_ema.iloc[-1] else "down",
-                        "volume_status": self._get_volume_status_desc(vol_rate.iloc[-1] if not pd.isna(vol_rate.iloc[-1]) else 1.0),
+                        "volume_status": self._get_volume_status_desc(
+                            vol_rate.iloc[-1] if not pd.isna(vol_rate.iloc[-1]) else 1.0
+                        ),
                     },
-
                     # 支撐壓力位
                     "support_resistance": {
                         "pivot": round(pivot, 2),
@@ -2370,19 +2374,14 @@ class MarketDataService:
                         "recent_high_60d": round(recent_high, 2),
                         "recent_low_60d": round(recent_low, 2),
                     },
-
                     # 多因子評分詳情
                     "multi_factor_scores": factor_scores,
-
                     # K線型態
                     "pattern_recognition": pattern,
-
                     # 風險指標
                     "risk_metrics": risk_metrics,
-
                     # 進出場策略
                     "entry_exit_strategy": entry_exit,
-
                     # 分析理由
                     "reasons": reasons,
                 },
@@ -2417,8 +2416,17 @@ class MarketDataService:
         else:
             return "strong_downtrend"
 
-    def _calculate_trend_score(self, close: float, ema20: float, ema50: float, ema200: float,
-                               adx: float, weekly_trend: str, monthly_trend: str, ma_alignment: str) -> dict:
+    def _calculate_trend_score(
+        self,
+        close: float,
+        ema20: float,
+        ema50: float,
+        ema200: float,
+        adx: float,
+        weekly_trend: str,
+        monthly_trend: str,
+        ma_alignment: str,
+    ) -> dict:
         """計算趨勢因子評分"""
         score = 0
         reasons = []
@@ -2475,9 +2483,22 @@ class MarketDataService:
 
         return {"score": max(-100, min(100, score)), "reasons": reasons}
 
-    def _calculate_momentum_score(self, rsi: float, rsi_prev: float, macd: float, macd_signal: float,
-                                  macd_hist: float, macd_hist_prev: float, k: float, d: float,
-                                  k_prev: float, d_prev: float, williams_r: float, cci: float, roc: float) -> dict:
+    def _calculate_momentum_score(
+        self,
+        rsi: float,
+        rsi_prev: float,
+        macd: float,
+        macd_signal: float,
+        macd_hist: float,
+        macd_hist_prev: float,
+        k: float,
+        d: float,
+        k_prev: float,
+        d_prev: float,
+        williams_r: float,
+        cci: float,
+        roc: float,
+    ) -> dict:
         """計算動量因子評分"""
         score = 0
         reasons = []
@@ -2550,8 +2571,16 @@ class MarketDataService:
 
         return {"score": max(-100, min(100, score)), "reasons": reasons}
 
-    def _calculate_volatility_score(self, close: float, bb_upper: float, bb_middle: float, bb_lower: float,
-                                    bb_width: float, bb_width_avg: float, atr_percent: float) -> dict:
+    def _calculate_volatility_score(
+        self,
+        close: float,
+        bb_upper: float,
+        bb_middle: float,
+        bb_lower: float,
+        bb_width: float,
+        bb_width_avg: float,
+        atr_percent: float,
+    ) -> dict:
         """計算波動率/布林因子評分"""
         score = 0
         reasons = []
@@ -2590,8 +2619,9 @@ class MarketDataService:
 
         return {"score": max(-100, min(100, score)), "reasons": reasons}
 
-    def _calculate_volume_score(self, volume: int, vol_sma20: float, vol_rate: float,
-                                obv: float, obv_ema: float, price_change: float) -> dict:
+    def _calculate_volume_score(
+        self, volume: int, vol_sma20: float, vol_rate: float, obv: float, obv_ema: float, price_change: float
+    ) -> dict:
         """計算成交量因子評分"""
         score = 0
         reasons = []
@@ -2625,8 +2655,9 @@ class MarketDataService:
 
         return {"score": max(-100, min(100, score)), "reasons": reasons}
 
-    def _calculate_price_position_score(self, close: float, recent_high: float, recent_low: float,
-                                        pivot: float, r1: float, s1: float) -> dict:
+    def _calculate_price_position_score(
+        self, close: float, recent_high: float, recent_low: float, pivot: float, r1: float, s1: float
+    ) -> dict:
         """計算價格位置因子評分"""
         score = 0
         reasons = []
@@ -2690,8 +2721,9 @@ class MarketDataService:
 
         return signal, confidence, desc
 
-    def _identify_candlestick_pattern(self, open_prices: np.ndarray, high_prices: np.ndarray,
-                                      low_prices: np.ndarray, close_prices: np.ndarray) -> dict:
+    def _identify_candlestick_pattern(
+        self, open_prices: np.ndarray, high_prices: np.ndarray, low_prices: np.ndarray, close_prices: np.ndarray
+    ) -> dict:
         """識別K線型態"""
         patterns = []
 
@@ -2749,9 +2781,18 @@ class MarketDataService:
 
         return {"patterns": patterns, "signal": overall_signal}
 
-    def _calculate_entry_exit_strategy(self, close: float, atr: float, signal: str,
-                                       s1: float, s2: float, r1: float, r2: float,
-                                       recent_high: float, recent_low: float) -> dict:
+    def _calculate_entry_exit_strategy(
+        self,
+        close: float,
+        atr: float,
+        signal: str,
+        s1: float,
+        s2: float,
+        r1: float,
+        r2: float,
+        recent_high: float,
+        recent_low: float,
+    ) -> dict:
         """計算進出場策略"""
         strategy = {}
 
@@ -2762,7 +2803,11 @@ class MarketDataService:
             strategy["stop_loss_percent"] = round((close - strategy["stop_loss"]) / close * 100, 2)
             strategy["target_1"] = round(min(close + 1.5 * atr, r1), 2)
             strategy["target_2"] = round(min(close + 3 * atr, r2), 2)
-            strategy["risk_reward_ratio"] = round((strategy["target_1"] - close) / (close - strategy["stop_loss"]), 2) if close > strategy["stop_loss"] else 0
+            strategy["risk_reward_ratio"] = (
+                round((strategy["target_1"] - close) / (close - strategy["stop_loss"]), 2)
+                if close > strategy["stop_loss"]
+                else 0
+            )
             strategy["position_suggestion"] = "建議分批進場，首次進場 1/3 倉位"
         elif signal in ["strong_sell", "sell"]:
             strategy["action"] = "賣出/放空"
@@ -2771,7 +2816,11 @@ class MarketDataService:
             strategy["stop_loss_percent"] = round((strategy["stop_loss"] - close) / close * 100, 2)
             strategy["target_1"] = round(max(close - 1.5 * atr, s1), 2)
             strategy["target_2"] = round(max(close - 3 * atr, s2), 2)
-            strategy["risk_reward_ratio"] = round((close - strategy["target_1"]) / (strategy["stop_loss"] - close), 2) if strategy["stop_loss"] > close else 0
+            strategy["risk_reward_ratio"] = (
+                round((close - strategy["target_1"]) / (strategy["stop_loss"] - close), 2)
+                if strategy["stop_loss"] > close
+                else 0
+            )
             strategy["position_suggestion"] = "建議減碼或分批放空"
         else:
             strategy["action"] = "觀望"
@@ -2828,7 +2877,9 @@ class MarketDataService:
             "volatility_20d": round(volatility_20d, 2),
             "max_drawdown_percent": round(max_drawdown, 2),
             "atr_percent": round(atr_percent, 2),
-            "suggested_position_size": "小倉位" if risk_level == "high" else ("中倉位" if risk_level == "medium" else "正常倉位"),
+            "suggested_position_size": (
+                "小倉位" if risk_level == "high" else ("中倉位" if risk_level == "medium" else "正常倉位")
+            ),
         }
 
     def _get_volume_status_desc(self, vol_rate: float) -> str:
@@ -3300,7 +3351,9 @@ class MarketDataService:
             open_price = float(index_data.get("open") or index_data.get("openPrice") or 0)
             high_price = float(index_data.get("high") or index_data.get("highPrice") or 0)
             low_price = float(index_data.get("low") or index_data.get("lowPrice") or 0)
-            prev_close = float(index_data.get("previousClose") or index_data.get("referencePrice") or index_data.get("prevClose") or 0)
+            prev_close = float(
+                index_data.get("previousClose") or index_data.get("referencePrice") or index_data.get("prevClose") or 0
+            )
             change = float(index_data.get("change") or index_data.get("chg") or 0)
             change_percent = float(
                 index_data.get("change_percent") or index_data.get("chg_percent") or index_data.get("changePercent") or 0
@@ -3309,13 +3362,21 @@ class MarketDataService:
             # 獲取成交量
             volume_val = 0
             if isinstance(index_data.get("total"), dict):
-                volume_val = int(index_data.get("total", {}).get("trade_volume", 0) or index_data.get("total", {}).get("tradeVolume", 0) or 0)
+                volume_val = int(
+                    index_data.get("total", {}).get("trade_volume", 0)
+                    or index_data.get("total", {}).get("tradeVolume", 0)
+                    or 0
+                )
             else:
-                volume_val = int(index_data.get("trade_volume") or index_data.get("tradeVolume") or index_data.get("volume") or 0)
+                volume_val = int(
+                    index_data.get("trade_volume") or index_data.get("tradeVolume") or index_data.get("volume") or 0
+                )
 
             trade_value = 0
             if isinstance(index_data.get("total"), dict):
-                trade_value = float(index_data.get("total", {}).get("trade_value", 0) or index_data.get("total", {}).get("tradeValue", 0) or 0)
+                trade_value = float(
+                    index_data.get("total", {}).get("trade_value", 0) or index_data.get("total", {}).get("tradeValue", 0) or 0
+                )
             else:
                 trade_value = float(index_data.get("trade_value") or index_data.get("tradeValue") or 0)
 
@@ -3327,9 +3388,7 @@ class MarketDataService:
 
             # 上漲股票（使用漲跌幅排序）
             try:
-                movers_up = self.reststock.snapshot.movers(
-                    market="TSE", direction="up", change="percent", type="COMMONSTOCK"
-                )
+                movers_up = self.reststock.snapshot.movers(market="TSE", direction="up", change="percent", type="COMMONSTOCK")
                 if movers_up:
                     if isinstance(movers_up, dict) and "data" in movers_up:
                         up_stocks = movers_up["data"]
@@ -3402,7 +3461,7 @@ class MarketDataService:
                 total_stocks = 1  # 避免除以零
 
             # 漲跌比 (Advance/Decline Ratio)
-            ad_ratio = up_count / down_count if down_count > 0 else (float('inf') if up_count > 0 else 1.0)
+            ad_ratio = up_count / down_count if down_count > 0 else (float("inf") if up_count > 0 else 1.0)
 
             # 漲跌線 (ADL - Advance/Decline Line) - 簡化計算
             adl_value = up_count - down_count
@@ -3467,7 +3526,7 @@ class MarketDataService:
 
             # === 計算市場情緒指標 ===
             # 多空比
-            bull_bear_ratio = ad_ratio if ad_ratio != float('inf') else 10.0
+            bull_bear_ratio = ad_ratio if ad_ratio != float("inf") else 10.0
 
             # 恐懼貪婪指數（0-100，50為中性）
             fear_greed_index = self._calculate_fear_greed(
@@ -3477,7 +3536,7 @@ class MarketDataService:
                 avg_down_pct=avg_down_pct,
                 limit_up_count=limit_up_count,
                 limit_down_count=limit_down_count,
-                change_percent=change_percent
+                change_percent=change_percent,
             )
 
             # 情緒等級
@@ -3489,7 +3548,7 @@ class MarketDataService:
                 ad_ratio=ad_ratio,
                 market_breadth=market_breadth,
                 fear_greed_index=fear_greed_index,
-                trend_strength=trend_strength
+                trend_strength=trend_strength,
             )
 
             signal_action = self._get_signal_action(signal_score)
@@ -3531,7 +3590,7 @@ class MarketDataService:
                     "market_status": market_status,
                 },
                 "breadth": {
-                    "advance_decline_ratio": round(ad_ratio, 2) if ad_ratio != float('inf') else "無限大",
+                    "advance_decline_ratio": round(ad_ratio, 2) if ad_ratio != float("inf") else "無限大",
                     "advance_decline_line": adl_value,
                     "market_breadth": round(market_breadth * 100, 2),  # 百分比
                     "avg_up_percent": round(avg_up_pct, 2),
@@ -3540,14 +3599,20 @@ class MarketDataService:
                 },
                 "volume_analysis": {
                     "volume_status": self._get_volume_status(volume_val, trade_value),
-                    "top_volume_concentration": round(total_market_volume / max(volume_val, 1) * 100, 2) if volume_val > 0 else 0,
-                    "top_value_concentration": round(total_market_value / max(trade_value, 1) * 100, 2) if trade_value > 0 else 0,
+                    "top_volume_concentration": (
+                        round(total_market_volume / max(volume_val, 1) * 100, 2) if volume_val > 0 else 0
+                    ),
+                    "top_value_concentration": (
+                        round(total_market_value / max(trade_value, 1) * 100, 2) if trade_value > 0 else 0
+                    ),
                     "large_cap_activity": "活躍" if len(value_leaders) > 10 else "低迷",
                 },
                 "trend": {
                     "intraday_trend": intraday_trend,
                     "trend_strength": round(trend_strength, 1),
-                    "price_position": "高檔" if price > open_price * 1.01 else ("低檔" if price < open_price * 0.99 else "平盤附近"),
+                    "price_position": (
+                        "高檔" if price > open_price * 1.01 else ("低檔" if price < open_price * 0.99 else "平盤附近")
+                    ),
                     "volatility": round(((high_price - low_price) / open_price * 100) if open_price > 0 else 0, 2),
                 },
                 "sentiment": {
@@ -3564,7 +3629,7 @@ class MarketDataService:
                         change_percent=change_percent,
                         ad_ratio=ad_ratio,
                         market_breadth=market_breadth,
-                        fear_greed_index=fear_greed_index
+                        fear_greed_index=fear_greed_index,
                     ),
                 },
             }
@@ -3597,14 +3662,21 @@ class MarketDataService:
             change_pct = getattr(stock, "changePercent", None) or getattr(stock, "change_percent", 0)
         return float(change_pct) <= -9.5
 
-    def _calculate_fear_greed(self, ad_ratio: float, market_breadth: float, avg_up_pct: float,
-                              avg_down_pct: float, limit_up_count: int, limit_down_count: int,
-                              change_percent: float) -> float:
+    def _calculate_fear_greed(
+        self,
+        ad_ratio: float,
+        market_breadth: float,
+        avg_up_pct: float,
+        avg_down_pct: float,
+        limit_up_count: int,
+        limit_down_count: int,
+        change_percent: float,
+    ) -> float:
         """計算恐懼貪婪指數（0-100）"""
         score = 50  # 基準值
 
         # 漲跌比貢獻 (±15)
-        if ad_ratio != float('inf'):
+        if ad_ratio != float("inf"):
             if ad_ratio > 2:
                 score += 15
             elif ad_ratio > 1.5:
@@ -3687,9 +3759,9 @@ class MarketDataService:
         else:
             return "量能萎縮"
 
-    def _calculate_market_signal_score(self, change_percent: float, ad_ratio: float,
-                                       market_breadth: float, fear_greed_index: float,
-                                       trend_strength: float) -> float:
+    def _calculate_market_signal_score(
+        self, change_percent: float, ad_ratio: float, market_breadth: float, fear_greed_index: float, trend_strength: float
+    ) -> float:
         """計算市場訊號分數（-100 到 +100）"""
         score = 0
 
@@ -3698,7 +3770,7 @@ class MarketDataService:
         score = max(-25, min(25, score))
 
         # 漲跌比貢獻 (±25)
-        if ad_ratio != float('inf'):
+        if ad_ratio != float("inf"):
             ratio_score = (ad_ratio - 1) * 20
             score += max(-25, min(25, ratio_score))
 
@@ -3745,8 +3817,9 @@ class MarketDataService:
         else:
             return "理性觀望"
 
-    def _get_signal_reasoning(self, change_percent: float, ad_ratio: float,
-                              market_breadth: float, fear_greed_index: float) -> List[str]:
+    def _get_signal_reasoning(
+        self, change_percent: float, ad_ratio: float, market_breadth: float, fear_greed_index: float
+    ) -> List[str]:
         """獲取訊號理由"""
         reasons = []
 
@@ -3755,7 +3828,7 @@ class MarketDataService:
         elif change_percent < -1:
             reasons.append("指數明顯下跌")
 
-        if ad_ratio != float('inf'):
+        if ad_ratio != float("inf"):
             if ad_ratio > 2:
                 reasons.append("漲跌比極佳，多頭佔優")
             elif ad_ratio < 0.5:
@@ -4110,6 +4183,7 @@ class QuerySymbolQuoteArgs(BaseModel):
     account: str
     symbol: str
     market_type: Optional[str] = "Common"
+
 
 class QuerySymbolSnapshotArgs(BaseModel):
     account: str

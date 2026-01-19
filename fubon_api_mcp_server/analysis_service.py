@@ -1507,4 +1507,4 @@ class GenerateMarketSentimentIndexArgs(BaseModel):
     """市場情緒指數參數模型"""
 
     index_components: List[str] = ["technical", "volume", "options"]  # 指數組成成分
-    lookback_period: int = Field(30, ge=7, le=365-1)  # 回顧期間（天）
+    lookback_period: int = Field(30, ge=7, le=365 - 1)  # 回顧期間（天）
