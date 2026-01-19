@@ -13,11 +13,15 @@ class Config:
     """Configuration class for fubon_api_mcp_server."""
 
     def __init__(self) -> None:
-        # Load environment variables
+        # Load environment variables - Traditional PFX authentication
         self.username: Optional[str] = os.getenv("FUBON_USERNAME")
         self.password: Optional[str] = os.getenv("FUBON_PASSWORD")
         self.pfx_path: Optional[str] = os.getenv("FUBON_PFX_PATH")
         self.pfx_password: Optional[str] = os.getenv("FUBON_PFX_PASSWORD")
+
+        # Load environment variables - API-Key authentication (SDK v2.2.7+)
+        self.api_key: Optional[str] = os.getenv("FUBON_API_KEY")
+        self.api_secret: Optional[str] = os.getenv("FUBON_API_SECRET")
 
         # Data directory configuration - platform-specific defaults
         if sys.platform == "win32":
