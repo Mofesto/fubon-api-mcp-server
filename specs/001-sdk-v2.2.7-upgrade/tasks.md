@@ -226,7 +226,8 @@ Phase 2 (Foundational: SDK download & config)
 - [x] T030 [P] Run pre-commit checks: `black fubon_api_mcp_server/`, `isort fubon_api_mcp_server/`, `flake8 fubon_api_mcp_server/` and ensure all pass without changes required
   ✅ **Completed**: Black reformatted 5 files, isort fixed 1 file, flake8 no fatal errors (E9,F63,F7,F82)
 
-- [ ] T031 [P] Tag release with version bump (e.g., `v0.4.0`) corresponding to SDK v2.2.7 milestone; verify setuptools-scm generates version in `_version.py`
+- [x] T031 [P] Tag release with version bump (e.g., `v0.4.0`) corresponding to SDK v2.2.7 milestone; verify setuptools-scm generates version in `_version.py`
+  ✅ **Completed**: Tagged v2.2.7, setuptools-scm generated __version__ = '2.2.7', commit_id = 'g0240bbbff'
 
 ---
 
