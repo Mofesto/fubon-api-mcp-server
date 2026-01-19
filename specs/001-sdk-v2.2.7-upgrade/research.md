@@ -274,6 +274,7 @@ No unresolved dependencies remain. Ready to proceed to Phase 1 (Design) and Phas
 ---
 
 **Status**: ✅ RESEARCH COMPLETE  
+**SDK v2.2.7**: ✅ Available in `wheels/` directory (all platforms)  
 **Approved for**: Phase 1 (Design) + Phase 2 (Foundational)  
 **Last Updated**: 2025-01-19
 

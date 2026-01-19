@@ -90,20 +90,20 @@ Phase 2 (Foundational: SDK download & config)
 
 ---
 
-- [ ] T004 [P] Download SDK v2.2.7 wheel binaries for all platforms (Windows, macOS ARM64/x86_64, Linux x86_64) and place in `wheels/` directory
+- [x] T004 [P] Download SDK v2.2.7 wheel binaries for all platforms (Windows, macOS ARM64/x86_64, Linux x86_64) and place in `wheels/` directory
   
-- [ ] T005 [P] Update `pyproject.toml` to require `fubon_neo>=2.2.7` as minimum version (replace current unspecified or <2.2.7 requirement)
+- [x] T005 [P] Update `pyproject.toml` to require `fubon_neo>=2.2.7` as minimum version (replace current unspecified or <2.2.7 requirement)
 
-- [ ] T006 Extend `config.py` to support API-Key authentication environment variables: `FUBON_API_KEY`, `FUBON_API_SECRET` alongside existing `FUBON_USERNAME`, `FUBON_PASSWORD`, `FUBON_PFX_PATH`, `FUBON_PFX_PASSWORD`
+- [x] T006 Extend `config.py` to support API-Key authentication environment variables: `FUBON_API_KEY`, `FUBON_API_SECRET` alongside existing `FUBON_USERNAME`, `FUBON_PASSWORD`, `FUBON_PFX_PATH`, `FUBON_PFX_PASSWORD`
 
-- [ ] T007 [P] Modify `server.py` SDK initialization to detect and support dual authentication methods: 
+- [x] T007 [P] Modify `server.py` SDK initialization to detect and support dual authentication methods: 
   - If `FUBON_API_KEY` + `FUBON_API_SECRET` present → Initialize with API-Key auth
   - If `FUBON_USERNAME` + `FUBON_PASSWORD` + `FUBON_PFX_PATH` present → Initialize with traditional PFX auth
   - Both paths must be tested independently
 
-- [ ] T008 [P] Update `utils.py` to add API-Key credential validation helper function `validate_api_key_credentials(api_key: str, secret_key: str) -> tuple[bool, str]` that checks format and non-empty values
+- [x] T008 [P] Update `utils.py` to add API-Key credential validation helper function `validate_api_key_credentials(api_key: str, secret_key: str) -> tuple[bool, str]` that checks format and non-empty values
 
-- [ ] T009 Run full existing integration test suite against v2.2.7 and verify all tests pass unchanged (validate backward compatibility ≥99.9% success rate)
+- [x] T009 Run full existing integration test suite against v2.2.7 and verify all tests pass unchanged (validate backward compatibility ≥99.9% success rate)
 
 ---
 
