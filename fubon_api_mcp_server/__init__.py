@@ -29,5 +29,5 @@
 作者: Fubon MCP Team
 """
 
-__version__ = "2.0.6"
+__version__ = "2.2.3"
 __author__ = "Fubon MCP Team"
