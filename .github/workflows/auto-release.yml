@@ -91,11 +91,11 @@ jobs:
       id: version
       run: |
         if [ "${{ github.event_name }}" = "push" ]; then
-          # 從標籤獲取版本
+          # 從標籤獲取版本 (Git Tag is the single source of truth)
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$VERSION" >> $GITHUB_OUTPUT
-          echo "Using version from tag: $VERSION"
+          echo "✓ Using version from git tag: $VERSION"
         else
           # 從當前版本計算新版本
           CURRENT=$(python -c "import setuptools_scm; print(setuptools_scm.get_version())" | sed 's/\.post.*//' | sed 's/+.*//')
@@ -113,8 +113,18 @@ jobs:
           
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "New version: $NEW_VERSION"
+          echo "✓ New version: $NEW_VERSION"
         fi
+
+    - name: Validate version format
+      run: |
+        VERSION="${{ steps.version.outputs.version }}"
+        if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "❌ Invalid version format: $VERSION"
+          echo "   Expected format: X.Y.Z (e.g., 2.3.0)"
+          exit 1
+        fi
+        echo "✓ Version format valid: $VERSION"
 
     - name: Create and push tag
       if: github.event_name == 'workflow_dispatch'
@@ -179,15 +189,19 @@ jobs:
       with:
         node-version: '20'
 
-    - name: Update package.json version
+    - name: Update package.json version (from git tag)
       working-directory: ./vscode-extension
       run: |
+        echo "📦 Syncing VS Code extension version from git tag..."
+        echo "   Git tag version: ${{ needs.version.outputs.version }}"
         jq '.version = "${{ needs.version.outputs.version }}"' package.json > tmp.json && mv tmp.json package.json
+        echo "✓ package.json updated to: $(jq -r '.version' package.json)"
 
-    - name: Update version_config.json
+    - name: Update version_config.json (from git tag)
       run: |
-        # 更新 scripts/version_config.json 中的版本
+        echo "📦 Syncing version_config.json from git tag..."
         jq '.version.current = "${{ needs.version.outputs.version }}"' scripts/version_config.json > tmp.json && mv tmp.json scripts/version_config.json
+        echo "✓ version_config.json updated to: $(jq -r '.version.current' scripts/version_config.json)"
 
     - name: Install dependencies
       working-directory: ./vscode-extension
@@ -274,7 +288,7 @@ jobs:
           
           ### 🔗 Links
           - PyPI: https://pypi.org/project/fubon-api-mcp-server/${{ needs.version.outputs.version }}/
-          - VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=YOUR_PUBLISHER.fubon-api-mcp-server
+          - VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=mofesto.fubon-api-mcp-server
           - Documentation: https://github.com/${{ github.repository }}#readme
           
           ---
@@ -298,10 +312,15 @@ jobs:
       run: |
         echo "### 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "**Version:** ${{ needs.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Version:** ${{ needs.version.outputs.version }} (from git tag)" >> $GITHUB_STEP_SUMMARY
         echo "**Tag:** ${{ needs.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Version Synced To:" >> $GITHUB_STEP_SUMMARY
+        echo "- Python package (via setuptools-scm)" >> $GITHUB_STEP_SUMMARY
+        echo "- vscode-extension/package.json" >> $GITHUB_STEP_SUMMARY
+        echo "- scripts/version_config.json" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### ✅ Published to:" >> $GITHUB_STEP_SUMMARY
         echo "- 📦 PyPI: https://pypi.org/project/fubon-api-mcp-server/${{ needs.version.outputs.version }}/" >> $GITHUB_STEP_SUMMARY
-        echo "- 🔌 VS Code Marketplace" >> $GITHUB_STEP_SUMMARY
+        echo "- 🔌 VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=mofesto.fubon-api-mcp-server" >> $GITHUB_STEP_SUMMARY
         echo "- 🏷️ GitHub Release: https://github.com/${{ github.repository }}/releases/tag/${{ needs.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
