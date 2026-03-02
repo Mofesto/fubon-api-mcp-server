@@ -258,7 +258,7 @@ jobs:
         echo "$CHANGELOG" > /tmp/changelog.txt
 
     - name: Download VSIX artifact
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: vscode-extension-${{ needs.version.outputs.version }}
         path: ./artifacts
