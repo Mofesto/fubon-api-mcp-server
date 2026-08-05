@@ -7,12 +7,24 @@ services, including account validation, error handling, and API calls.
 
 import functools
 import logging
+import re
 import traceback
 from typing import Any, Callable, List, Optional, Tuple, Union
 
 from . import config as config_module
 
 logger = logging.getLogger(__name__)
+
+_USER_DEF_PATTERN = re.compile(r"^[A-Za-z0-9]{1,10}$")
+
+
+def validate_user_def(value: Optional[str]) -> Optional[str]:
+    """Validate the v2.2.8 securities order user-defined reference."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or not _USER_DEF_PATTERN.fullmatch(value):
+        raise ValueError("user_def 僅可使用英文字母與數字，且長度必須為 1-10 字元")
+    return value
 
 # =============================================================================
 # Error Handling Decorator
@@ -123,7 +135,7 @@ def validate_and_get_account(account: str) -> Tuple[Optional[Any], Optional[str]
         if config_module.sdk is None:
             logger.debug("Initializing SDK and logging in for account validation...")
 
-            # Detect authentication method: API-Key vs Traditional PFX
+            # Detect authentication method: API-Key + web certificate vs traditional PFX
             api_key = os.getenv("FUBON_API_KEY")
             api_secret = os.getenv("FUBON_API_SECRET")
             username = os.getenv("FUBON_USERNAME")
@@ -133,22 +145,29 @@ def validate_and_get_account(account: str) -> Tuple[Optional[Any], Optional[str]
 
             sdk = FubonSDK()
 
-            # Attempt API-Key authentication if credentials are present
-            if api_key and api_secret:
-                logger.debug("Using API-Key authentication (SDK v2.2.7+)")
-                # Validate API-Key credentials
-                is_valid, error_msg = validate_api_key_credentials(api_key, api_secret)
-                if not is_valid:
-                    return None, error_msg
-
-                # API-Key login (SDK v2.2.7+ method signature)
-                # Note: Actual method name/signature depends on SDK v2.2.7 documentation
-                # This is a placeholder - adjust based on actual SDK API
-                try:
-                    accounts = sdk.login(api_key=api_key, secret_key=api_secret)
-                except TypeError:
-                    # Fallback if SDK doesn't support keyword args or method doesn't exist yet
-                    return None, "API-Key authentication not supported by installed SDK version / SDK 版本不支援 API 金鑰驗證"
+            # v2.2.8 API-Key login is authenticated by the web certificate:
+            # apikey_login(personal_id, api_key, cert_path, cert_password).
+            # Keep the older keyword-login path only for existing test doubles and
+            # deployments that supplied the pre-v2.2.8 experimental variables.
+            if api_key:
+                logger.debug("Using API-Key authentication (SDK v2.2.8+)")
+                if username and pfx_path and hasattr(sdk, "apikey_login"):
+                    try:
+                        accounts = sdk.apikey_login(username, api_key, pfx_path, pfx_password)
+                    except (AttributeError, TypeError):
+                        return None, "API-Key authentication not supported by installed SDK version / SDK 版本不支援 API 金鑰驗證"
+                elif api_secret:
+                    # Backward-compatible fallback for the pre-v2.2.8 integration
+                    # contract. A real v2.2.8 SDK uses the branch above.
+                    is_valid, error_msg = validate_api_key_credentials(api_key, api_secret)
+                    if not is_valid:
+                        return None, error_msg
+                    try:
+                        accounts = sdk.login(api_key=api_key, secret_key=api_secret)
+                    except TypeError:
+                        return None, "API-Key authentication not supported by installed SDK version; v2.2.8 requires FUBON_USERNAME, FUBON_API_KEY, and FUBON_PFX_PATH / SDK 版本不支援 API 金鑰驗證；v2.2.8 需要 FUBON_USERNAME、FUBON_API_KEY 與 FUBON_PFX_PATH"
+                else:
+                    return None, "API-Key authentication requires FUBON_USERNAME, FUBON_API_KEY, and FUBON_PFX_PATH / SDK v2.2.8 API 金鑰登入需要 FUBON_USERNAME、FUBON_API_KEY 與 FUBON_PFX_PATH"
 
             # Otherwise use traditional PFX authentication
             elif username and password and pfx_path:
@@ -158,7 +177,7 @@ def validate_and_get_account(account: str) -> Tuple[Optional[Any], Optional[str]
             else:
                 return (
                     None,
-                    "No valid credentials found. Provide either (FUBON_API_KEY + FUBON_API_SECRET) or (FUBON_USERNAME + FUBON_PASSWORD + FUBON_PFX_PATH) / 未找到有效憑證。請提供 (FUBON_API_KEY + FUBON_API_SECRET) 或 (FUBON_USERNAME + FUBON_PASSWORD + FUBON_PFX_PATH)",
+                    "No valid credentials found. Provide either (FUBON_USERNAME + FUBON_API_KEY + FUBON_PFX_PATH) or legacy (FUBON_API_KEY + FUBON_API_SECRET) or (FUBON_USERNAME + FUBON_PASSWORD + FUBON_PFX_PATH) / 未找到有效憑證。請提供 (FUBON_USERNAME + FUBON_API_KEY + FUBON_PFX_PATH)、舊版 (FUBON_API_KEY + FUBON_API_SECRET) 或 (FUBON_USERNAME + FUBON_PASSWORD + FUBON_PFX_PATH)",
                 )
 
             if not accounts or not hasattr(accounts, "is_success") or not accounts.is_success:
@@ -291,13 +310,13 @@ def normalize_item(item: Any, keys: List[str]) -> dict:
 
 
 # =============================================================================
-# Certificate Export (SDK v2.2.7+ Feature)
+# Certificate Export (SDK v2.2.8-compatible workflow)
 # =============================================================================
 
 
 def export_certificate(password: str, output_path: str) -> Tuple[bool, str]:
     """
-    Export certificate to file (SDK v2.2.7+ feature).
+    Export certificate to file using the configured SDK export capability.
 
     This function wraps the SDK's certificate export capability, which exports
     the user's web certificate in PKCS#12 (.pfx) format. The exported certificate

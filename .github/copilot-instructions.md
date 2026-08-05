@@ -4,7 +4,7 @@ This repo wraps the Fubon Securities Python SDK (`fubon_neo`) into an MCP server
 
 ### Architecture & Key Files
 - **Monolith server**: `fubon_api_mcp_server/server.py` (all MCP tools, resources, global state)
-- **Service classes**: `trading_service.py`, `market_data_service.py`, `account_service.py`, `reports_service.py`, `indicators_service.py` - each registers MCP tools with the main FastMCP instance
+- **Service classes**: `trading_service.py`, `market_data_service.py`, `account_service.py`, `reports_service.py`, `indicators_service.py` - each registers MCP tools with the main MCPServer instance
 - **Service responsibilities**: Services follow a pattern — `MarketDataService` handles REST/futopt data parsing and normalization; `TradingService` encapsulates all order operations including condition and time-slice orders; `AccountService` provides accounting endpoints and PnL queries; `ReportsService` surfaces SDK callbacks into MCP tools.
 - **Config & Utils**: `config.py` (env vars, data dirs), `utils.py` (account validation, error handling), `enums.py` (safe enum conversions)
 - **Globals in server.py**: `sdk`, `accounts`, `reststock` (stock REST), `restfutopt` (futures/options REST), report lists (`latest_order_reports`, etc.)
@@ -66,7 +66,7 @@ if result and hasattr(result, "is_success") and result.is_success:
 - Local cache: historical data under `data/` (CSV). Prefer reading cache before hitting API.
 
 ### Big picture / Why these decisions
-- Single monolith with service classes — this keeps the runtime artifact simple and the `FastMCP` registration centralized in `server.py` so new tools can be added by registering methods in service classes.
+- Single monolith with service classes — this keeps the runtime artifact simple and the `MCPServer` registration centralized in `server.py` so new tools can be added by registering methods in service classes.
 - Reinitialize `sdk` per call via `validate_and_get_account` — tests and tooling expect stateless tool invocations and this avoids stale session/auth issues.
 - Local historical caching reduces API calls and simplifies offline testing — `@mcp.resource` endpoints intentionally return the cache only for deterministic testing.
 
@@ -89,7 +89,7 @@ if result and hasattr(result, "is_success") and result.is_success:
 
 ### Style & Quality Gates
 - Black line-length 127, isort profile "black"; flake8 checks (E9, F63, F7, F82) only.
-- Type checking: gradual; ignore external SDKs like `fubon_neo`, `mcp`, `fastmcp`.
+- Type checking: gradual; ignore external SDKs like `fubon_neo` and `mcp`.
 - Keep changes minimal and aligned with existing patterns; avoid refactors across unrelated tools.
 
 ### Integration Notes

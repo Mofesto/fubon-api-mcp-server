@@ -19,7 +19,7 @@ class Config:
         self.pfx_path: Optional[str] = os.getenv("FUBON_PFX_PATH")
         self.pfx_password: Optional[str] = os.getenv("FUBON_PFX_PASSWORD")
 
-        # Load environment variables - API-Key authentication (SDK v2.2.7+)
+        # Load environment variables - API-Key authentication (SDK v2.2.8+)
         self.api_key: Optional[str] = os.getenv("FUBON_API_KEY")
         self.api_secret: Optional[str] = os.getenv("FUBON_API_SECRET")
 

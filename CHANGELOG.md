@@ -1,9 +1,31 @@
 # Changelog
 
+## [Unreleased]
+
+### MCP 2.0 / Protocol 2026-07-28
+
+### Changed
+- 遷移官方 MCP Python SDK v2，使用 `MCPServer` 取代 v1 的 `FastMCP`。
+- 新增 Streamable HTTP transport 設定，預設使用 stateless 模式；stdio 維持預設以相容桌面 Host。
+- 由官方 SDK 處理 `server/discover`、2026-07-28 per-request metadata、structured output 與嚴格 schema 驗證。
+- 移除與官方 MCP v2 不相容的獨立 `fastmcp` 依賴。
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+### SDK v2.2.8
+
+#### Added
+- 新增 `get_capital_changes`、`get_dividends` 與 `get_listing_applicants` MCP 市場資料工具。
+- 歷史 K 線支援 `adjusted` 還原股價，以及 `timeframe`、`fields`、`sort` 參數。
+- 證券普通下單與批量下單支援 `user_def`，並在送出 SDK 前驗證英數字與 10 字元上限。
+
+#### Changed
+- `fubon_neo` 升級至 v2.2.8，並更新 Windows、Linux、macOS ARM64、macOS x86_64 wheels。
+- API-Key 登入改用 v2.2.8 正式介面 `apikey_login(personal_id, api_key, cert_path, cert_password)`；傳統 PFX 登入維持相容。
+- adjusted、非日線或指定欄位的歷史查詢不使用既有未調整日線 SQLite 快取，避免資料語意混用。
 
 ## [2.2.7] - 2026-01-19
 

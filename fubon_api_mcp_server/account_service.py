@@ -22,7 +22,7 @@
 from typing import Dict, List, Optional
 
 from fubon_neo.sdk import FubonSDK
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from pydantic import BaseModel
 
 from .utils import validate_and_get_account
@@ -31,7 +31,7 @@ from .utils import validate_and_get_account
 class AccountService:
     """帳戶服務類"""
 
-    def __init__(self, mcp: FastMCP, sdk: FubonSDK, accounts: List[str]):
+    def __init__(self, mcp: MCPServer, sdk: FubonSDK, accounts: List[str]):
         self.mcp = mcp
         self.sdk = sdk
         self.accounts = accounts

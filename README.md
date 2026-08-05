@@ -7,7 +7,9 @@
 [![codecov](https://codecov.io/gh/Mofesto/fubon-api-mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/Mofesto/fubon-api-mcp-server)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-富邦證券市場資料 MCP (Model Communication Protocol) 伺服器，提供完整的台股交易功能與市場數據查詢。
+富邦證券市場資料 MCP (Model Context Protocol) 伺服器，提供完整的台股交易功能與市場數據查詢。
+
+本專案目前使用官方 MCP Python SDK `mcp 2.0.x`，對應 MCP protocol revision `2026-07-28`。服務以 `MCPServer` 註冊工具與 prompts；stdio 是桌面 Host 的預設傳輸，Streamable HTTP 可透過 `FUBON_MCP_STATELESS_HTTP=true` 啟用新版無狀態請求模型。
 
 ## ✨ 功能特點
 
@@ -171,7 +173,8 @@ if res["status"] == "success":
 ### 📊 市場數據
 - ✅ **即時行情**：盤中報價、K線、成交明細、分價量表
 - ✅ **行情快照**：市場概覽、漲跌幅排行、成交量排行
-- ✅ **歷史數據**：52週統計、歷史K線、本地數據快取
+- ✅ **歷史數據**：52週統計、歷史K線、本地數據快取、還原股價與 K 線欄位/排序選項
+- ✅ **股務事件**：資本變動、除權息、申請上市櫃公司資料（SDK v2.2.8）
 
 ### 💰 帳戶資訊
 - ✅ **銀行水位**：資金餘額、可用餘額查詢
@@ -313,12 +316,12 @@ FUBON_PFX_PASSWORD=您的憑證密碼（如果有）
 FUBON_DATA_DIR=./data
 ```
 
-#### 方式二：API-Key 認證（API-Key Authentication）✨ SDK v2.2.7+
+#### 方式二：API-Key 認證（API-Key Authentication）✨ SDK v2.2.8+
 
 **適用場景**：
 - 🔐 需要 IP 白名單控制的自動化交易
 - 🤖 CI/CD 環境中的程式化交易
-- ☁️ 雲端環境部署（無需管理 PFX 憑證檔案）
+- ☁️ 以網頁憑證搭配 API Key 登入
 - 🔄 需要快速輪換憑證的場景
 
 **步驟 1：申請 API Key / Apply for API Key**
@@ -333,11 +336,16 @@ https://www.fbs.com.tw/TradeAPI/docs/key/
 編輯 `.env` 文件：
 
 ```env
-# API-Key 認證（SDK v2.2.7+）
+# API-Key 認證（SDK v2.2.8+）
+FUBON_USERNAME=您的富邦證券帳號（API Key 登入的 personal_id）
 FUBON_API_KEY=your_api_key_here
-FUBON_API_SECRET=your_api_secret_here
+FUBON_PFX_PATH=/path/to/exported/web-certificate.pfx
+FUBON_PFX_PASSWORD=您的憑證密碼
 FUBON_DATA_DIR=./data
 ```
+
+v2.2.8 的 API-Key 登入會呼叫 `apikey_login(personal_id, api_key, cert_path, cert_password)`。
+請先在富邦金鑰管理頁申請網頁憑證並匯出 PFX；API Secret 僅在申請頁顯示，不是此 SDK 登入方法的參數。
 
 **步驟 3：啟動服務 / Start Server**
 
@@ -350,12 +358,11 @@ python server.py
 
 | 特性 Feature | API-Key 認證 | 傳統 PFX 認證 |
 |-------------|-------------|--------------|
-| 認證方式 | API Key + Secret | 帳號 + 密碼 + PFX 憑證 |
-| 安全控制 | ✅ IP 白名單 | ❌ 無 |
-| 憑證管理 | ✅ 線上輪換 | ❌ 需重新下載憑證 |
-| CI/CD 友善 | ✅ 是 | ⚠️ 需管理憑證檔案 |
-| 雲端部署 | ✅ 簡單 | ⚠️ 需管理檔案路徑 |
-| SDK 版本要求 | v2.2.7+ | v2.2.4+ |
+| 認證方式 | personal_id + API Key + PFX | 帳號 + 密碼 + PFX 憑證 |
+| 安全控制 | ✅ API Key 權限/IP 控制 | ❌ 無 API Key 權限控制 |
+| 憑證管理 | ✅ 可由網頁匯出並輪換 | ⚠️ 需管理憑證檔案 |
+| CI/CD 友善 | ✅ 可搭配環境變數 | ⚠️ 需管理憑證檔案 |
+| SDK 版本要求 | v2.2.8+ | v2.2.4+ |
 
 **安全最佳實務 / Security Best Practices**
 
@@ -376,10 +383,10 @@ python server.py
 # Error: Invalid API Key format
 無效的 API 金鑰格式 (太短) / Invalid API Key format (too short)
 
-# 錯誤：找不到 API Key
-# Error: API Key not found
-環境中找不到 API 金鑰或祕密 / API Key or Secret not found in environment
-請檢查 .env 文件是否正確設定 FUBON_API_KEY 和 FUBON_API_SECRET
+# 錯誤：API-Key 缺少登入憑證
+# Error: API-Key login requires a certificate
+API 金鑰登入需要 FUBON_USERNAME、FUBON_API_KEY 與 FUBON_PFX_PATH
+API-Key login requires FUBON_USERNAME, FUBON_API_KEY, and FUBON_PFX_PATH
 
 # 錯誤：API Key 過期或已撤銷
 # Error: API Key expired or revoked
@@ -391,7 +398,7 @@ API 金鑰已過期或已被撤銷 / API Key has expired or been revoked
 
 系統會自動偵測使用哪種認證方式：
 
-- 如果設定了 `FUBON_API_KEY` + `FUBON_API_SECRET` → 使用 API-Key 認證
+- 如果設定了 `FUBON_USERNAME` + `FUBON_API_KEY` + `FUBON_PFX_PATH` → 使用 v2.2.8 API-Key 認證
 - 如果設定了 `FUBON_USERNAME` + `FUBON_PASSWORD` + `FUBON_PFX_PATH` → 使用傳統 PFX 認證
 - 兩種方式皆可，系統優先使用 API-Key 認證
 
@@ -400,6 +407,20 @@ API 金鑰已過期或已被撤銷 / API Key has expired or been revoked
 ```bash
 python server.py
 ```
+
+#### MCP v2 傳輸設定
+
+預設 `stdio` 適合 VS Code、Claude Desktop 等桌面 MCP Host。需要遠端部署時，可使用新版 Streamable HTTP：
+
+```env
+FUBON_MCP_TRANSPORT=streamable-http
+FUBON_MCP_HOST=127.0.0.1
+FUBON_MCP_PORT=8000
+FUBON_MCP_HTTP_PATH=/mcp
+FUBON_MCP_STATELESS_HTTP=true
+```
+
+`stateless_http=true` 會讓每個請求使用獨立 transport，不依賴 `Mcp-Session-Id` 或 sticky session，並由官方 SDK 處理 `server/discover`、2026-07-28 per-request metadata 與協定協商。`sse` 仍可作為舊版 client 的相容選項。
 
 ### 5. VS Code Extension 安裝（推薦）
 
@@ -837,7 +858,28 @@ from mcp_fubon import get_historical_candles
 candles = get_historical_candles({
     "symbol": "2330",
     "from_date": "2024-01-01",
-    "to_date": "2024-12-31"
+    "to_date": "2024-12-31",
+    "adjusted": true,
+    "timeframe": "D",
+    "sort": "asc"
+})
+```
+
+#### 股務事件（SDK v2.2.8）
+
+```python
+from mcp_fubon import get_capital_changes, get_dividends, get_listing_applicants
+
+capital_changes = get_capital_changes({
+    "start_date": "2026-01-01",
+    "end_date": "2026-12-31",
+    "sort": "asc"
+})
+dividends = get_dividends({"start_date": "2026-01-01", "end_date": "2026-12-31"})
+listing_applicants = get_listing_applicants({
+    "start_date": "2026-01-01",
+    "end_date": "2026-12-31",
+    "sort": "desc"
 })
 ```
 
@@ -963,11 +1005,17 @@ fubon-api-mcp-server/
 | `FUBON_PASSWORD` | ✅* | 登入密碼 |
 | `FUBON_PFX_PATH` | ✅* | 電子憑證路徑 (.pfx) |
 | `FUBON_PFX_PASSWORD` | ❌ | 憑證密碼（如果有） |
-| **API-Key 認證 (SDK v2.2.7+)** | | |
+| **API-Key 認證 (SDK v2.2.8+)** | | |
 | `FUBON_API_KEY` | ✅** | 富邦證券 API Key |
-| `FUBON_API_SECRET` | ✅** | 富邦證券 API Secret |
+| `FUBON_PFX_PATH` | ✅** | 網頁匯出的 PFX 憑證路徑 |
+| `FUBON_PFX_PASSWORD` | ❌ | 匯出憑證密碼 |
 | **共用設定** | | |
 | `FUBON_DATA_DIR` | ❌ | 數據快取目錄（預設: ./data） |
+| **MCP v2 傳輸** | | |
+| `FUBON_MCP_TRANSPORT` | ❌ | `stdio`（預設）、`streamable-http` 或 `sse` |
+| `FUBON_MCP_HOST` | ❌ | HTTP/SSE bind host（預設 `127.0.0.1`） |
+| `FUBON_MCP_PORT` | ❌ | HTTP/SSE port（預設 `8000`） |
+| `FUBON_MCP_STATELESS_HTTP` | ❌ | Streamable HTTP 是否無狀態（預設 `true`） |
 
 *必填：使用傳統 PFX 認證時  
 **必填：使用 API-Key 認證時
@@ -975,7 +1023,7 @@ fubon-api-mcp-server/
 ### 核心依賴說明
 
 - **`fubon-neo`**: 富邦證券官方 Python SDK，提供完整的交易 API
-- **`mcp`**: Model Context Protocol 服務器框架
+- **`mcp>=2.0.0,<3.0.0`**: 官方 MCP Python SDK，支援 protocol revision `2026-07-28`
 - **`pandas`**: 數據處理和分析
 - **`pydantic`**: 數據驗證和序列化
 - **`python-dotenv`**: 環境變數管理
@@ -1050,7 +1098,7 @@ fubon-api-mcp-server/
 
 ### v1.0.0 (2025-09-XX)
 - 🚀 **初始版本**: 基礎交易和行情功能
-- 📦 **MCP整合**: Model Communication Protocol支持
+- 📦 **MCP整合**: Model Context Protocol支持
 
 ## 🤝 貢獻指南
 

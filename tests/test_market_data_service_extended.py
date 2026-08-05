@@ -16,7 +16,7 @@ from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from fubon_api_mcp_server.market_data_service import MarketDataService
 
@@ -27,7 +27,7 @@ class TestMarketDataServiceExtended:
     @pytest.fixture
     def mock_mcp(self):
         """模擬 MCP 實例"""
-        return Mock(spec=FastMCP)
+        return Mock(spec=MCPServer)
 
     @pytest.fixture
     def mock_sdk(self):

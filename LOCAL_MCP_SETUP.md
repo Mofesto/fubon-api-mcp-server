@@ -7,6 +7,7 @@
 ## 環境要求
 
 - Python 3.10+
+- 官方 MCP Python SDK 2.0.x（MCP protocol 2026-07-28）
 - VS Code with GitHub Copilot Chat extension
 - 富邦證券帳號和憑證
 
@@ -69,6 +70,10 @@ VS Code的MCP配置文件已自動設置在：
   }
 }
 ```
+
+桌面 Host 維持 `stdio` 即可。遠端部署請將環境變數設為
+`FUBON_MCP_TRANSPORT=streamable-http` 與
+`FUBON_MCP_STATELESS_HTTP=true`，使用 MCP v2 的無狀態 Streamable HTTP。
 
 ### 4. 重新啟動VS Code
 

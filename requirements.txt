@@ -1,18 +1,17 @@
 # fubon_neo (from local wheel - platform specific)
 # Installation will automatically select the correct wheel for your platform
-./wheels/fubon_neo-2.2.7-cp37-abi3-win_amd64.whl ; sys_platform == 'win32'
-./wheels/fubon_neo-2.2.7-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ; sys_platform == 'linux'
-./wheels/fubon_neo-2.2.7-cp37-abi3-macosx_11_0_arm64.whl ; sys_platform == 'darwin' and platform_machine == 'arm64'
-./wheels/fubon_neo-2.2.7-cp37-abi3-macosx_10_12_x86_64.whl ; sys_platform == 'darwin' and platform_machine == 'x86_64'
+./wheels/fubon_neo-2.2.8-cp37-abi3-win_amd64.whl ; sys_platform == 'win32'
+./wheels/fubon_neo-2.2.8-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl ; sys_platform == 'linux'
+./wheels/fubon_neo-2.2.8-cp37-abi3-macosx_11_0_arm64.whl ; sys_platform == 'darwin' and platform_machine == 'arm64'
+./wheels/fubon_neo-2.2.8-cp37-abi3-macosx_10_12_x86_64.whl ; sys_platform == 'darwin' and platform_machine == 'x86_64'
 fugle-marketdata>=2.4.0
 pandas
-fastmcp
-mcp
-pydantic
+mcp>=2.0.0,<3.0.0
+pydantic>=2.12.0
 python-dotenv
 TA-Lib
 
-# 測試依賴
+# Test dependencies
 pytest>=7.0.0
 pytest-cov>=4.0.0
 pytest-xdist>=3.0.0

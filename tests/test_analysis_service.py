@@ -547,7 +547,7 @@ class TestAnalysisServiceIntegration:
 
         from dotenv import load_dotenv
         from fubon_neo.sdk import FubonSDK
-        from mcp.server.fastmcp import FastMCP
+        from mcp.server.mcpserver import MCPServer
 
         # 檢查環境變數
         load_dotenv()
@@ -568,7 +568,7 @@ class TestAnalysisServiceIntegration:
             pytest.skip("SDK 登入失敗")
 
         # 創建服務實例
-        mock_mcp = Mock(spec=FastMCP)
+        mock_mcp = Mock(spec=MCPServer)
         reststock = sdk.marketdata.rest_client.stock if hasattr(sdk, "marketdata") else None
         restfutopt = sdk.marketdata.rest_client.futopt if hasattr(sdk, "marketdata") else None
 

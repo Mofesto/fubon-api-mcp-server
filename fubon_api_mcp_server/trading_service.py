@@ -34,8 +34,8 @@ from fubon_neo.constant import (
     TriggerContent,
 )
 from fubon_neo.sdk import Condition, ConditionDayTrade, ConditionOrder, FubonSDK, Order
-from mcp.server.fastmcp import FastMCP
-from pydantic import BaseModel
+from mcp.server.mcpserver import MCPServer
+from pydantic import BaseModel, Field
 
 # 本地模組導入
 from .enums import (
@@ -53,7 +53,7 @@ from .enums import (
     to_trading_type,
     to_trigger_content,
 )
-from .utils import validate_and_get_account
+from .utils import validate_and_get_account, validate_user_def
 
 
 class TradingService:
@@ -61,7 +61,7 @@ class TradingService:
 
     def __init__(
         self,
-        mcp: FastMCP,
+        mcp: MCPServer,
         sdk: FubonSDK,
         accounts: List[str],
         base_data_dir: Path,
@@ -268,6 +268,7 @@ class TradingService:
         """
         try:
             validated_args = PlaceOrderArgs(**args)
+            validate_user_def(validated_args.user_def)
             account_obj, error = validate_and_get_account(validated_args.account)
             if error:
                 return {"status": "error", "data": None, "message": error}
@@ -288,6 +289,7 @@ class TradingService:
                 price_type=to_price_type(validated_args.price_type),
                 time_in_force=to_time_in_force(validated_args.time_in_force),
                 order_type=to_order_type(validated_args.order_type),
+                user_def=validated_args.user_def,
             )
 
             # 調用 SDK 下單 (account, OrderObject)
@@ -628,28 +630,32 @@ class TradingService:
     def _place_single_order(self, order: Dict) -> dict:
         """下單單筆委託（用於批量下單）"""
         try:
+            validated_order = PlaceOrderArgs(**order)
+            validate_user_def(validated_order.user_def)
+
             # 驗證帳戶
-            account_obj, error = validate_and_get_account(order["account"])
+            account_obj, error = validate_and_get_account(validated_order.account)
             if error:
                 return {"status": "error", "data": None, "symbol": order.get("symbol"), "message": error}
 
             # 構建委託物件（Order）並呼叫 SDK
-            price_val = order["price"]
-            price_type_str = order.get("price_type", "Limit")
+            price_val = validated_order.price
+            price_type_str = validated_order.price_type
 
             # 當 price_type 為 Market, LimitUp, LimitDown 時，price 應為空
             if price_type_str in ["Market", "LimitUp", "LimitDown"]:
                 price_val = None
 
             order_obj = Order(
-                buy_sell=to_bs_action(order["buy_sell"]),
-                symbol=order["symbol"],
+                buy_sell=to_bs_action(validated_order.buy_sell),
+                symbol=validated_order.symbol,
                 price=price_val,
-                quantity=order["quantity"],
-                market_type=to_market_type(order.get("market_type", "Common")),
+                quantity=validated_order.quantity,
+                market_type=to_market_type(validated_order.market_type),
                 price_type=to_price_type(price_type_str),
-                time_in_force=to_time_in_force(order.get("time_in_force", "ROD")),
-                order_type=to_order_type(order.get("order_type", "Stock")),
+                time_in_force=to_time_in_force(validated_order.time_in_force),
+                order_type=to_order_type(validated_order.order_type),
+                user_def=validated_order.user_def,
             )
 
             # 調用 SDK 下單 (account, OrderObject)
@@ -660,7 +666,7 @@ class TradingService:
                 return {
                     "status": "success",
                     "data": self._to_dict(result.data),
-                    "symbol": order["symbol"],
+                    "symbol": validated_order.symbol,
                     "message": f"委託單下單成功，委託單號: {result.data.get('order_no', 'N/A')}",
                 }
             else:
@@ -670,7 +676,7 @@ class TradingService:
                 return {
                     "status": "error",
                     "data": None,
-                    "symbol": order["symbol"],
+                    "symbol": validated_order.symbol,
                     "message": error_msg,
                 }
 
@@ -678,7 +684,7 @@ class TradingService:
             return {
                 "status": "error",
                 "data": None,
-                "symbol": order["symbol"],
+                "symbol": order.get("symbol"),
                 "message": f"下單時發生錯誤: {str(e)}",
             }
 
@@ -2397,6 +2403,7 @@ class PlaceOrderArgs(BaseModel):
     price_type: str = "Limit"
     time_in_force: str = "ROD"
     order_type: str = "Stock"
+    user_def: Optional[str] = Field(default=None, min_length=1, max_length=10, pattern=r"^[A-Za-z0-9]+$")
 
 
 class CancelOrderArgs(BaseModel):

@@ -23,7 +23,7 @@ from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
 from fubon_neo.sdk import FubonSDK
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from pydantic import BaseModel, Field
 
 from . import indicators
@@ -34,7 +34,7 @@ from .utils import validate_and_get_account
 class AnalysisService:
     """指標與分析服務類"""
 
-    def __init__(self, mcp: FastMCP, sdk: FubonSDK, accounts: List[str], reststock=None, restfutopt=None):
+    def __init__(self, mcp: MCPServer, sdk: FubonSDK, accounts: List[str], reststock=None, restfutopt=None):
         self.mcp = mcp
         self.sdk = sdk
         self.accounts = accounts

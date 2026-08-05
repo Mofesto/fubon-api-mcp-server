@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from pydantic import BaseModel, Field
 
 from . import indicators
@@ -31,7 +31,7 @@ from .utils import validate_and_get_account
 class MarketDataService:
     """市場數據服務類"""
 
-    def __init__(self, mcp: FastMCP, base_data_dir: Path, reststock, restfutopt, sdk):
+    def __init__(self, mcp: MCPServer, base_data_dir: Path, reststock, restfutopt, sdk):
         self.mcp = mcp
         self.base_data_dir = base_data_dir
         self.reststock = reststock
@@ -261,6 +261,9 @@ class MarketDataService:
         """註冊所有市場數據相關的工具"""
         # 股票市場數據工具
         self.mcp.tool()(self.historical_candles)
+        self.mcp.tool()(self.get_capital_changes)
+        self.mcp.tool()(self.get_dividends)
+        self.mcp.tool()(self.get_listing_applicants)
         self.mcp.tool()(self.get_intraday_tickers)
         self.mcp.tool()(self.get_intraday_ticker)
         self.mcp.tool()(self.get_intraday_quote)
@@ -305,23 +308,41 @@ class MarketDataService:
             symbol = validated_args.symbol
             from_date = validated_args.from_date
             to_date = validated_args.to_date
+            adjusted = validated_args.adjusted
+            timeframe = validated_args.timeframe
+            fields = validated_args.fields
+            sort = validated_args.sort
 
-            # 確保資料是最新的（檢查並自動更新過舊資料）
-            self._ensure_fresh_data(symbol, to_date)
+            # SQLite 快取目前只保存日線、未還原且完整欄位的資料。其他查詢
+            # 必須直接走 SDK，避免將不同語意的 K 線混在同一張表中。
+            use_cache = self._historical_cache_compatible(adjusted, timeframe, fields)
 
-            # 嘗試從本地數據獲取
-            local_result = self._get_local_historical_data(symbol, from_date, to_date)
-            if local_result:
-                return local_result
+            if use_cache:
+                # 確保資料是最新的（檢查並自動更新過舊資料）
+                self._ensure_fresh_data(symbol, to_date)
+
+                # 嘗試從本地數據獲取
+                local_result = self._get_local_historical_data(symbol, from_date, to_date, sort=sort)
+                if local_result:
+                    return local_result
 
             # 本地沒有數據，使用 API 獲取
-            api_data = self._fetch_api_historical_data(symbol, from_date, to_date)
+            api_data = self._fetch_api_historical_data(
+                symbol,
+                from_date,
+                to_date,
+                timeframe=timeframe,
+                adjusted=adjusted,
+                fields=fields,
+                sort=sort,
+            )
             if api_data:
                 # 處理並保存數據
                 df = pd.DataFrame(api_data)
-                df = self._process_historical_data(df)
-                # 儲存至本地 SQLite 快取 (不再使用 CSV)
-                self._save_to_local_db(symbol, df.to_dict("records"))
+                df = self._process_historical_data(df, sort=sort)
+                # 僅保存與既有快取語意一致的查詢結果。
+                if use_cache:
+                    self._save_to_local_db(symbol, df.to_dict("records"))
                 return {
                     "status": "success",
                     "data": df.to_dict("records"),
@@ -341,7 +362,106 @@ class MarketDataService:
                 "message": f"獲取數據時發生錯誤: {str(e)}",
             }
 
-    def _get_local_historical_data(self, symbol: str, from_date: str, to_date: str) -> dict:
+    def _get_corporate_action_data(self, method_name: str, args: Dict, args_model, message: str) -> dict:
+        """Call a v2.2.8 corporate-actions endpoint with consistent MCP output."""
+        try:
+            validated_args = args_model(**args)
+            if self.reststock is None:
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": "股票行情服務未初始化，請先登入系統",
+                }
+
+            # Support both Pydantic v1 and v2 without emitting a deprecation
+            # warning on the v2 runtime used by the release build.
+            if hasattr(validated_args, "model_dump"):
+                api_params = validated_args.model_dump(exclude_none=True)
+            else:
+                api_params = validated_args.dict(exclude_none=True)
+            corporate_actions = getattr(self.reststock, "corporate_actions", None)
+            if corporate_actions is None:
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": "目前 SDK 不支援 v2.2.8 股務事件 API",
+                }
+
+            result = getattr(corporate_actions, method_name)(**api_params)
+            if result is None:
+                return {
+                    "status": "error",
+                    "data": None,
+                    "message": f"{message}失敗: API 沒有回傳資料",
+                }
+
+            if isinstance(result, dict):
+                status_code = result.get("statusCode", result.get("status_code"))
+                try:
+                    if status_code is not None and int(status_code) >= 400:
+                        return {
+                            "status": "error",
+                            "data": None,
+                            "message": f"{message}失敗: {result.get('message', result)}",
+                        }
+                except (TypeError, ValueError):
+                    # Keep unknown vendor status formats visible as data rather
+                    # than failing normalization itself.
+                    pass
+
+            # v2.2.8 REST client returns a JSON dict. Keep that wire shape intact
+            # so camelCase fields such as effectiveDate remain available to callers.
+            if not isinstance(result, (dict, list, str, int, float, bool)):
+                if hasattr(result, "dict") and callable(result.dict):
+                    result = result.dict()
+                else:
+                    result = self._normalize_result(result)
+
+            return {
+                "status": "success",
+                "data": result,
+                "message": message,
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "data": None,
+                "message": f"{message}失敗: {str(e)}",
+            }
+
+    def get_capital_changes(self, args: Dict) -> dict:
+        """取得上市櫃股票及 ETF 的資本變動資料（v2.2.8）。"""
+        return self._get_corporate_action_data(
+            "capital_changes",
+            args,
+            CapitalChangesArgs,
+            "成功獲取資本變動資料",
+        )
+
+    def get_dividends(self, args: Dict) -> dict:
+        """取得上市櫃股票的除權息資料（v2.2.8）。"""
+        return self._get_corporate_action_data(
+            "dividends",
+            args,
+            DividendsArgs,
+            "成功獲取除權息資料",
+        )
+
+    def get_listing_applicants(self, args: Dict) -> dict:
+        """取得申請上市櫃公司資料（v2.2.8）。"""
+        return self._get_corporate_action_data(
+            "listing_applicants",
+            args,
+            ListingApplicantsArgs,
+            "成功獲取申請上市櫃公司資料",
+        )
+
+    @staticmethod
+    def _historical_cache_compatible(adjusted: Optional[bool], timeframe: Optional[str], fields: Optional[str]) -> bool:
+        """Return whether a historical query can use the legacy daily cache."""
+        return adjusted is not True and (timeframe is None or timeframe == "D") and fields is None
+
+    def _get_local_historical_data(self, symbol: str, from_date: str, to_date: str, sort: str = "desc") -> dict:
         """從本地數據獲取歷史數據"""
         local_data = self._read_local_stock_data(symbol)
         if local_data is None:
@@ -359,7 +479,7 @@ class MarketDataService:
         if df.empty:
             return None
 
-        df = self._process_historical_data(df)
+        df = self._process_historical_data(df, sort=sort)
         return {
             "status": "success",
             "data": df.to_dict("records"),
@@ -457,7 +577,17 @@ class MarketDataService:
             self.logger.warning(f"檢查資料新鮮度時發生錯誤: {e}")
             # 不拋出異常，繼續使用現有資料
 
-    def _fetch_api_historical_data(self, symbol: str, from_date: str, to_date: str) -> list:
+    def _fetch_api_historical_data(
+        self,
+        symbol: str,
+        from_date: str,
+        to_date: str,
+        *,
+        timeframe: Optional[str] = None,
+        adjusted: Optional[bool] = None,
+        fields: Optional[str] = None,
+        sort: Optional[str] = None,
+    ) -> list:
         """從 API 獲取歷史數據"""
         from_datetime = pd.to_datetime(from_date)
         to_datetime = pd.to_datetime(to_date)
@@ -474,16 +604,38 @@ class MarketDataService:
                     symbol,
                     current_from.strftime("%Y-%m-%d"),
                     current_to.strftime("%Y-%m-%d"),
+                    timeframe=timeframe,
+                    adjusted=adjusted,
+                    fields=fields,
+                    sort=sort,
                 )
                 all_data.extend(segment_data)
                 current_from = current_to + pd.Timedelta(days=1)
         else:
             # 直接獲取數據
-            all_data = self._fetch_historical_data_segment(symbol, from_date, to_date)
+            all_data = self._fetch_historical_data_segment(
+                symbol,
+                from_date,
+                to_date,
+                timeframe=timeframe,
+                adjusted=adjusted,
+                fields=fields,
+                sort=sort,
+            )
 
         return all_data
 
-    def _fetch_historical_data_segment(self, symbol: str, from_date: str, to_date: str) -> list:
+    def _fetch_historical_data_segment(
+        self,
+        symbol: str,
+        from_date: str,
+        to_date: str,
+        *,
+        timeframe: Optional[str] = None,
+        adjusted: Optional[bool] = None,
+        fields: Optional[str] = None,
+        sort: Optional[str] = None,
+    ) -> list:
         """
         獲取一段歷史數據。
 
@@ -497,6 +649,14 @@ class MarketDataService:
         """
         try:
             params = {"symbol": symbol, "from": from_date, "to": to_date}
+            if timeframe is not None:
+                params["timeframe"] = timeframe
+            if adjusted is not None:
+                params["adjusted"] = "true" if adjusted else "false"
+            if fields is not None:
+                params["fields"] = fields
+            if sort is not None:
+                params["sort"] = sort
             self.logger.debug("正在獲取 %s 從 %s 到 %s 的數據...", symbol, params["from"], params["to"])
             response = self.reststock.historical.candles(**params)
             self.logger.debug("API 回應內容: %s", response)
@@ -529,7 +689,7 @@ class MarketDataService:
 
         return []
 
-    def _process_historical_data(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _process_historical_data(self, df: pd.DataFrame, sort: str = "desc") -> pd.DataFrame:
         """
         處理歷史數據，添加計算欄位。
 
@@ -539,16 +699,18 @@ class MarketDataService:
         Returns:
             pd.DataFrame: 處理後的數據
         """
-        df = df.sort_values(by="date", ascending=False)
-        # 添加更多資訊欄位
-        df["vol_value"] = df["close"] * df["volume"]  # 成交值
-        df["price_change"] = df["close"] - df["open"]  # 漲跌
-        # 安全計算漲跌幅，避免 open 為 0 導致除以零
-        df["change_ratio"] = np.where(
-            df["open"] == 0,
-            0.0,
-            (df["price_change"] / df["open"]) * 100,
-        )
+        df = df.sort_values(by="date", ascending=sort == "asc")
+        # 添加更多資訊欄位；當 API 使用 fields 過濾欄位時，不因缺少
+        # open/close/volume 而讓整個查詢失敗。
+        if "close" in df.columns and "volume" in df.columns:
+            df["vol_value"] = df["close"] * df["volume"]  # 成交值
+        if "close" in df.columns and "open" in df.columns:
+            df["price_change"] = df["close"] - df["open"]  # 漲跌
+            df["change_ratio"] = np.where(
+                df["open"] == 0,
+                0.0,
+                (df["price_change"] / df["open"]) * 100,
+            )
         return df
 
     def _read_local_stock_data(self, stock_code):
@@ -4050,6 +4212,27 @@ class HistoricalCandlesArgs(BaseModel):
     symbol: str
     from_date: str
     to_date: str
+    timeframe: Optional[str] = None
+    adjusted: Optional[bool] = None
+    fields: Optional[str] = None
+    sort: str = Field(default="desc", pattern="^(asc|desc)$")
+
+
+class CapitalChangesArgs(BaseModel):
+    start_date: str
+    end_date: str
+    sort: Optional[str] = Field(default=None, pattern="^(asc|desc)$")
+
+
+class DividendsArgs(BaseModel):
+    start_date: str
+    end_date: str
+
+
+class ListingApplicantsArgs(BaseModel):
+    start_date: str
+    end_date: str
+    sort: Optional[str] = Field(default=None, pattern="^(asc|desc)$")
 
 
 class GetIntradayTickersArgs(BaseModel):

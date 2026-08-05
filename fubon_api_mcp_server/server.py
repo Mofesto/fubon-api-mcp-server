@@ -11,7 +11,7 @@
 - 批量並行下單功能
 
 主要組件：
-- FastMCP: MCP 服務器框架
+- MCPServer: MCP v2 服務器框架（支援 2026-07-28 協定）
 - FubonSDK: 富邦證券官方 SDK
 - Pydantic: 數據驗證和序列化
 - Pandas: 數據處理和分析
@@ -21,7 +21,10 @@
 - FUBON_PASSWORD: 密碼
 - FUBON_PFX_PATH: PFX 憑證檔案路徑
 - FUBON_PFX_PASSWORD: PFX 憑證密碼（可選）
+- FUBON_API_KEY: v2.2.8 API-Key（可選，需搭配 FUBON_USERNAME 與 FUBON_PFX_PATH）
 - FUBON_DATA_DIR: 本地數據儲存目錄（可選，預設為用戶應用程式支援目錄）
+- FUBON_MCP_TRANSPORT: stdio（預設）、streamable-http 或 sse
+- FUBON_MCP_STATELESS_HTTP: Streamable HTTP 是否使用 MCP 2026-07-28 stateless 模式
 
 作者: MCP Server Team
 版本: 1.6.0
@@ -46,7 +49,7 @@ import logging
 
 from dotenv import load_dotenv
 from fubon_neo.sdk import Condition, ConditionDayTrade, ConditionOrder, FubonSDK
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from pydantic import BaseModel, Field
 
 # 配置模組導入
@@ -105,9 +108,10 @@ username = os.getenv("FUBON_USERNAME")
 password = os.getenv("FUBON_PASSWORD")
 pfx_path = os.getenv("FUBON_PFX_PATH")
 pfx_password = os.getenv("FUBON_PFX_PASSWORD")
+api_key = os.getenv("FUBON_API_KEY")
 
 # MCP 服務器實例
-mcp = FastMCP("fubon-api-mcp-server")
+mcp = MCPServer("fubon-api-mcp-server", version="2.2.8")
 
 # =============================================================================
 # SDK 相關全局變數（在 main() 中初始化以避免導入時錯誤）
@@ -1459,12 +1463,24 @@ class MCPServerState:
 
             MCPServerState._initialized = True
 
-    def initialize_sdk(self, username: str, password: str, pfx_path: str, pfx_password: str = ""):
+    def initialize_sdk(
+        self,
+        username: str,
+        password: str,
+        pfx_path: str,
+        pfx_password: str = "",
+        api_key: Optional[str] = None,
+    ):
         """初始化SDK"""
         try:
             logger.info("正在初始化富邦證券SDK...")
             self.sdk = FubonSDK()
-            self.accounts = self.sdk.login(username, password, pfx_path, pfx_password)
+            if api_key:
+                if not username or not pfx_path:
+                    raise ValueError("API-Key 登入需要 FUBON_USERNAME、FUBON_API_KEY 與 FUBON_PFX_PATH")
+                self.accounts = self.sdk.apikey_login(username, api_key, pfx_path, pfx_password)
+            else:
+                self.accounts = self.sdk.login(username, password, pfx_path, pfx_password)
             self.sdk.init_realtime()
             self.reststock = self.sdk.marketdata.rest_client.stock
             self.restfutopt = self.sdk.marketdata.rest_client.futopt
@@ -1483,6 +1499,11 @@ class MCPServerState:
         except Exception as e:
             logger.exception(f"SDK初始化失敗: {str(e)}")
             return False
+
+    def clear_cache(self):
+        """Clear cached MCP resource data during logout or re-login."""
+        self._resource_cache.clear()
+        self._last_cache_cleanup = datetime.now()
 
     def logout(self):
         """登出並清理狀態"""
@@ -1529,6 +1550,65 @@ class MCPServerState:
 server_state = MCPServerState()
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    """Read a strict boolean environment variable with a safe default."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} 必須是 true/false（也支援 1/0、yes/no、on/off）")
+
+
+def run_mcp_server() -> None:
+    """Run MCP v2 using the configured transport.
+
+    Stdio remains the default for desktop MCP hosts. Streamable HTTP opts into
+    the 2026-07-28 stateless request model by default; each request is handled
+    by the official MCP v2 server without relying on a session id or sticky
+    routing. SSE remains available for legacy clients.
+    """
+    transport = os.getenv("FUBON_MCP_TRANSPORT", "stdio").strip().lower()
+    if transport == "stdio":
+        mcp.run("stdio")
+        return
+
+    host = os.getenv("FUBON_MCP_HOST", "127.0.0.1").strip()
+    port_text = os.getenv("FUBON_MCP_PORT", "8000").strip()
+    try:
+        port = int(port_text)
+    except ValueError as exc:
+        raise ValueError("FUBON_MCP_PORT 必須是整數") from exc
+    if not 1 <= port <= 65535:
+        raise ValueError("FUBON_MCP_PORT 必須介於 1 到 65535")
+
+    if transport == "streamable-http":
+        mcp.run(
+            "streamable-http",
+            host=host,
+            port=port,
+            streamable_http_path=os.getenv("FUBON_MCP_HTTP_PATH", "/mcp").strip() or "/mcp",
+            json_response=_env_bool("FUBON_MCP_JSON_RESPONSE", False),
+            stateless_http=_env_bool("FUBON_MCP_STATELESS_HTTP", True),
+        )
+        return
+
+    if transport == "sse":
+        mcp.run(
+            "sse",
+            host=host,
+            port=port,
+            sse_path=os.getenv("FUBON_MCP_SSE_PATH", "/sse").strip() or "/sse",
+            message_path=os.getenv("FUBON_MCP_MESSAGE_PATH", "/messages/").strip() or "/messages/",
+        )
+        return
+
+    raise ValueError("FUBON_MCP_TRANSPORT 必須是 stdio、streamable-http 或 sse")
+
+
 def main():
     """
     應用程式主入口點函數。
@@ -1537,7 +1617,7 @@ def main():
     並啟動 MCP 服務器。這個函數會在程式啟動時執行所有必要的初始化工作。
 
     初始化流程:
-    1. 檢查必要的環境變數（用戶名、密碼、憑證路徑）
+    1. 檢查必要的環境變數（傳統帳密或 v2.2.8 API-Key 登入資料）
     2. 初始化富邦 SDK 實例
     3. 登入到富邦證券系統
     4. 初始化即時資料連線
@@ -1546,19 +1626,23 @@ def main():
 
     環境變數需求:
     - FUBON_USERNAME: 富邦證券帳號
-    - FUBON_PASSWORD: 登入密碼
-    - FUBON_PFX_PATH: PFX 憑證檔案路徑
+    - 傳統登入：FUBON_PASSWORD、FUBON_PFX_PATH
+    - API-Key 登入：FUBON_API_KEY、FUBON_PFX_PATH（網頁匯出憑證）
     - FUBON_PFX_PASSWORD: PFX 憑證密碼（可選）
 
     如果初始化失敗，程式會輸出錯誤訊息並以錯誤代碼退出。
     """
     try:
-        # 檢查必要的環境變數
-        if not all([username, password, pfx_path]):
+        # API-Key 登入仍需 personal_id 與網頁匯出的 PFX 憑證；沒有 API-Key
+        # 時維持既有的帳號密碼登入流程。
+        if api_key:
+            if not all([username, api_key, pfx_path]):
+                raise ValueError("FUBON_USERNAME, FUBON_API_KEY, and FUBON_PFX_PATH environment variables are required")
+        elif not all([username, password, pfx_path]):
             raise ValueError("FUBON_USERNAME, FUBON_PASSWORD, and FUBON_PFX_PATH environment variables are required")
 
         # 使用新的狀態管理系統初始化SDK
-        success = server_state.initialize_sdk(username, password, pfx_path, pfx_password or "")
+        success = server_state.initialize_sdk(username, password, pfx_path, pfx_password or "", api_key=api_key)
         if not success:
             raise ValueError("登入失敗，請檢查憑證是否正確")
 
@@ -1584,7 +1668,7 @@ def main():
         indicators_service = AnalysisService(mcp, config.sdk, config.accounts, config.reststock, config.restfutopt)
 
         logger.info("富邦證券MCP server運行中...")
-        mcp.run()
+        run_mcp_server()
     except KeyboardInterrupt:
         logger.info("收到中斷信號，正在優雅關閉...")
         server_state.logout()
