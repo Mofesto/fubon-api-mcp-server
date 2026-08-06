@@ -134,6 +134,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.3] - 2026-01-24
+### Fixed
+- 🔧 **MCP 自動註冊**: 修正 VS Code 擴展安裝後 MCP Server 無法自動出現在已註冊列表的問題
+- 擴展激活時自動寫入 `mcp.json` 配置，無需用戶手動執行 Configure 命令
+- 同步所有版本號 (`package.json`, `__init__.py`, `version_config.json`) 至 2.2.3
+
+### Changed
+- 重構 `registerMCPServerProvider()` 函數，新增 `autoRegisterMCPServer()` 自動註冊邏輯
+- 改進 inputs 配置，為密碼欄位添加 `password: true` 屬性
+
 ## [2.2.1] - 2025-11-24
 ### Added
 - ✅ Normalize SDK responses across services: `_normalize_result` to standardize dict/object/string returns for tools.

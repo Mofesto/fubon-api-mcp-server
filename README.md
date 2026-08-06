@@ -276,8 +276,15 @@ source .venv/bin/activate
 # 安裝本專案
 pip install fubon-api-mcp-server
 
-# 安裝富邦官方 SDK
-pip install fubon-neo
+# 安裝富邦官方 SDK（從本地 wheel 檔案）
+# Windows
+pip install wheels/fubon_neo-2.2.5-cp37-abi3-win_amd64.whl
+# macOS (Apple Silicon)
+pip install wheels/fubon_neo-2.2.5-cp37-abi3-macosx_11_0_arm64.whl
+# macOS (Intel)
+pip install wheels/fubon_neo-2.2.5-cp37-abi3-macosx_10_12_x86_64.whl
+# Linux
+pip install wheels/fubon_neo-2.2.5-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 ```
 
 #### 方式二：從原始碼安裝
@@ -295,8 +302,8 @@ python install_fubon_neo.py
 ```
 
 **注意**: 
-- `fubon-neo` 套件需要從富邦官方網站下載 `.whl` 文件
-- 或者直接使用 `pip install fubon-neo`（如果已上傳到 PyPI）
+- `fubon-neo` 套件**不在 PyPI 上公開發布**，需要從本專案的 `wheels/` 目錄安裝對應平台的 `.whl` 檔案
+- 或者從[富邦官方網站](https://www.fbs.com.tw/TradeAPI/docs/welcome/)下載最新版本
 - 本專案的 MCP 服務器功能依賴 `fubon-neo` 作為底層 API 橋接
 
 ### 3. 環境配置

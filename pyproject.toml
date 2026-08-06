@@ -48,6 +48,9 @@ dependencies = [
     "python-dotenv>=1.0.0",
 ]
 
+# Note: fubon_neo is required but not on PyPI. Install separately:
+# pip install wheels/fubon_neo-2.2.8-cp37-abi3-win_amd64.whl
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.3] - 2026-01-24
+
+### 🔧 Fixed
+- **MCP 自動註冊問題修正**: 修正擴展安裝後 MCP Server 無法自動出現在「已註冊 MCP」列表的問題
+- 擴展激活時自動將 `fubon-api-mcp-server` 配置寫入 `mcp.json`
+- 無需用戶手動執行 "Configure Fubon MCP Server" 命令
+
+### ✨ Added
+- 新增 `autoRegisterMCPServer()` 函數實現自動註冊邏輯
+- 註冊成功後提示用戶重新載入 VS Code
+
+### 📝 Changed
+- 重構 `registerMCPServerProvider()` 函數
+- 改進 inputs 配置，為密碼欄位添加 `password: true` 屬性
+
 ## [1.8.8] - 2025-11-05
 
 ### 🔧 Fixed
