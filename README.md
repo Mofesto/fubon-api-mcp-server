@@ -278,13 +278,13 @@ pip install fubon-api-mcp-server
 
 # 安裝富邦官方 SDK（從本地 wheel 檔案）
 # Windows
-pip install wheels/fubon_neo-2.2.5-cp37-abi3-win_amd64.whl
+pip install wheels/fubon_neo-2.2.8-cp37-abi3-win_amd64.whl
 # macOS (Apple Silicon)
-pip install wheels/fubon_neo-2.2.5-cp37-abi3-macosx_11_0_arm64.whl
+pip install wheels/fubon_neo-2.2.8-cp37-abi3-macosx_11_0_arm64.whl
 # macOS (Intel)
-pip install wheels/fubon_neo-2.2.5-cp37-abi3-macosx_10_12_x86_64.whl
+pip install wheels/fubon_neo-2.2.8-cp37-abi3-macosx_10_12_x86_64.whl
 # Linux
-pip install wheels/fubon_neo-2.2.5-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+pip install wheels/fubon_neo-2.2.8-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 ```
 
 #### 方式二：從原始碼安裝
@@ -1174,14 +1174,14 @@ flake8 .
 
 ### PyPI Package
 - **套件名稱**: `fubon-api-mcp-server`
-- **最新版本**: 2.2.1
+- **最新版本**: 2.2.8
 - **安裝**: `pip install fubon-api-mcp-server`
 - **PyPI**: https://pypi.org/project/fubon-api-mcp-server/
 
 ### VS Code Extension
 - **Extension ID**: `mofesto.fubon-api-mcp-server`
 - **Publisher**: mofesto
-- **版本**: 2.2.1
+- **版本**: 2.2.8
 - **Marketplace**: https://marketplace.visualstudio.com/items?itemName=mofesto.fubon-api-mcp-server
 - **安裝方式**: 在 VS Code 中搜尋 "Fubon API MCP Server"
 

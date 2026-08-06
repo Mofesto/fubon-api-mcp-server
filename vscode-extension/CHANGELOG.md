@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.8] - 2026-08-06
+
+### Changed
+- Synchronize the extension release with the Fubon API MCP Server v2.2.8 release.
+- Preserve automatic MCP registration and password-protected credential inputs.
+
 ## [2.2.3] - 2026-01-24
 
 ### 🔧 Fixed

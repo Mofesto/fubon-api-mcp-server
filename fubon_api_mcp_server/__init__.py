@@ -25,9 +25,9 @@
 - FUBON_PFX_PASSWORD: PFX 憑證密碼（可選）
 - FUBON_DATA_DIR: 本地數據儲存目錄（可選）
 
-版本: 1.6.0
+版本: 2.2.8
 作者: Fubon MCP Team
 """
 
-__version__ = "2.2.3"
+__version__ = "2.2.8"
 __author__ = "Fubon MCP Team"

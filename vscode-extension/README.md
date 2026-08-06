@@ -8,7 +8,7 @@
 
 **Extension ID**: `mofesto.fubon-api-mcp-server`  
 **Publisher**: mofesto  
-**Version**: 2.2.1
+**Version**: 2.2.8
 
 ## ✨ 功能特點
 
@@ -180,5 +180,5 @@ Apache-2.0 License
 **開發者**: Mofesto.Cui  
 **Publisher**: mofesto  
 **Extension ID**: mofesto.fubon-api-mcp-server  
-**版本**: 2.2.1  
-**最後更新**: 2025-11-04
+**版本**: 2.2.8
+**最後更新**: 2026-08-06

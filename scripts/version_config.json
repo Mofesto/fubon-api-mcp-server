@@ -7,7 +7,7 @@
     "repository": "fubon-api-mcp-server"
   },
   "version": {
-    "current": "2.2.3",
+    "current": "2.2.8",
     "fubon_neo": "2.2.8",
     "mcp": "2.0.0",
     "mcp_protocol": "2026-07-28"
