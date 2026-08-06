@@ -99,6 +99,26 @@ git push
 #    - 觸發自動發布
 ```
 
+### VS Code Marketplace 認證
+
+GitHub Actions 的 Marketplace 發布使用 Microsoft Entra workload identity，不再使用會過期的 `VSCODE_MARKETPLACE_TOKEN` PAT。
+`vscode-release` 會透過 GitHub OIDC 登入 Entra，取得 Azure DevOps access token，並執行 `vsce publish --azure-credential`。
+
+在 GitHub 的 `release` environment 設定以下 Actions secrets：
+
+- `AZURE_CLIENT_ID`：Entra service principal 的 application/client ID
+- `AZURE_TENANT_ID`：Entra tenant ID
+
+Entra 設定需要：
+
+1. 為該 service principal 建立 GitHub OIDC federated credential，issuer 為 `https://token.actions.githubusercontent.com`，audience 為 `api://AzureADTokenExchange`，subject 為 `repo:Mofesto/fubon-api-mcp-server:environment:release`。
+2. 將 service principal 加入 Visual Studio Marketplace 的 `mofesto` publisher，並授予 Contributor/Marketplace publish 權限。
+3. 確認 workflow job 的 `release` environment 可使用上述 secrets。
+
+此流程使用 `allow-no-subscriptions`，因此不需要 Azure subscription secret；Azure DevOps resource ID 為 `499b84ac-1321-427f-aa17-267ca6975798`。
+
+若某個版本已完成 PyPI 發布但 Marketplace/GitHub Release 中斷，可從 GitHub Actions 手動執行 `Auto Release`，填入 `release_tag`（例如 `v2.2.8`）。這會重用既有 tag、跳過重複的 PyPI 上傳，只重新執行 Marketplace 與 GitHub Release。
+
 ### 僅更新版本號
 
 ```powershell

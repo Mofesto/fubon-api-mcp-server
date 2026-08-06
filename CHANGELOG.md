@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- 🔐 VS Code Marketplace 發布改用 GitHub OIDC + Microsoft Entra workload identity，透過 `vsce --azure-credential` 取代 PAT。
+
 ## [2.2.8] - 2026-08-06
 
 ### MCP 2.0 / Protocol 2026-07-28

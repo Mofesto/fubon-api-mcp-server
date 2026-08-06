@@ -16,6 +16,11 @@ on:
           - minor  # 1.8.0 -> 1.9.0
           - major  # 1.8.0 -> 2.0.0
         default: 'patch'
+      release_tag:
+        description: 'Existing tag to republish (for partial release recovery, e.g. v2.2.8)'
+        required: false
+        type: string
+        default: ''
 
 jobs:
   # 先執行完整的 CI 測試
@@ -89,6 +94,9 @@ jobs:
 
     - name: Determine version
       id: version
+      env:
+        BUMP_TYPE: ${{ inputs.bump_type }}
+        RELEASE_TAG: ${{ inputs.release_tag }}
       run: |
         if [ "${{ github.event_name }}" = "push" ]; then
           # 從標籤獲取版本 (Git Tag is the single source of truth)
@@ -96,6 +104,16 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$VERSION" >> $GITHUB_OUTPUT
           echo "✓ Using version from git tag: $VERSION"
+        elif [ -n "$RELEASE_TAG" ]; then
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid release tag: $RELEASE_TAG"
+            echo "   Expected format: vX.Y.Z (e.g., v2.2.8)"
+            exit 1
+          fi
+          VERSION=${RELEASE_TAG#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          echo "✓ Republishing existing tag: $RELEASE_TAG"
         else
           # 從當前版本計算新版本
           CURRENT=$(python -c "import setuptools_scm; print(setuptools_scm.get_version())" | sed 's/\.post.*//' | sed 's/+.*//')
@@ -103,9 +121,9 @@ jobs:
           
           IFS='.' read -r major minor patch <<< "$CURRENT"
           
-          if [ "${{ github.event.inputs.bump_type }}" = "major" ]; then
+          if [ "$BUMP_TYPE" = "major" ]; then
             NEW_VERSION="$((major + 1)).0.0"
-          elif [ "${{ github.event.inputs.bump_type }}" = "minor" ]; then
+          elif [ "$BUMP_TYPE" = "minor" ]; then
             NEW_VERSION="$major.$((minor + 1)).0"
           else
             NEW_VERSION="$major.$minor.$((patch + 1))"
@@ -127,16 +145,21 @@ jobs:
         echo "✓ Version format valid: $VERSION"
 
     - name: Create and push tag
-      if: github.event_name == 'workflow_dispatch'
+      if: github.event_name == 'workflow_dispatch' && inputs.release_tag == ''
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git tag ${{ steps.version.outputs.tag }}
         git push origin ${{ steps.version.outputs.tag }}
 
+    - name: Reuse existing tag
+      if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+      run: echo "✓ Reusing existing tag ${{ steps.version.outputs.tag }}; no tag mutation performed"
+
   # 發布到 PyPI
   pypi-release:
     needs: version
+    if: github.event_name == 'push' || inputs.release_tag == ''
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -175,8 +198,12 @@ jobs:
   vscode-release:
     needs: version
     runs-on: ubuntu-latest
+    environment: release
     permissions:
+      id-token: write
       contents: read
+    env:
+      AZURE_CORE_OUTPUT: none
 
     steps:
     - uses: actions/checkout@v6
@@ -188,6 +215,24 @@ jobs:
       uses: actions/setup-node@v6
       with:
         node-version: '20'
+
+    - name: Azure login with Microsoft Entra workload identity
+      uses: azure/login@v3
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        allow-no-subscriptions: true
+
+    - name: Verify Azure DevOps Entra access token
+      shell: bash
+      run: |
+        set -euo pipefail
+        token="$(az account get-access-token \
+          --resource 499b84ac-1321-427f-aa17-267ca6975798 \
+          --query accessToken \
+          --output tsv)"
+        test -n "$token"
+        echo "✓ Azure DevOps Entra access token acquired"
 
     - name: Update package.json version (from git tag)
       working-directory: ./vscode-extension
@@ -208,17 +253,15 @@ jobs:
       run: npm install
 
     - name: Install vsce
-      run: npm install -g @vscode/vsce
+      run: npm install -g @vscode/vsce@3.9.2
 
     - name: Package extension
       working-directory: ./vscode-extension
       run: vsce package
 
-    - name: Publish to VS Code Marketplace
+    - name: Publish to VS Code Marketplace with Microsoft Entra ID
       working-directory: ./vscode-extension
-      env:
-        VSCE_PAT: ${{ secrets.VSCODE_MARKETPLACE_TOKEN }}
-      run: vsce publish -p $VSCE_PAT
+      run: vsce publish --azure-credential
 
     - name: Upload VSIX artifact
       uses: actions/upload-artifact@v6
@@ -230,6 +273,9 @@ jobs:
   # 創建 GitHub Release
   github-release:
     needs: [version, pypi-release, vscode-release]
+    if: >-
+      always() && needs.version.result == 'success' && needs.vscode-release.result == 'success' &&
+      (needs.pypi-release.result == 'success' || needs.pypi-release.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write
