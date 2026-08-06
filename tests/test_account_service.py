@@ -21,7 +21,7 @@ pytest tests/test_account_service.py::TestAccountServiceIntegration -v
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from fubon_api_mcp_server.account_service import AccountService
 
@@ -32,7 +32,7 @@ class TestAccountServiceMock:
     @pytest.fixture
     def mock_mcp(self):
         """模擬 MCP 實例"""
-        return Mock(spec=FastMCP)
+        return Mock(spec=MCPServer)
 
     @pytest.fixture
     def mock_sdk(self):

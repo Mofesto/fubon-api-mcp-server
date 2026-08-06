@@ -7,7 +7,7 @@ name = "fubon-api-mcp-server"
 dynamic = ["version"]
 description = "富邦證券 MCP 服務器 - Model Context Protocol 服務器用於富邦證券 API，提供完整的台股交易功能與市場數據查詢"
 readme = "README.md"
-license = "Apache-2.0"
+license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
 authors = [
     {name = "Jimmy Cui", email = "mcp@fubon.com"},
@@ -39,17 +39,17 @@ classifiers = [
     "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
 ]
 dependencies = [
+    "fubon_neo>=2.2.8,<2.2.9",
     "pandas",
     "scipy",
     "TA-Lib",
-    "fastmcp>=0.1.0",
-    "mcp>=1.0.0",
-    "pydantic>=2.0.0",
+    "mcp>=2.0.0,<3.0.0",
+    "pydantic>=2.12.0",
     "python-dotenv>=1.0.0",
 ]
 
 # Note: fubon_neo is required but not on PyPI. Install separately:
-# pip install wheels/fubon_neo-2.2.5-cp37-abi3-win_amd64.whl
+# pip install wheels/fubon_neo-2.2.8-cp37-abi3-win_amd64.whl
 
 [project.optional-dependencies]
 dev = [
@@ -99,7 +99,16 @@ fubon_api_mcp_server = ["*.txt", "*.md"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["assets", "wheels", "assets.*", "wheels.*"]
+exclude = [
+    "assets",
+    "assets.*",
+    "wheels",
+    "wheels.*",
+    "build",
+    "build.*",
+    "dist",
+    "dist.*",
+]
 
 [tool.black]
 line-length = 127
@@ -164,7 +173,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = [
     "mcp.*",
-    "fastmcp.*",
+    "mcp_types.*",
     "pandas.*",
 ]
 ignore_missing_imports = true
@@ -202,6 +211,7 @@ addopts = [
 markers = [
     "slow: 標記慢速測試",
     "integration: 標記整合測試",
+    "live_readonly: 使用真實憑證但禁止交易寫入的唯讀整合測試",
     "trading: 標記交易相關測試（需要特殊啟用）",
 ]
 

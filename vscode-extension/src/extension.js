@@ -70,18 +70,18 @@ function registerMCPServerProvider(context) {
 function autoRegisterMCPServer() {
     const mcpConfigPath = getMCPConfigPath();
     const configDir = path.dirname(mcpConfigPath);
-    
+
     outputChannel.appendLine(`檢查 MCP 配置檔案: ${mcpConfigPath}`);
-    
+
     // 確保目錄存在
     if (!fs.existsSync(configDir)) {
         fs.mkdirSync(configDir, { recursive: true });
         outputChannel.appendLine(`已建立目錄: ${configDir}`);
     }
-    
+
     // 讀取或創建配置
     let mcpConfig = { servers: {}, inputs: [] };
-    
+
     if (fs.existsSync(mcpConfigPath)) {
         try {
             const content = fs.readFileSync(mcpConfigPath, 'utf8');
@@ -96,13 +96,13 @@ function autoRegisterMCPServer() {
             outputChannel.appendLine(`讀取 MCP 配置失敗，將創建新配置: ${error.message}`);
         }
     }
-    
+
     // 檢查是否已存在 fubon-api-mcp-server 配置
     if (mcpConfig.servers['fubon-api-mcp-server']) {
         outputChannel.appendLine('Fubon MCP Server 配置已存在');
         return;
     }
-    
+
     // 添加 Fubon MCP Server 配置 (使用 python -m 啟動)
     mcpConfig.servers['fubon-api-mcp-server'] = {
         type: 'stdio',
@@ -116,7 +116,7 @@ function autoRegisterMCPServer() {
             FUBON_DATA_DIR: '${input:fubon_data_dir}'
         }
     };
-    
+
     // 更新 inputs (確保不重複)
     const inputIds = new Set(mcpConfig.inputs.map(i => i.id));
     const newInputs = [
@@ -126,17 +126,17 @@ function autoRegisterMCPServer() {
         { id: 'fubon_pfx_password', type: 'promptString', description: 'FUBON_PFX_PASSWORD (電子憑證密碼)', password: true },
         { id: 'fubon_data_dir', type: 'promptString', description: 'FUBON_DATA_DIR (數據快取目錄, 預設 ./data)' }
     ];
-    
+
     for (const input of newInputs) {
         if (!inputIds.has(input.id)) {
             mcpConfig.inputs.push(input);
         }
     }
-    
+
     // 寫入配置
     fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
     outputChannel.appendLine(`MCP 配置已寫入: ${mcpConfigPath}`);
-    
+
     // 顯示成功訊息
     vscode.window.showInformationMessage(
         'Fubon MCP Server 已自動註冊！請重新載入 VS Code 以啟用。',
@@ -155,7 +155,7 @@ function getMCPConfigPath() {
     // VS Code MCP 配置位置 (標準 mcp.json)
     // 支援多版本: Code (Stable), Code - Insiders, VSCodium 等
     const homeDir = os.homedir();
-    
+
     // 檢測當前 VS Code 版本
     let vscodeDir = 'Code'; // 預設為 Stable
     if (vscode.env.appName.includes('Insiders')) {
@@ -165,7 +165,7 @@ function getMCPConfigPath() {
     } else if (vscode.env.appName.includes('Cursor')) {
         vscodeDir = 'Cursor';
     }
-    
+
     if (process.platform === 'win32') {
         return path.join(homeDir, 'AppData', 'Roaming', vscodeDir, 'User', 'mcp.json');
     } else if (process.platform === 'darwin') {
@@ -180,30 +180,30 @@ function getMCPConfigPath() {
  */
 async function configureMCPServer() {
     const config = vscode.workspace.getConfiguration('fubon-mcp');
-    
+
     // 獲取配置
     const username = await vscode.window.showInputBox({
         prompt: '請輸入富邦證券帳號',
         value: config.get('username') || '',
         placeHolder: '您的富邦證券帳號'
     });
-    
+
     if (!username) {
         vscode.window.showWarningMessage('未輸入帳號，取消配置');
         return;
     }
-    
+
     const pfxPath = await vscode.window.showInputBox({
         prompt: '請輸入 PFX 憑證檔案路徑',
         value: config.get('pfxPath') || '',
         placeHolder: 'C:\\path\\to\\your\\certificate.pfx'
     });
-    
+
     if (!pfxPath) {
         vscode.window.showWarningMessage('未輸入憑證路徑，取消配置');
         return;
     }
-    
+
     // 根據平台設定預設路徑提示
     const defaultDataDirHint = process.platform === 'win32'
         ? '%USERPROFILE%\\AppData\\Local\\fubon-mcp\\data'
@@ -216,12 +216,12 @@ async function configureMCPServer() {
         value: config.get('dataDir') || '',
         placeHolder: `空白表示使用預設路徑 ${defaultDataDirHint}`
     });
-    
+
     // 保存配置
     await config.update('username', username, vscode.ConfigurationTarget.Global);
     await config.update('pfxPath', pfxPath, vscode.ConfigurationTarget.Global);
     await config.update('dataDir', dataDir, vscode.ConfigurationTarget.Global);
-    
+
     // 更新 MCP 配置文件
     try {
         await updateMCPConfig(username, pfxPath, dataDir);
@@ -237,18 +237,18 @@ async function configureMCPServer() {
 async function updateMCPConfig(username, pfxPath, dataDir) {
     const mcpConfigPath = getMCPConfigPath();
     const configDir = path.dirname(mcpConfigPath);
-    
+
     outputChannel.appendLine(`準備寫入 MCP 註冊檔: ${mcpConfigPath}`);
-    
+
     // 確保目錄存在
     if (!fs.existsSync(configDir)) {
         fs.mkdirSync(configDir, { recursive: true });
         outputChannel.appendLine(`已建立目錄: ${configDir}`);
     }
-    
+
     // 讀取或創建配置
     let mcpConfig = { servers: {}, inputs: [] };
-    
+
     if (fs.existsSync(mcpConfigPath)) {
         try {
             const content = fs.readFileSync(mcpConfigPath, 'utf8');
@@ -263,7 +263,7 @@ async function updateMCPConfig(username, pfxPath, dataDir) {
             outputChannel.appendLine(`讀取 MCP 配置失敗: ${error.message}`);
         }
     }
-    
+
     // 添加 Fubon MCP Server 配置 (使用 python -m 啟動)
     mcpConfig.servers['fubon-api-mcp-server'] = {
         type: 'stdio',
@@ -277,7 +277,7 @@ async function updateMCPConfig(username, pfxPath, dataDir) {
             FUBON_DATA_DIR: '${input:fubon_data_dir}'
         }
     };
-    
+
     // 更新 inputs (確保不重複)
     const inputIds = new Set(mcpConfig.inputs.map(i => i.id));
     const newInputs = [
@@ -287,13 +287,13 @@ async function updateMCPConfig(username, pfxPath, dataDir) {
         { id: 'fubon_pfx_password', type: 'promptString', description: 'FUBON_PFX_PASSWORD (電子憑證密碼)' },
         { id: 'fubon_data_dir', type: 'promptString', description: 'FUBON_DATA_DIR (數據快取目錄, 預設 ./data)' }
     ];
-    
+
     for (const input of newInputs) {
         if (!inputIds.has(input.id)) {
             mcpConfig.inputs.push(input);
         }
     }
-    
+
     // 寫入配置
     fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpConfig, null, 2), 'utf8');
     outputChannel.appendLine(`MCP 註冊檔已寫入: ${mcpConfigPath}`);
@@ -391,7 +391,7 @@ async function startMCPServer() {
         mcpServerProcess.on('close', (code) => {
             outputChannel.appendLine(`Fubon MCP Server 已停止 (exit code: ${code})`);
             mcpServerProcess = null;
-            
+
             if (code !== 0) {
                 vscode.window.showErrorMessage(`Fubon MCP Server 異常退出 (code: ${code})`);
             }

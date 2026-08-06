@@ -1,9 +1,138 @@
 # Changelog
 
+## [Unreleased]
+
+### MCP 2.0 / Protocol 2026-07-28
+
+### Changed
+- 遷移官方 MCP Python SDK v2，使用 `MCPServer` 取代 v1 的 `FastMCP`。
+- 新增 Streamable HTTP transport 設定，預設使用 stateless 模式；stdio 維持預設以相容桌面 Host。
+- 由官方 SDK 處理 `server/discover`、2026-07-28 per-request metadata、structured output 與嚴格 schema 驗證。
+- 移除與官方 MCP v2 不相容的獨立 `fastmcp` 依賴。
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+### SDK v2.2.8
+
+#### Added
+- 新增 `get_capital_changes`、`get_dividends` 與 `get_listing_applicants` MCP 市場資料工具。
+- 歷史 K 線支援 `adjusted` 還原股價，以及 `timeframe`、`fields`、`sort` 參數。
+- 證券普通下單與批量下單支援 `user_def`，並在送出 SDK 前驗證英數字與 10 字元上限。
+
+#### Changed
+- `fubon_neo` 升級至 v2.2.8，並更新 Windows、Linux、macOS ARM64、macOS x86_64 wheels。
+- API-Key 登入改用 v2.2.8 正式介面 `apikey_login(personal_id, api_key, cert_path, cert_password)`；傳統 PFX 登入維持相容。
+- adjusted、非日線或指定欄位的歷史查詢不使用既有未調整日線 SQLite 快取，避免資料語意混用。
+
+## [2.2.7] - 2026-01-19
+
+### Added - SDK v2.2.7 Upgrade
+
+#### 🔐 API-Key Authentication (P1 Feature)
+- **New authentication method**: API-Key + Secret for passwordless login
+- **Use cases**: CI/CD pipelines, cloud deployments, IP whitelisting
+- **Dual authentication support**: Traditional PFX and API-Key both fully supported
+- **Environment variables**: `FUBON_API_KEY` and `FUBON_API_SECRET`
+- **Bilingual error messages**: All validation messages in English + Traditional Chinese (繁體中文)
+- **Comprehensive tests**: 14 new tests covering all API-Key scenarios (100% passing)
+
+新增 API-Key 認證機制：支援無密碼登入、CI/CD 整合、雲端部署場景。同時支援傳統 PFX 憑證認證與新式 API-Key 認證。
+
+#### 📜 Certificate Export (P2 Feature)
+- **Export web certificates**: Programmatic export in PKCS#12 (.pfx) format
+- **Password protection**: Required password for export security
+- **Format validation**: PKCS#12 magic bytes verification (0x30 0x82)
+- **Round-trip testing**: Export and import validation
+- **Bilingual error messages**: Certificate export errors in English + Chinese
+- **Comprehensive tests**: 12 new tests covering all export scenarios (100% passing)
+
+新增憑證匯出功能：支援程式化匯出 PKCS#12 格式憑證、密碼保護、格式驗證。
+
+#### ✅ SDK Compatibility Validation (P2 Feature)
+- **100% backward compatible**: All 316 existing tests pass unchanged
+- **Enum verification**: All trading parameters (BSAction, PriceType, MarketType, OrderType, TimeInForce) validated
+- **API signature compatibility**: All methods unchanged, only additive changes
+- **Platform support**: Windows, macOS (ARM64 + x86_64), Linux x86_64
+- **Python 3.13 support**: Extended Python version support (3.8 - 3.13)
+- **Comprehensive tests**: 14 new compatibility tests (100% passing)
+
+完成 SDK v2.2.7 相容性驗證：所有 316 個現有測試通過、所有交易參數 enum 驗證通過、多平台支援。
+
+### Changed
+- **SDK version**: Upgraded from `fubon_neo==2.2.4` to `fubon_neo>=2.2.7`
+- **Test suite**: Expanded from 316 to 342 total tests (+26 new tests)
+- **Code coverage**: Core services 81% (exceeds 80% target)
+- **Documentation**: README.md updated with bilingual API-Key setup guide
+
+### Dependencies
+- **Python**: Now supports Python 3.8 - 3.13 (previously 3.8 - 3.12)
+- **SDK wheels**: Platform-specific wheels included in `wheels/` directory
+  - Windows 64-bit: `fubon_neo-2.2.7-cp37-abi3-win_amd64.whl`
+  - macOS ARM64: `fubon_neo-2.2.7-cp37-abi3-macosx_11_0_arm64.whl`
+  - macOS x86_64: `fubon_neo-2.2.7-cp37-abi3-macosx_10_12_x86_64.whl`
+  - Linux x86_64: `fubon_neo-2.2.7-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl`
+
+### Documentation
+- **README.md**: Added comprehensive API-Key authentication section (bilingual)
+- **.env.example**: Updated with API-Key configuration examples
+- **COMPATIBILITY_REPORT.md**: Full SDK v2.2.4→v2.2.7 compatibility analysis
+- **Bilingual support**: All user-facing messages in English + Traditional Chinese
+
+### Testing
+- **Total tests**: 342 (316 existing + 26 new)
+- **Pass rate**: 100% (342/342 passing)
+- **Code coverage**: 69% overall, 81% core services
+- **New test files**:
+  - `tests/test_auth_apikey.py`: 14 tests for API-Key authentication
+  - `tests/test_certificate_export.py`: 12 tests for certificate export
+  - `tests/test_sdk_compatibility.py`: 14 tests for SDK compatibility
+
+### Fixed
+- **Python 3.13 compatibility**: All tests pass on Python 3.13.2
+- **No breaking changes**: Zero modifications required for existing code
+- **Enum compatibility**: All trading parameter enums validated
+
+### Migration Guide
+1. **Option 1 - Keep using PFX authentication** (no changes required):
+   ```bash
+   # Your existing .env configuration still works
+   FUBON_USERNAME=your_username
+   FUBON_PASSWORD=your_password
+   FUBON_PFX_PATH=path/to/certificate.pfx
+   FUBON_PFX_PASSWORD=pfx_password
+   ```
+
+2. **Option 2 - Switch to API-Key authentication** (optional):
+   ```bash
+   # New API-Key authentication (no PFX file needed)
+   FUBON_API_KEY=your_api_key
+   FUBON_API_SECRET=your_api_secret
+   ```
+
+3. **Upgrade SDK**:
+   ```bash
+   # Upgrade to SDK v2.2.7
+   pip install --upgrade fubon_neo>=2.2.7
+   
+   # Or install from local wheels
+   pip install wheels/fubon_neo-2.2.7-cp37-abi3-<your_platform>.whl
+   ```
+
+### Security Notes
+- **API-Key authentication**: Requires API-Key申請 from Fubon portal
+- **IP whitelisting**: Recommended for production API-Key usage
+- **Key rotation**: Follow Fubon's key rotation policy
+- **Environment isolation**: Use different API-Keys for dev/staging/prod
+
+### Known Limitations
+- **Certificate export**: PKCS#12 format only (PEM not supported)
+- **API-Key**: Requires SDK v2.2.7+ (not available in older versions)
+- **Backward compatibility**: API-Key credentials not supported by SDK v2.2.4 or earlier
+
+---
 
 ## [2.2.3] - 2026-01-24
 ### Fixed

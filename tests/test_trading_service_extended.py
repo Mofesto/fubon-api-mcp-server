@@ -18,7 +18,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from fubon_api_mcp_server.trading_service import TradingService
 
@@ -29,7 +29,7 @@ class TestTradingServiceExtended:
     @pytest.fixture
     def mock_mcp(self):
         """模擬 MCP 實例"""
-        return Mock(spec=FastMCP)
+        return Mock(spec=MCPServer)
 
     @pytest.fixture
     def mock_sdk(self):

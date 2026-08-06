@@ -3,17 +3,17 @@
 測試 utils.py 模組的輔助函數
 """
 import os
-from unittest.mock import Mock, MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 import pytest
 
 from fubon_api_mcp_server import config as config_module
 from fubon_api_mcp_server.utils import (
-    handle_exceptions,
-    validate_and_get_account,
-    get_order_by_no,
     _safe_api_call,
+    get_order_by_no,
+    handle_exceptions,
     normalize_item,
+    validate_and_get_account,
 )
 
 
@@ -111,6 +111,7 @@ class TestValidateAndGetAccount:
             "FUBON_PFX_PATH": "test.pfx",
             "FUBON_PFX_PASSWORD": "pfxpass",
         },
+        clear=True,
     )
     def test_sdk_initialization_success(self, mock_sdk_class, mock_load_dotenv):
         """測試 SDK 初始化成功"""
@@ -143,6 +144,7 @@ class TestValidateAndGetAccount:
     @patch.dict(
         os.environ,
         {"FUBON_USERNAME": "testuser", "FUBON_PASSWORD": "testpass", "FUBON_PFX_PATH": "test.pfx"},
+        clear=True,
     )
     def test_sdk_initialization_failure(self, mock_sdk_class, mock_load_dotenv):
         """測試 SDK 初始化失敗"""
@@ -340,4 +342,3 @@ def test_normalize_item_with_none_values():
 
 if __name__ == "__main__":
     pytest.main([__file__, "-q"])
-

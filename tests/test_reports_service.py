@@ -21,7 +21,7 @@ pytest tests/test_reports_service.py::TestReportsServiceIntegration -v
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from fubon_api_mcp_server.reports_service import ReportsService
 
@@ -32,7 +32,7 @@ class TestReportsServiceMock:
     @pytest.fixture
     def mock_mcp(self):
         """模擬 MCP 實例"""
-        return Mock(spec=FastMCP)
+        return Mock(spec=MCPServer)
 
     @pytest.fixture
     def mock_sdk(self):

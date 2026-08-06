@@ -129,7 +129,9 @@ git push
 {
   "version": {
     "current": "1.8.4",
-    "fubon_neo": "2.2.5"
+    "fubon_neo": "2.2.8",
+    "mcp": "2.0.0",
+    "mcp_protocol": "2026-07-28"
   },
   "publisher": {
     "name": "mofesto",

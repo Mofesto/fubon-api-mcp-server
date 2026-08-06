@@ -360,7 +360,7 @@ Recommended position = 8-16% of account in this example
 6. **Backtesting**: TradingView, AmiBroker, Python libraries
 
 ### Recommended Learning Resources
-- **Books**: 
+- **Books**:
   - "Trading in the Zone" by Mark Douglas (Psychology)
   - "Market Wizards" by Jack Schwager (Interviews)
   - "Technical Analysis of the Financial Markets" by John Murphy
