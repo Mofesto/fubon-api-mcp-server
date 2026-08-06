@@ -193,27 +193,30 @@ if res["status"] == "success":
 - ✅ **錯誤處理**：完善的異常處理機制
 - ✅ **參數驗證**：輸入驗證與錯誤訊息
 
-### 🤖 Phase 3: 高級分析與量化交易
-- ✅ **8項高級MCP提示**：投資組合績效分析、進階風險管理、投資組合優化、市場情緒分析、算法策略建構、期權策略優化、期貨價差分析、波動率交易顧問
-- ✅ **6項量化交易工具**：投資組合VaR計算、投資組合壓力測試、投資組合配置優化、績效歸因分析、套利機會偵測、市場情緒指數生成
+### 🤖 Phase 3: 正式資料分析與量化工具
+- ✅ **7 項高階 MCP 提示**：投資組合損益貢獻、進階風險管理、投資組合優化、市場技術／量能情緒、算法策略研究、期貨跨月價差、歷史實現波動率
+- ✅ **6 項唯讀量化工具**：VaR/CVaR、明確價格衝擊壓力測試、長倉配置優化、成交／損益貢獻、統計／期貨跨月價差、技術／量能情緒指數
+- 🔒 **正式資料邊界**：只使用富邦帳戶、成交歷史、證券行情及期貨選擇權行情 API；不會呼叫下單、改單或刪單 API
+- ⚠️ **明確資料不足**：空倉、行情過期或共同觀測不足會回傳 `insufficient_data`，不會用預設波動率、固定報酬或模擬情緒補值
 
 #### 高級分析提示（Advanced Analysis Prompts）
-- ✅ **performance_analytics**：全面投資組合績效分析，包含Sharpe比率、Sortino比率、最大回撤等指標
-- ✅ **advanced_risk_management**：多因子風險評估，包含市場風險、信用風險、流動性風險分析
-- ✅ **portfolio_optimization**：現代投資組合理論（MPT）基礎的資產配置優化
-- ✅ **market_sentiment_analysis**：多維度市場情緒分析，整合新聞、社交媒體、技術指標
-- ✅ **algorithmic_strategy_builder**：量化策略開發，支援均值回歸、動量策略、統計套利
-- ✅ **options_strategy_optimizer**：期權Greeks分析，包含Delta、Gamma、Theta、Vega、Rho計算
-- ✅ **futures_spread_analyzer**：期貨價差分析，包含跨期價差、跨商品價差、統計套利機會
-- ✅ **volatility_trading_advisor**：波動率基礎策略，包含VIX指數分析、隱含波動率、實現波動率
+- ✅ **performance_analytics**：正式成交現金流、目前未實現損益貢獻與指定富邦指數價格報酬對照
+- ✅ **advanced_risk_management**：正式持倉 VaR/CVaR 與使用者明確提供的價格衝擊情境
+- ✅ **portfolio_optimization**：以正式歷史報酬與共變異矩陣進行最大 Sharpe、最小波動或目標報酬配置
+- ✅ **market_sentiment_analysis**：指定標的的技術指標與成交量狀態，不含新聞、社群或選擇權情緒
+- ✅ **algorithmic_strategy_builder**：使用正式歷史 K 線進行離線策略研究與回測設計
+- ✅ **futures_spread_analyzer**：使用明確指定的近月／遠月合約計算正式跨月價差與 Z-score
+- ✅ **volatility_trading_advisor**：使用正式歷史 K 線分析實現波動率、ATR 與布林通道
 
 #### 量化交易工具（Quantitative Trading Tools）
-- ✅ **calculate_portfolio_var**：投資組合風險價值（VaR）計算，多種方法（歷史模擬、參數法、蒙特卡洛）
-- ✅ **run_portfolio_stress_test**：投資組合壓力測試，模擬極端市場狀況下的表現
-- ✅ **optimize_portfolio_allocation**：投資組合配置優化，使用MPT和Black-Litterman模型
-- ✅ **calculate_performance_attribution**：績效歸因分析，分解收益來源（股票選擇、資產配置、時機選擇）
-- ✅ **detect_arbitrage_opportunities**：套利機會偵測，包含統計套利、期貨現貨套利、期權套利
-- ✅ **generate_market_sentiment_index**：市場情緒指數生成，整合多種情緒指標的綜合指數
+- ✅ **calculate_portfolio_var**：以正式持倉權重和共同日報酬計算歷史、參數或 Monte Carlo VaR/CVaR
+- ✅ **run_portfolio_stress_test**：把呼叫者明確提供的整體／個股價格變動套用至正式持倉
+- ✅ **optimize_portfolio_allocation**：以 SciPy 和正式歷史報酬求解長倉、全額配置的權重
+- ✅ **calculate_performance_attribution**：呈現期間成交現金流、目前未實現損益貢獻及基準價格報酬；不推算缺乏淨值資料的 Brinson 歸因
+- ✅ **detect_arbitrage_opportunities**：以指定股票配對或期貨跨月合約的正式價格計算價差與 Z-score，不宣稱保證套利獲利
+- ✅ **generate_market_sentiment_index**：只整合指定標的的正式技術與成交量成分
+
+富邦 API 目前未提供本專案所需的新聞／社群情緒、選擇權未平倉量、隱含波動率、Greeks、期間起始淨值及完整入出金歷史；這些能力不會以測試資料替代，也不列為已支援功能。
 
 ## � 與富邦證券官方 API 的關係
 

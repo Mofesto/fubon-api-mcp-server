@@ -30,6 +30,13 @@ $projectRoot = if (Test-Path (Join-Path $scriptDir "scripts")) {
 # Change to project root
 Push-Location $projectRoot
 
+# Prefer the repository virtual environment so checks use the declared dev dependencies.
+$pythonCommand = if (Test-Path ".venv\Scripts\python.exe") {
+    (Resolve-Path ".venv\Scripts\python.exe").Path
+} else {
+    "python"
+}
+
 # Ensure we can find the source directories
 if (-not (Test-Path "fubon_api_mcp_server") -or -not (Test-Path "tests")) {
     Write-Host "Error: Cannot find fubon_api_mcp_server or tests directory" -ForegroundColor Red
@@ -99,32 +106,32 @@ $results = @()
 # Black formatting (auto-fix)
 $results += Invoke-QuickCheck `
     -Name "Code formatting (black)" `
-    -Command "python" `
+    -Command $pythonCommand `
     -Arguments @("-m", "black", "--check", "--quiet", "fubon_api_mcp_server", "tests", "--exclude", "_version.py") `
-    -FixCommand "python" `
+    -FixCommand $pythonCommand `
     -FixArguments @("-m", "black", "--quiet", "fubon_api_mcp_server", "tests", "--exclude", "_version.py")
 
 # Import sorting (auto-fix)
 $results += Invoke-QuickCheck `
     -Name "Import sorting (isort)" `
-    -Command "python" `
+    -Command $pythonCommand `
     -Arguments @("-m", "isort", "--check-only", "--quiet", "fubon_api_mcp_server", "tests", "--skip", "fubon_api_mcp_server/_version.py") `
-    -FixCommand "python" `
+    -FixCommand $pythonCommand `
     -FixArguments @("-m", "isort", "fubon_api_mcp_server", "tests", "--skip", "fubon_api_mcp_server/_version.py")
 
 # Flake8 critical errors (no auto-fix) - use ruff to attempt fixes
 $results += Invoke-QuickCheck `
     -Name "Critical code errors (flake8)" `
-    -Command "python" `
+    -Command $pythonCommand `
     -Arguments @("-m", "flake8", "fubon_api_mcp_server", "tests", "--select=E9,F63,F7,F82", "--quiet") `
-    -FixCommand "python" `
+    -FixCommand $pythonCommand `
     -FixArguments @("-m", "ruff", "check", "--fix", "fubon_api_mcp_server", "tests")
 
 # Quick test run (most important tests only)
 Write-Host "Running quick tests... " -NoNewline
 
 try {
-    $testOutput = & python -m pytest -q --tb=no `
+    $testOutput = & $pythonCommand -m pytest -q --tb=no `
         tests/test_utils.py `
         tests/test_reports_service.py `
         tests/test_account_service.py 2>&1

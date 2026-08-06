@@ -208,6 +208,7 @@ addopts = [
 markers = [
     "slow: 標記慢速測試",
     "integration: 標記整合測試",
+    "live_readonly: 使用真實憑證但禁止交易寫入的唯讀整合測試",
     "trading: 標記交易相關測試（需要特殊啟用）",
 ]
 
