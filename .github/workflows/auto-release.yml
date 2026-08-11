@@ -31,7 +31,7 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
@@ -80,7 +80,7 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
     
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
@@ -167,7 +167,7 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ needs.version.outputs.tag }}
         fetch-depth: 0
@@ -206,7 +206,7 @@ jobs:
       AZURE_CORE_OUTPUT: none
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ needs.version.outputs.tag }}
         fetch-depth: 0
@@ -281,7 +281,7 @@ jobs:
       contents: write
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
