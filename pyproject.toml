@@ -39,7 +39,7 @@ classifiers = [
     "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
 ]
 dependencies = [
-    "fubon_neo>=2.2.8,<2.2.9",
+    "fubon_neo>=2.2.8,<2.3.2",
     "pandas",
     "scipy",
     "TA-Lib",
